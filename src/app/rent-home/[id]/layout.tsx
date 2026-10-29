@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const description = `${listing.title} available for ₹${listing.monthlyRent?.toLocaleString('en-IN') || 0}/month in ${
     listing.area || 'your city'
   }. Zero brokerage. Contact verified landlord directly on FixBro.`;
-  const canonicalUrl = `https://fixbro.in/rent-home/${slug}`;
+  const canonicalUrl = `https://labour.fixbro.in/rent-home/${slug}`;
   const ogImage = listing.photos && listing.photos.length > 0 ? listing.photos[0] : '/default-image.png';
 
   return {
@@ -77,19 +77,19 @@ export default async function RentalDetailLayout({
               '@type': 'ListItem',
               'position': 1,
               'name': 'Home',
-              'item': 'https://fixbro.in',
+              'item': 'https://labour.fixbro.in',
             },
             {
               '@type': 'ListItem',
               'position': 2,
               'name': 'Rent a Home',
-              'item': 'https://fixbro.in/rent-home',
+              'item': 'https://labour.fixbro.in/rent-home',
             },
             {
               '@type': 'ListItem',
               'position': 3,
               'name': listing.title,
-              'item': `https://fixbro.in/rent-home/${slug}`,
+              'item': `https://labour.fixbro.in/rent-home/${slug}`,
             },
           ],
         },
@@ -103,7 +103,7 @@ export default async function RentalDetailLayout({
             'price': listing.monthlyRent || 0,
             'priceCurrency': 'INR',
             'businessFunction': 'https://schema.org/RentalOffer',
-            'url': `https://fixbro.in/rent-home/${slug}`,
+            'url': `https://labour.fixbro.in/rent-home/${slug}`,
             'seller': {
               '@type': 'Person',
               'name': listing.userName || 'FixBro Landlord',

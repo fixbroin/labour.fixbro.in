@@ -4,7 +4,7 @@ export const getBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://fixbro.in';
+  return process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://labour.fixbro.in';
 };
 
 export const API_ENDPOINTS = {

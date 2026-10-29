@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
             cancellationPaymentId: razorpay_payment_id,
           };
 
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
           fetch(`${appUrl}/api/bookings/post-process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
           };
 
           // Trigger Server Post-Processing (Auto dispatch, notification, WhatsApp)
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
           fetch(`${appUrl}/api/bookings/post-process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

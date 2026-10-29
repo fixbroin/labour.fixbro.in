@@ -575,8 +575,9 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
         return;
       }
       // Handle date filters (createdAt/updatedAt) on actual table columns
-      if (field === 'createdAt' || field === 'updatedAt') {
-        const sqlField = `\`${field}\``;
+      if (field === 'createdAt' || field === 'updatedAt' || field === 'created_at' || field === 'updated_at') {
+        const mappedField = (field === 'created_at' ? 'createdAt' : (field === 'updated_at' ? 'updatedAt' : field));
+        const sqlField = `\`${mappedField}\``;
         const dateValue = extractDate(c.value);
         
         if (op === '==') {
@@ -684,8 +685,9 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
         throw new Error(`Access denied: Invalid sorting direction "${direction}"`);
       }
 
-      if (field === 'createdAt' || field === 'updatedAt') {
-        orderByClauses.push(`\`${field}\` ${direction.toUpperCase()}`);
+      if (field === 'createdAt' || field === 'updatedAt' || field === 'created_at' || field === 'updated_at') {
+        const mappedField = (field === 'created_at' ? 'createdAt' : (field === 'updated_at' ? 'updatedAt' : field));
+        orderByClauses.push(`\`${mappedField}\` ${direction.toUpperCase()}`);
       } else if (['order', 'price', 'rating', 'reviewCount', 'discountedPrice', 'minQuantity', 'maxQuantity'].includes(field)) {
         orderByClauses.push(`CAST(${jsonExtractText(field)} AS SIGNED) ${direction.toUpperCase()}`);
       } else {

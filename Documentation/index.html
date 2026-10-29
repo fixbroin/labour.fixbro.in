@@ -567,7 +567,7 @@
           <strong>Launch Development Server:</strong>
           <p>Run the development server script. On first startup, the database compiler will automatically populate all system tables in your local database:</p>
           <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>npm run dev</code></pre>
-          <p>The website will be accessible locally at <code>http://localhost:3001</code>. Open the website, log into the admin dashboard, and verify everything works.</p>
+          <p>The website will be accessible locally at <code>http://localhost:3008</code>. Open the website, log into the admin dashboard, and verify everything works.</p>
         </li>
         <li class="step-item">
           <strong>Production Compilation:</strong>
@@ -603,7 +603,7 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
 
 # Base URL for dynamic paths/sitemaps
 NEXT_PUBLIC_BASE_URL=https://yourdomain.com
-PORT=3001
+PORT=3008
 
 # System Administrator Configuration (Primary admin account & notifications destination)
 NEXT_PUBLIC_ADMIN_EMAIL=your_admin_email_here
@@ -764,14 +764,14 @@ pm2 startup</code></pre>
       <p>Create a new site configuration file under Nginx:</p>
       <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo nano /etc/nginx/sites-available/your-app-name</code></pre>
       
-      <p>Paste this initial HTTP block to forward domain requests to Next.js running on port 3001:</p>
+      <p>Paste this initial HTTP block to forward domain requests to Next.js running on port 3008:</p>
       <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>server {
     listen 80;
     server_name yourdomain.com www.yourdomain.com;
     client_max_body_size 500M;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3008;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -830,7 +830,7 @@ server {
         access_log off;
         add_header Cache-Control "public, max-age=2592000, immutable";
 
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3008;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -844,13 +844,13 @@ server {
         access_log off;
         add_header Cache-Control "public, immutable";
 
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3008;
         proxy_set_header Host $host;
     }
 
     # Main Next.js App Reverse Proxy with WebSocket support
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3008;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";

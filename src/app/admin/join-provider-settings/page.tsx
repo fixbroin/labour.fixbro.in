@@ -307,7 +307,7 @@ export default function AdminJoinProviderSettingsPage() {
                 <Input 
                   value={settings.canonicalUrl} 
                   onChange={(e) => handleChange('canonicalUrl', e.target.value)}
-                  placeholder="https://fixbro.in/join-provider"
+                  placeholder="https://labour.fixbro.in/join-provider"
                 />
               </div>
             </CardContent>

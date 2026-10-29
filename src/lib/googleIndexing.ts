@@ -71,7 +71,7 @@ export async function submitToGoogleIndexing(
   identifier: any,
   isActive: boolean = true
 ) {
-  const baseUrl = getBaseUrl() || 'https://fixbro.in';
+  const baseUrl = getBaseUrl() || 'https://labour.fixbro.in';
   const urls: string[] = [];
   const action = isActive ? 'URL_UPDATED' : 'URL_DELETED';
 
@@ -216,7 +216,7 @@ export async function submitToGoogleIndexing(
 }
 
 export async function runBulkIndexingBatch() {
-  const baseUrl = getBaseUrl() || 'https://fixbro.in';
+  const baseUrl = getBaseUrl() || 'https://labour.fixbro.in';
   const urls: string[] = [];
 
   // 1. Static Pages

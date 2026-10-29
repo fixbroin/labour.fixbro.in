@@ -8,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = settings.rentalsSeoTitle || DEFAULT_MARKETPLACE_SETTINGS.rentalsSeoTitle;
   const description = settings.rentalsSeoDescription || DEFAULT_MARKETPLACE_SETTINGS.rentalsSeoDescription;
   const keywords = settings.rentalsSeoKeywords || DEFAULT_MARKETPLACE_SETTINGS.rentalsSeoKeywords;
-  const canonicalUrl = settings.rentalsCanonicalUrl || 'https://fixbro.in/rent-home';
+  const canonicalUrl = settings.rentalsCanonicalUrl || 'https://labour.fixbro.in/rent-home';
   const ogImage = settings.rentalsOgImage || '/default-image.png';
 
   return {
@@ -57,13 +57,13 @@ export default async function RentalRootLayout({
             '@type': 'ListItem',
             'position': 1,
             'name': 'Home',
-            'item': 'https://fixbro.in',
+            'item': 'https://labour.fixbro.in',
           },
           {
             '@type': 'ListItem',
             'position': 2,
             'name': 'Rent a Home',
-            'item': 'https://fixbro.in/rent-home',
+            'item': 'https://labour.fixbro.in/rent-home',
           },
         ],
       },
@@ -71,11 +71,11 @@ export default async function RentalRootLayout({
         '@type': 'CollectionPage',
         'name': 'Rent a Home, Flats, Rooms & Apartments Near You',
         'description': 'Search 1RK, 1BHK, 2BHK, 3BHK flats, rooms, and independent houses for rent with zero brokerage.',
-        'url': 'https://fixbro.in/rent-home',
+        'url': 'https://labour.fixbro.in/rent-home',
         'provider': {
           '@type': 'Organization',
           'name': 'FixBro',
-          'url': 'https://fixbro.in',
+          'url': 'https://labour.fixbro.in',
         },
       },
     ],

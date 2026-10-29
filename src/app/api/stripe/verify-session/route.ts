@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
             };
 
             // Trigger Post-Processing
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
             fetch(`${appUrl}/api/bookings/post-process`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

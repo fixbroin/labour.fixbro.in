@@ -132,15 +132,31 @@ async function main() {
           \`id\` VARCHAR(255) NOT NULL,
           \`parent_id\` VARCHAR(255) DEFAULT NULL,
           \`data\` LONGTEXT NOT NULL,
-          \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (\`id\`),
           KEY \`idx_parent\` (\`parent_id\`),
-          KEY \`idx_created\` (\`created_at\`),
-          KEY \`idx_updated\` (\`updated_at\`)
+          KEY \`idx_created\` (\`createdAt\`),
+          KEY \`idx_updated\` (\`updatedAt\`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `;
       await dbConn.query(createTableQuery);
+
+      // Self-heal / migrate legacy column names (created_at -> createdAt, updated_at -> updatedAt)
+      try {
+        const [columns] = await dbConn.query(`SHOW COLUMNS FROM \`${cleanName}\``);
+        const colNames = columns.map(c => c.Field);
+        if (colNames.includes('created_at') && !colNames.includes('createdAt')) {
+          await dbConn.query(`ALTER TABLE \`${cleanName}\` CHANGE COLUMN \`created_at\` \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+          console.log(`[DB-Init] Migrated created_at -> createdAt on ${cleanName}`);
+        }
+        if (colNames.includes('updated_at') && !colNames.includes('updatedAt')) {
+          await dbConn.query(`ALTER TABLE \`${cleanName}\` CHANGE COLUMN \`updated_at\` \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
+          console.log(`[DB-Init] Migrated updated_at -> updatedAt on ${cleanName}`);
+        }
+      } catch (colErr) {
+        console.warn(`[DB-Init] Note checking/migrating columns for ${cleanName}:`, colErr.message);
+      }
     }
     console.log('[DB-Init] All database tables checked/created successfully.');
   } catch (err) {

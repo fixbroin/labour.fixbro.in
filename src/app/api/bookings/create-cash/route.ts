@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
     const docRef = await adminDb.collection('bookings').add(newBookingData);
 
     // 5. Trigger Server-Side Post Processing (Notifications, Dispatch, WhatsApp)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
     fetch(`${appUrl}/api/bookings/post-process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -8,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = settings.furnitureSeoTitle || DEFAULT_MARKETPLACE_SETTINGS.furnitureSeoTitle;
   const description = settings.furnitureSeoDescription || DEFAULT_MARKETPLACE_SETTINGS.furnitureSeoDescription;
   const keywords = settings.furnitureSeoKeywords || DEFAULT_MARKETPLACE_SETTINGS.furnitureSeoKeywords;
-  const canonicalUrl = settings.furnitureCanonicalUrl || 'https://fixbro.in/furniture';
+  const canonicalUrl = settings.furnitureCanonicalUrl || 'https://labour.fixbro.in/furniture';
   const ogImage = settings.furnitureOgImage || '/default-image.png';
 
   return {
@@ -57,13 +57,13 @@ export default async function FurnitureRootLayout({
             '@type': 'ListItem',
             'position': 1,
             'name': 'Home',
-            'item': 'https://fixbro.in',
+            'item': 'https://labour.fixbro.in',
           },
           {
             '@type': 'ListItem',
             'position': 2,
             'name': 'Buy & Sell Furniture',
-            'item': 'https://fixbro.in/furniture',
+            'item': 'https://labour.fixbro.in/furniture',
           },
         ],
       },
@@ -71,11 +71,11 @@ export default async function FurnitureRootLayout({
         '@type': 'CollectionPage',
         'name': 'Buy & Sell Used and New Furniture Online',
         'description': 'Marketplace to buy and sell used and new furniture near your location. Connect directly with owners.',
-        'url': 'https://fixbro.in/furniture',
+        'url': 'https://labour.fixbro.in/furniture',
         'provider': {
           '@type': 'Organization',
           'name': 'FixBro',
-          'url': 'https://fixbro.in',
+          'url': 'https://labour.fixbro.in',
         },
       },
     ],

@@ -116,7 +116,7 @@ export const DEFAULT_JOIN_PROVIDER_SETTINGS: JoinProviderPageSettings = {
   pageTitle: "Join as a Service Provider & Partner | Local Jobs Near Me in Carpentry, TV Installation, Plumbing, Electrical & More",
   metaDescription: "Looking for carpenter jobs near me, plumber jobs near me, or TV installation work? Register with Fixbro in Bangalore & across India. Get verified customer bookings dispatched to your local radius, flexible online/offline schedule, and earnings withdrawal within 3 days.",
   metaKeywords: "carpenter job near me, carpentry work near me, join carpentry service work, join carpentry category provider, plumber job near me, plumbing work near me, join plumbing category provider, TV installation job near me, TV installation work near me, join TV installation category provider, electrician job near me, electrical work near me, interior carpenter job near me, AC technician job near me, appliance repair job near me, home service partner registration Bangalore, handyman jobs near me India",
-  canonicalUrl: "https://fixbro.in/join-provider",
+  canonicalUrl: "https://labour.fixbro.in/join-provider",
 
   heroBadge: "Join Fixbro Partner Network",
   heroHeadline: "Grow Your Earnings with Daily Home Service Jobs in Your Area",

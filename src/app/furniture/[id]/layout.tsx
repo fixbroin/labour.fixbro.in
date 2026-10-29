@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const description = `${listing.title} for ₹${listing.price?.toLocaleString('en-IN') || 0} in ${listing.area || 'your city'}. Condition: ${
     listing.listingType === 'brand_new' ? 'Brand New' : 'Used'
   }. Connect with verified seller directly with zero commission on FixBro.`;
-  const canonicalUrl = `https://fixbro.in/furniture/${slug}`;
+  const canonicalUrl = `https://labour.fixbro.in/furniture/${slug}`;
   const ogImage = listing.photos && listing.photos.length > 0 ? listing.photos[0] : '/default-image.png';
 
   return {
@@ -77,19 +77,19 @@ export default async function FurnitureDetailLayout({
               '@type': 'ListItem',
               'position': 1,
               'name': 'Home',
-              'item': 'https://fixbro.in',
+              'item': 'https://labour.fixbro.in',
             },
             {
               '@type': 'ListItem',
               'position': 2,
               'name': 'Buy & Sell Furniture',
-              'item': 'https://fixbro.in/furniture',
+              'item': 'https://labour.fixbro.in/furniture',
             },
             {
               '@type': 'ListItem',
               'position': 3,
               'name': listing.title,
-              'item': `https://fixbro.in/furniture/${slug}`,
+              'item': `https://labour.fixbro.in/furniture/${slug}`,
             },
           ],
         },
@@ -111,7 +111,7 @@ export default async function FurnitureDetailLayout({
               listing.status === 'active'
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/SoldOut',
-            'url': `https://fixbro.in/furniture/${slug}`,
+            'url': `https://labour.fixbro.in/furniture/${slug}`,
             'seller': {
               '@type': 'Person',
               'name': listing.userName || 'FixBro Seller',

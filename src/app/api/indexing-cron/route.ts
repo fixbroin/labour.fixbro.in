@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const baseUrl = getBaseUrl() || 'https://fixbro.in';
+    const baseUrl = getBaseUrl() || 'https://labour.fixbro.in';
     const urls: string[] = [];
 
     console.log("[Indexing Cron] Compiling all site URLs...");

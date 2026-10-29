@@ -336,7 +336,7 @@ export default function AdminMarketplaceSettingsPage() {
                   <Input
                     value={settings.furnitureCanonicalUrl || ''}
                     onChange={(e) => setSettings({ ...settings, furnitureCanonicalUrl: e.target.value })}
-                    placeholder="https://fixbro.in/furniture"
+                    placeholder="https://labour.fixbro.in/furniture"
                     className="rounded-xl h-9 text-xs bg-white dark:bg-card"
                   />
                 </div>
@@ -380,7 +380,7 @@ export default function AdminMarketplaceSettingsPage() {
                   <Input
                     value={settings.rentalsCanonicalUrl || ''}
                     onChange={(e) => setSettings({ ...settings, rentalsCanonicalUrl: e.target.value })}
-                    placeholder="https://fixbro.in/rent-home"
+                    placeholder="https://labour.fixbro.in/rent-home"
                     className="rounded-xl h-9 text-xs bg-white dark:bg-card"
                   />
                 </div>

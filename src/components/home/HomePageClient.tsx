@@ -495,7 +495,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       setCache('pageH1', currentH1);
 
       const siteName = fetchedSeoSettings.siteName || 'Fixbro';
-      const defaultOgImage = (process.env.NEXT_PUBLIC_BASE_URL || 'https://fixbro.in') + '/android-chrome-512x512.png';
+      const defaultOgImage = (process.env.NEXT_PUBLIC_BASE_URL || 'https://labour.fixbro.in') + '/android-chrome-512x512.png';
 
       let webSettingsData: GlobalWebSettings | null = null;
       try {
@@ -507,7 +507,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       } catch (e) { console.error("Error fetching webSettings for LD+JSON:", e); }
 
       const ogImage = webSettingsData?.websiteIconUrl || webSettingsData?.logoUrl || fetchedSeoSettings.structuredDataImage || defaultOgImage;
-      const pageUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://fixbro.in';
+      const pageUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://labour.fixbro.in';
       let specificPageUrl = pageUrl;
       if (citySlug && areaSlug) specificPageUrl = `${pageUrl}/${citySlug}/${areaSlug}`;
       else if (citySlug) specificPageUrl = `${pageUrl}/${citySlug}`;
