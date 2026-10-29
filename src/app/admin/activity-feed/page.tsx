@@ -1,0 +1,1390 @@
+"use client";
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, 
+  Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, 
+  Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User, Map as MapIcon, PackageSearch,
+  CheckCircle, XCircle, PlayCircle, Smartphone, Globe, MapPin, Building2, Search, X
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import type { UserActivity, FirestoreUser } from '@/types/firestore';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, Timestamp, limit, getDocs, writeBatch, where, documentId, startAfter, getDoc, doc, type DocumentSnapshot, deleteDoc, onSnapshot } from '@/lib/mysqlDb';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import PermissionGuard from '@/components/admin/PermissionGuard';
+import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getArchivedActivities } from '@/lib/adminDashboardUtils';
+import { triggerRefresh } from '@/lib/revalidateUtils';
+
+
+import { getTimestampMillis } from '@/lib/utils';
+
+interface GroupedUserActivity extends UserActivity {
+  _isGrouped?: boolean;
+  _totalQuantity?: number;
+  _groupCount?: number;
+  userDisplayName?: string; // Denormalized name
+}
+
+const EventBadge = ({ eventType }: { eventType: UserActivity['eventType'] }) => {
+  const configs: Record<string, { icon: any, color: string, bg: string, label: string }> = {
+    newUser: { icon: UserPlus, color: 'text-green-600', bg: 'bg-green-500/10', label: 'New User' },
+    userLogin: { icon: UserCircle, color: 'text-blue-600', bg: 'bg-blue-500/10', label: 'Login' },
+    userLogout: { icon: LogOut, color: 'text-red-600', bg: 'bg-red-500/10', label: 'Logout' },
+    pageView: { icon: Home, color: 'text-indigo-600', bg: 'bg-indigo-500/10', label: 'Page View' },
+    addToCart: { icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-500/10', label: 'Cart Add' },
+    removeFromCart: { icon: TrashIcon, color: 'text-pink-600', bg: 'bg-pink-500/10', label: 'Cart Remove' },
+    newBooking: { icon: Tag, color: 'text-teal-600', bg: 'bg-teal-500/10', label: 'Booking' },
+    checkoutStep: { icon: Zap, color: 'text-purple-600', bg: 'bg-purple-500/10', label: 'Checkout' },
+    adminAction: { icon: CalendarCheck2, color: 'text-slate-600', bg: 'bg-slate-500/10', label: 'Admin' },
+    timeOnPage: { icon: Clock, color: 'text-slate-500', bg: 'bg-slate-500/5', label: 'Time Spent' },
+    providerAcceptJob: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-500/10', label: 'Provider Accept' },
+    providerRejectJob: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-500/10', label: 'Provider Reject' },
+    providerStartWork: { icon: PlayCircle, color: 'text-amber-600', bg: 'bg-amber-500/10', label: 'Work Started' },
+    providerCompleteWork: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-500/10', label: 'Work Completed' },
+  };
+
+  const config = configs[eventType] || { icon: Activity, color: 'text-gray-500', bg: 'bg-gray-500/10', label: eventType };
+  const Icon = config.icon;
+
+  return (
+    <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-transparent font-bold text-[10px] uppercase tracking-wider shadow-sm", config.bg, config.color)}>
+      <Icon className="h-3 w-3" />
+      <span>{config.label}</span>
+    </div>
+  );
+};
+
+const getSourceBadgeInfo = (activity: UserActivity) => {
+  if (activity.source === 'app') {
+    return {
+      isApp: true,
+      label: activity.platform || 'App (Android)',
+      sub: activity.appVariant ? activity.appVariant.toUpperCase() : 'APP',
+    };
+  }
+  if (activity.source === 'web') {
+    return {
+      isApp: false,
+      label: activity.platform || 'Direct Web',
+      sub: 'WEB',
+    };
+  }
+
+  // Fallback for earlier logs using User-Agent
+  const ua = (activity.userAgent || '').toLowerCase();
+  if (ua.includes('fixbroapp') || ua.includes('fixbro') || ua.includes('flutter')) {
+    return {
+      isApp: true,
+      label: 'App (Android)',
+      sub: 'APP',
+    };
+  }
+  return {
+    isApp: false,
+    label: 'Direct Web',
+    sub: 'WEB',
+  };
+};
+
+const PlatformBadge = ({ activity }: { activity: UserActivity }) => {
+  const info = getSourceBadgeInfo(activity);
+  if (info.isApp) {
+    return (
+      <div
+        title={`Visit from Mobile App: ${info.label}`}
+        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[9px] uppercase tracking-wider shadow-xs whitespace-nowrap"
+      >
+        <Smartphone className="h-2.5 w-2.5 shrink-0" />
+        <span>{info.label}</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      title={`Visit from Standard Web Browser: ${info.label}`}
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[9px] uppercase tracking-wider shadow-xs whitespace-nowrap"
+    >
+      <Globe className="h-2.5 w-2.5 shrink-0" />
+      <span>{info.label}</span>
+    </div>
+  );
+};
+
+const formatTimestamp = (timestamp?: any): string => {
+  const millis = getTimestampMillis(timestamp);
+  if (!millis) return 'N/A';
+  return formatDistanceToNow(new Date(millis), { addSuffix: true });
+};
+
+const getRequestPincode = (request: UserActivity): string => {
+  if (request.eventData?.pincode) return String(request.eventData.pincode).trim();
+  const addr = `${request.eventData?.addressLine1 || ''} ${request.eventData?.addressLine2 || ''}`;
+  const match = addr.match(/\b[1-9][0-9]{5}\b/);
+  return match ? match[0] : '';
+};
+
+const getRequestCity = (request: UserActivity): string => {
+  if (request.eventData?.city && String(request.eventData.city).trim()) {
+    return String(request.eventData.city).trim();
+  }
+  if (request.eventData?.state && String(request.eventData.state).trim()) {
+    return String(request.eventData.state).trim();
+  }
+  const pin = getRequestPincode(request);
+  if (pin) {
+    if (pin.startsWith('110')) return 'Delhi';
+    if (pin.startsWith('2013')) return 'Noida';
+    if (pin.startsWith('2010')) return 'Ghaziabad';
+    if (pin.startsWith('121')) return 'Faridabad';
+    if (pin.startsWith('122')) return 'Gurugram';
+    if (pin.startsWith('500')) return 'Hyderabad';
+    if (pin.startsWith('560')) return 'Bengaluru';
+    if (pin.startsWith('400')) return 'Mumbai';
+    if (pin.startsWith('600')) return 'Chennai';
+    if (pin.startsWith('700')) return 'Kolkata';
+    if (pin.startsWith('302')) return 'Jaipur';
+  }
+  return 'Unspecified';
+};
+
+export default function AdminActivityFeedPage() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
+  const [cachedActivities, setCachedActivities] = useState<UserActivity[]>([]);
+  const [liveActivities, setLiveActivities] = useState<UserActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'web' | 'app'>('all');
+  const { toast } = useToast();
+
+  const [outOfZoneRequests, setOutOfZoneRequests] = useState<UserActivity[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(true);
+  const [isDeletingRequest, setIsDeletingRequest] = useState<string | null>(null);
+  const [visibleRequestsCount, setVisibleRequestsCount] = useState<number>(50);
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string | null>(null);
+  const [selectedPincodeFilter, setSelectedPincodeFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    setIsLoadingRequests(true);
+    const q = query(
+      collection(db, "outOfZoneRequests"),
+      orderBy("timestamp", "desc")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as UserActivity));
+      setOutOfZoneRequests(items);
+      setIsLoadingRequests(false);
+    }, (error) => {
+      console.error("Error loading out-of-coverage requests:", error);
+      setIsLoadingRequests(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const { cityGroups, pincodeGroups, totalRequestsCount } = useMemo(() => {
+    const cityMap: Record<string, { city: string; count: number; pincodes: Set<string> }> = {};
+    const pincodeMap: Record<string, { pincode: string; city: string; count: number }> = {};
+
+    outOfZoneRequests.forEach(req => {
+      const pin = getRequestPincode(req);
+      const city = getRequestCity(req);
+
+      if (!cityMap[city]) {
+        cityMap[city] = { city, count: 0, pincodes: new Set() };
+      }
+      cityMap[city].count++;
+      if (pin) cityMap[city].pincodes.add(pin);
+
+      if (pin) {
+        if (!pincodeMap[pin]) {
+          pincodeMap[pin] = { pincode: pin, city, count: 0 };
+        }
+        pincodeMap[pin].count++;
+      }
+    });
+
+    const sortedCities = Object.values(cityMap).sort((a, b) => b.count - a.count);
+    const sortedPincodes = Object.values(pincodeMap).sort((a, b) => b.count - a.count);
+
+    return {
+      cityGroups: sortedCities,
+      pincodeGroups: sortedPincodes,
+      totalRequestsCount: outOfZoneRequests.length
+    };
+  }, [outOfZoneRequests]);
+
+  const filteredOutOfZoneRequests = useMemo(() => {
+    return outOfZoneRequests.filter(req => {
+      const city = getRequestCity(req).toLowerCase();
+      const pincode = getRequestPincode(req);
+      const address = (req.eventData?.addressLine1 || '').toLowerCase();
+      const name = (req.userDisplayName || '').toLowerCase();
+
+      if (selectedCityFilter && city !== selectedCityFilter.toLowerCase()) {
+        return false;
+      }
+      if (selectedPincodeFilter && pincode !== selectedPincodeFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        return city.includes(q) || pincode.includes(q) || address.includes(q) || name.includes(q);
+      }
+      return true;
+    });
+  }, [outOfZoneRequests, selectedCityFilter, selectedPincodeFilter, searchQuery]);
+
+  const displayedOutOfZoneRequests = useMemo(() => {
+    return filteredOutOfZoneRequests.slice(0, visibleRequestsCount);
+  }, [filteredOutOfZoneRequests, visibleRequestsCount]);
+
+  const handleDeleteRequest = async (id: string) => {
+    setIsDeletingRequest(id);
+    try {
+      await deleteDoc(doc(db, "outOfZoneRequests", id));
+      toast({ title: "Success", description: "Request record deleted successfully." });
+    } catch (error) {
+      console.error("Error deleting request:", error);
+      toast({ title: "Error", description: "Could not delete request record.", variant: "destructive" });
+    } finally {
+      setIsDeletingRequest(null);
+    }
+  };
+
+  const formatActivityTimestamp = useCallback((timestamp?: any): string => {
+    const millis = getTimestampMillis(timestamp);
+    if (!millis) return 'N/A';
+    return `${formatDateInTimezone(millis, appConfig?.timezone, { day: '2-digit', month: 'short' })} ${formatTimeInTimezone(millis, appConfig?.timezone)}`;
+  }, [appConfig?.timezone]);
+  const loadCachedData = useCallback(async () => {
+    try {
+      const result = await getArchivedActivities();
+      setCachedActivities(result);
+    } catch (err) {
+      console.error("Error loading activity feed cache:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // 2. Setup Live Listener (Real-time for ONLY the latest 20 items)
+  useEffect(() => {
+    loadCachedData();
+
+    const q = query(collection(db, "userActivities"), orderBy("timestamp", "desc"), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newLive = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as UserActivity));
+      setLiveActivities(newLive);
+    }, (error) => {
+      console.error("Live listener error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [loadCachedData]);
+
+  // 3. Merge Live and Cached data (Deduplicated)
+  const activities = useMemo(() => {
+    const combined = [...liveActivities, ...cachedActivities];
+    // Use a Map to ensure unique IDs (live data takes priority)
+    const uniqueMap = new Map(combined.map(a => [a.id, a]));
+    return Array.from(uniqueMap.values()).sort((a, b) => {
+        return getTimestampMillis(b.timestamp) - getTimestampMillis(a.timestamp);
+    });
+  }, [liveActivities, cachedActivities]);
+
+  // Fetch missing user names
+  useEffect(() => {
+    const uidsToFetch = Array.from(new Set(
+      activities
+        .filter(a => a.userId && (!a.userDisplayName || a.userDisplayName === 'Registered User'))
+        .map(a => a.userId)
+    )).filter(uid => uid && !userNames[uid]) as string[];
+
+    if (uidsToFetch.length === 0) return;
+
+    const fetchNames = async () => {
+      const newUserNames = { ...userNames };
+      // Process in small chunks to avoid massive concurrent requests or complex queries
+      for (const uid of uidsToFetch) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as FirestoreUser;
+            newUserNames[uid] = userData.displayName || userData.email || 'Registered User';
+          } else {
+            newUserNames[uid] = 'Registered User';
+          }
+        } catch (err) {
+          console.error(`Error fetching user ${uid}:`, err);
+          newUserNames[uid] = 'Registered User';
+        }
+      }
+      setUserNames(newUserNames);
+    };
+
+    fetchNames();
+  }, [activities, userNames]);
+
+
+  const displayActivities = useMemo(() => {
+    const result: GroupedUserActivity[] = [];
+    activities.forEach((activity) => {
+      // Add the real name if we have it in our map
+      const enhancedActivity = { ...activity } as GroupedUserActivity;
+      if (enhancedActivity.userId && userNames[enhancedActivity.userId]) {
+        enhancedActivity.userDisplayName = userNames[enhancedActivity.userId];
+      }
+
+      const prev = result[result.length - 1];
+      const isSameUser = prev && (
+        (enhancedActivity.userId && enhancedActivity.userId === prev.userId) || 
+        (enhancedActivity.guestId && enhancedActivity.guestId === prev.guestId)
+      );
+      
+      const isGroupableType = enhancedActivity.eventType === 'addToCart' || enhancedActivity.eventType === 'removeFromCart';
+      
+      if (isSameUser && prev.eventType === enhancedActivity.eventType && isGroupableType && prev.eventData.serviceId === enhancedActivity.eventData.serviceId) {
+        prev._isGrouped = true;
+        prev._groupCount = (prev._groupCount || 1) + 1;
+        if (enhancedActivity.eventData.quantity) {
+          prev._totalQuantity = (prev._totalQuantity || prev.eventData.quantity || 0) + enhancedActivity.eventData.quantity;
+        }
+      } else {
+        const newActivity = { ...enhancedActivity } as GroupedUserActivity;
+        if (isGroupableType) {
+          newActivity._totalQuantity = enhancedActivity.eventData.quantity;
+          newActivity._groupCount = 1;
+        }
+        result.push(newActivity);
+      }
+    });
+    return result;
+  }, [activities, userNames]);
+
+  // Separate activities into Customer and Provider activities
+  const customerActivities = useMemo(() => {
+    return displayActivities.filter(a => {
+      const isProvider = a.eventType.startsWith('provider') || 
+                         a.eventData?.pageUrl?.startsWith('/provider') || 
+                         a.eventData?.pageUrl?.includes('/provider');
+      return !isProvider;
+    });
+  }, [displayActivities]);
+
+  const providerActivities = useMemo(() => {
+    return displayActivities.filter(a => {
+      const isProvider = a.eventType.startsWith('provider') || 
+                         a.eventData?.pageUrl?.startsWith('/provider') || 
+                         a.eventData?.pageUrl?.includes('/provider');
+      return isProvider;
+    });
+  }, [displayActivities]);
+
+  const customerCounts = useMemo(() => {
+    let web = 0;
+    let app = 0;
+    customerActivities.forEach(a => {
+      if (getSourceBadgeInfo(a).isApp) app++;
+      else web++;
+    });
+    return { total: customerActivities.length, web, app };
+  }, [customerActivities]);
+
+  const providerCounts = useMemo(() => {
+    let web = 0;
+    let app = 0;
+    providerActivities.forEach(a => {
+      if (getSourceBadgeInfo(a).isApp) app++;
+      else web++;
+    });
+    return { total: providerActivities.length, web, app };
+  }, [providerActivities]);
+
+  const filteredCustomerActivities = useMemo(() => {
+    if (platformFilter === 'all') return customerActivities;
+    return customerActivities.filter(a => {
+      const isApp = getSourceBadgeInfo(a).isApp;
+      return platformFilter === 'app' ? isApp : !isApp;
+    });
+  }, [customerActivities, platformFilter]);
+
+  const filteredProviderActivities = useMemo(() => {
+    if (platformFilter === 'all') return providerActivities;
+    return providerActivities.filter(a => {
+      const isApp = getSourceBadgeInfo(a).isApp;
+      return platformFilter === 'app' ? isApp : !isApp;
+    });
+  }, [providerActivities, platformFilter]);
+
+  const handleClearAllActivities = async () => {
+    setIsClearing(true);
+    try {
+      const activitiesCollectionRef = collection(db, "userActivities");
+      const querySnapshot = await getDocs(activitiesCollectionRef);
+      
+      if (querySnapshot.empty) {
+        toast({ title: "No Activities", description: "There are no activities to clear.", variant: "default" });
+        setIsClearing(false);
+        return;
+      }
+
+      const batchArray = [];
+      let currentBatch = writeBatch(db);
+      let currentBatchSize = 0;
+
+      querySnapshot.docs.forEach((doc) => {
+        currentBatch.delete(doc.ref);
+        currentBatchSize++;
+        if (currentBatchSize === 500) { 
+          batchArray.push(currentBatch);
+          currentBatch = writeBatch(db);
+          currentBatchSize = 0;
+        }
+      });
+
+      if (currentBatchSize > 0) {
+        batchArray.push(currentBatch);
+      }
+
+      for (const batch of batchArray) {
+        await batch.commit();
+      }
+      
+      // SmartSync: Clear the server-side cache
+      await triggerRefresh('activities');
+      await triggerRefresh('global-cache');
+      
+      // Clear local state immediately
+      
+      setLiveActivities([]);
+      setCachedActivities([]);
+      toast({ title: "Activities Cleared", description: "All user activities have been cleared." });
+    } catch (error) {
+      console.error("Error clearing activities: ", error);
+      toast({ title: "Error Clearing Activities", description: (error as Error).message || "Could not clear all activities.", variant: "destructive" });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const renderEventData = (activity: GroupedUserActivity) => {
+    const data = activity.eventData;
+    const isGrouped = activity._isGrouped;
+    const totalQty = activity._totalQuantity;
+
+    switch (activity.eventType) {
+      case 'pageView':
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{data.pageUrl || 'N/A'}</span>
+            <Link href={data.pageUrl || '#'} target="_blank" rel="noopener noreferrer" className="p-1 hover:bg-primary/10 rounded-md transition-colors">
+              <ExternalLink className="h-3 w-3 text-primary" />
+            </Link>
+          </div>
+        );
+      case 'timeOnPage':
+        return <span className="text-xs font-medium">Spent <span className="text-primary">{data.durationSeconds}s</span> on {data.pageUrl || 'a page'}</span>;
+      case 'addToCart':
+        return (
+          <span className="text-xs font-medium">
+            Added <span className="text-orange-600">{data.serviceName}</span> 
+            {isGrouped ? (
+              <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                Total: {totalQty}
+              </span>
+            ) : (
+              ` (Qty: ${data.quantity})`
+            )}
+          </span>
+        );
+      case 'removeFromCart':
+        return (
+          <span className="text-xs font-medium text-pink-600">
+            Removed {data.serviceName}
+            {isGrouped && (
+              <span className="ml-2 px-2 py-0.5 bg-pink-100 text-pink-700 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                Total: {totalQty}
+              </span>
+            )}
+          </span>
+        );
+      case 'newBooking':
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-teal-600">{formatCurrency(data.totalAmount || 0, symbol, decimals, code)}</span>
+            <Link href={`/admin/bookings/edit/${data.bookingDocId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline flex items-center">
+              {data.bookingId} <ChevronRight className="h-3 w-3 ml-0.5" />
+            </Link>
+          </div>
+        );
+      case 'newUser':
+        return <span className="text-xs font-bold text-green-600">{data.email || data.mobileNumber}</span>;
+      case 'userLogin':
+        return (
+          <span className="text-xs font-medium">
+            via {data.email || data.mobileNumber || data.loginMethod || 'Auth'}
+            {data.loginMethod && (data.email || data.mobileNumber) && (
+              <span className="ml-1 text-[10px] text-muted-foreground uppercase opacity-70">({data.loginMethod})</span>
+            )}
+          </span>
+        );
+      case 'userLogout':
+        return <span className="text-xs text-muted-foreground italic">Logout ({data.logoutMethod})</span>;
+      case 'checkoutStep':
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-bold text-purple-600 uppercase tracking-tighter">{data.checkoutStepName || 'Checkout'}</span>
+            {data.checkoutStepName === 'time_slot_selected' && (data.scheduledDate || data.scheduledSlot) && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Date: <strong className="text-foreground">{data.scheduledDate}</strong> | Slot: <strong className="text-foreground">{data.scheduledSlot}</strong>
+              </span>
+            )}
+            {data.checkoutStepName === 'address_selected' && data.fullName && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Name: <strong className="text-foreground">{data.fullName}</strong> ({data.city || 'N/A'})
+              </span>
+            )}
+            {data.checkoutStepName === 'payment_method_selected' && data.paymentMethod && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Method: <strong className="text-foreground">{data.paymentMethod}</strong>
+              </span>
+            )}
+          </div>
+        );
+      case 'providerAcceptJob':
+        return (
+          <span className="text-xs font-medium">
+            Accepted job{' '}
+            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              {data.bookingId}
+            </Link>
+          </span>
+        );
+      case 'providerRejectJob':
+        return (
+          <span className="text-xs font-medium text-destructive">
+            Rejected job{' '}
+            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              {data.bookingId}
+            </Link>
+          </span>
+        );
+      case 'providerStartWork':
+        return (
+          <span className="text-xs font-medium text-amber-600">
+            Started work on{' '}
+            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              {data.bookingId}
+            </Link>
+          </span>
+        );
+      case 'providerCompleteWork':
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-bold text-green-600">
+              Completed work on{' '}
+              <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+                {data.bookingId}
+              </Link>
+            </span>
+            {data.paymentMethod && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Payment: <strong className="text-foreground">{data.paymentMethod}</strong>
+              </span>
+            )}
+            {data.additionalCharges && data.additionalCharges.length > 0 && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Extra: <strong className="text-foreground">+{data.additionalCharges.reduce((sum: number, c: any) => sum + c.amount, 0)}</strong>
+              </span>
+            )}
+          </div>
+        );
+      default:
+        return <code className="text-[10px] bg-muted/50 p-1 px-2 rounded font-mono text-muted-foreground break-all">{JSON.stringify(data)}</code>;
+    }
+  };
+
+  const renderActivityList = (
+    activitiesList: GroupedUserActivity[], 
+    typeLabel: string,
+    counts: { total: number; web: number; app: number }
+  ) => {
+    if (isLoading && activities.length === 0) {
+      return (
+        <div className="flex flex-col justify-center items-center h-[400px] space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest animate-pulse">Syncing Cache...</p>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {/* Source Platform Filter Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 px-6 sm:px-8 border-b bg-muted/15">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Source:</span>
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/60">
+              <Button
+                variant={platformFilter === 'all' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-bold rounded-lg transition-all",
+                  platformFilter === 'all' && "bg-background text-foreground shadow-xs font-extrabold"
+                )}
+                onClick={() => setPlatformFilter('all')}
+              >
+                All ({counts.total})
+              </Button>
+              <Button
+                variant={platformFilter === 'web' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                  platformFilter === 'web' 
+                    ? "bg-background text-blue-600 dark:text-blue-400 shadow-xs font-extrabold" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setPlatformFilter('web')}
+              >
+                <Globe className="h-3 w-3" />
+                Web ({counts.web})
+              </Button>
+              <Button
+                variant={platformFilter === 'app' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                  platformFilter === 'app' 
+                    ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-xs font-extrabold" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setPlatformFilter('app')}
+              >
+                <Smartphone className="h-3 w-3" />
+                App ({counts.app})
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-[11px] font-bold text-muted-foreground">
+            Showing <strong className="text-foreground">{activitiesList.length}</strong> {typeLabel.toLowerCase()}
+          </div>
+        </div>
+
+        {activitiesList.length === 0 ? (
+          <div className="text-center py-32 bg-muted/5">
+            <Activity className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
+            <p className="text-xl font-bold tracking-tight">No {typeLabel} Captured</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {platformFilter !== 'all' 
+                ? `No activities captured from ${platformFilter.toUpperCase()} source. Switch to "All" to view all events.` 
+                : 'Activities will appear here after the next sync.'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent border-none">
+                    <TableHead className="w-[160px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
+                    <TableHead className="w-[150px] text-[10px] font-black uppercase tracking-widest">Source</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
+                    <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <AnimatePresence initial={false}>
+                    {activitiesList.map((activity, idx) => (
+                      <motion.tr
+                        key={activity.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+                        className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]"
+                      >
+                        <TableCell className="pl-8 py-4">
+                          <EventBadge eventType={activity.eventType} />
+                        </TableCell>
+                        <TableCell>
+                          <PlatformBadge activity={activity} />
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-700 dark:text-slate-300">
+                          {renderEventData(activity)}
+                        </TableCell>
+                        <TableCell>
+                          {renderUserCell(activity)}
+                        </TableCell>
+                        <TableCell className="text-right pr-8">
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+                              {formatActivityTimestamp(activity.timestamp)}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile View: Cards */}
+            <div className="md:hidden">
+              <AnimatePresence initial={false}>
+                {activitiesList.map((activity, idx) => renderMobileCard(activity, idx))}
+              </AnimatePresence>
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const renderUserCell = (activity: GroupedUserActivity) => {
+    const isGuest = !activity.userId;
+    const name = activity.userDisplayName || (isGuest ? 'Guest User' : 'Registered User');
+    
+    return (
+      <div className="flex items-center gap-3">
+        <Avatar className="h-8 w-8 border shadow-sm shrink-0">
+          <AvatarFallback className={cn("text-[10px] font-black uppercase", isGuest ? "bg-slate-100 text-slate-500" : "bg-primary/10 text-primary")}>
+            {isGuest ? <User className="h-4 w-4" /> : name.charAt(0)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-bold truncate tracking-tight">{name}</p>
+            {!isGuest && <ShieldCheck className="h-3 w-3 text-blue-500" />}
+          </div>
+          <p className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]" title={activity.userId || activity.guestId || ""}>
+            {activity.userId || activity.guestId}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMobileCard = (activity: GroupedUserActivity, idx: number) => (
+    <motion.div
+      key={activity.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+      className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors"
+    >
+      <div className="flex justify-between items-start mb-4 gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <EventBadge eventType={activity.eventType} />
+          <PlatformBadge activity={activity} />
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+            {formatActivityTimestamp(activity.timestamp)}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-2xl border border-dashed border-muted-foreground/20">
+          <Avatar className="h-10 w-10 border shadow-sm shrink-0">
+            <AvatarFallback className={cn("text-xs font-black uppercase", !activity.userId ? "bg-slate-100 text-slate-500" : "bg-primary/10 text-primary")}>
+              {!activity.userId ? <User className="h-4 w-4" /> : (activity.userDisplayName || 'U').charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-bold truncate tracking-tight">
+                {activity.userDisplayName || (activity.userId ? 'Registered User' : 'Guest User')}
+              </p>
+              {activity.userId && <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />}
+            </div>
+            <p className="text-[10px] text-muted-foreground font-mono truncate break-all" title={activity.userId || activity.guestId || ""}>
+              {activity.userId || activity.guestId}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-primary/[0.03] border border-primary/5">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">Interaction Details</span>
+          </div>
+          <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {renderEventData(activity)}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  return (
+    <div className="space-y-8 pb-10">
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2 text-primary">
+            <div className="h-2 w-2 rounded-full bg-primary" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Platform History</span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tight flex items-center">
+            Activity Feed
+          </h1>
+          <p className="text-muted-foreground text-sm font-medium">Archived stream of all platform events. (Refreshed hourly)</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 bg-card border shadow-sm p-2 rounded-2xl">
+          <Button variant="outline" size="sm" className="h-10 rounded-xl font-bold text-xs" onClick={() => loadCachedData()} disabled={isLoading}>
+            <RefreshCcw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
+            Sync Now
+          </Button>
+
+          <PermissionGuard moduleId="activity_feed" action="delete">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-10 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive font-bold text-xs" disabled={isLoading || isClearing || activities.length === 0}>
+                  {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
+                  Delete All
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-3xl p-8">
+                <AlertDialogHeader>
+                  <div className="bg-destructive/10 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
+                    <AlertTriangle className="h-6 w-6 text-destructive" />
+                  </div>
+                  <AlertDialogTitle className="text-2xl font-bold tracking-tight text-destructive uppercase">Confirm Full Purge</AlertDialogTitle>
+                  <AlertDialogDescription className="text-base font-medium">
+                    This will permanently wipe ALL recorded user activities from the system. This operation cannot be reversed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-8 gap-3">
+                  <AlertDialogCancel className="rounded-xl border-none bg-muted hover:bg-muted/80">Keep Data</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAllActivities} className="rounded-xl bg-destructive hover:bg-destructive/90 px-8">
+                    Erase Everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </PermissionGuard>
+        </div>
+      </header>
+
+      <Tabs defaultValue="customer-feed" className="w-full">
+        <div className="w-full overflow-x-auto pb-1 mb-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="bg-muted p-1 rounded-xl flex w-max gap-1">
+            <TabsTrigger value="customer-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              Customer Feed ({customerActivities.length})
+            </TabsTrigger>
+            <TabsTrigger value="provider-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              Provider Feed ({providerActivities.length})
+            </TabsTrigger>
+            <TabsTrigger value="out-of-coverage" className="font-bold text-xs uppercase px-5 py-2 rounded-lg flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+              Out-of-Coverage Requests ({outOfZoneRequests.length})
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="customer-feed">
+          <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+            <CardContent className="p-0">
+              {renderActivityList(filteredCustomerActivities, 'Customer Events', customerCounts)}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="provider-feed">
+          <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+            <CardContent className="p-0">
+              {renderActivityList(filteredProviderActivities, 'Provider Events', providerCounts)}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="out-of-coverage">
+          <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+            <CardHeader className="p-6 md:p-8 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle className="text-2xl flex items-center">
+                    <AlertTriangle className="mr-2 h-6 w-6 text-amber-500" />
+                    Out-of-Coverage Requests
+                  </CardTitle>
+                  <CardDescription>
+                    Unserved customer demand locations outside active service zones.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                    Total Demand: {totalRequestsCount}
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {isLoadingRequests ? (
+                <div className="flex flex-col justify-center items-center h-[300px] space-y-4">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest animate-pulse">Loading Requests...</p>
+                </div>
+              ) : outOfZoneRequests.length === 0 ? (
+                <div className="text-center py-20 bg-muted/5">
+                  <PackageSearch className="mx-auto h-12 w-12 mb-3 text-muted-foreground/30" />
+                  <p className="font-bold text-lg">No requests captured</p>
+                  <p className="text-muted-foreground text-sm">No out-of-coverage requests recorded yet.</p>
+                </div>
+              ) : (
+                <>
+                  {/* City & Pincode Demand Analytics Section */}
+                  <div className="p-6 md:p-8 border-b bg-gradient-to-br from-amber-500/[0.04] via-muted/10 to-background space-y-6">
+                    {/* Stat KPI Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          Total Requests
+                        </span>
+                        <p className="text-2xl font-black text-foreground">{totalRequestsCount}</p>
+                        <p className="text-[11px] text-muted-foreground">All unserved locations</p>
+                      </div>
+
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                          Unique Cities
+                        </span>
+                        <p className="text-2xl font-black text-foreground">{cityGroups.length}</p>
+                        <p className="text-[11px] text-muted-foreground">High-demand regions</p>
+                      </div>
+
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-purple-500" />
+                          Top City
+                        </span>
+                        <p className="text-lg font-black text-foreground truncate">
+                          {cityGroups[0]?.city || 'N/A'}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {cityGroups[0] ? `${cityGroups[0].count} requests (${Math.round((cityGroups[0].count / (totalRequestsCount || 1)) * 100)}%)` : 'No data'}
+                        </p>
+                      </div>
+
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Tag className="h-3.5 w-3.5 text-emerald-500" />
+                          Top Pincode
+                        </span>
+                        <p className="text-lg font-black text-foreground truncate font-mono">
+                          {pincodeGroups[0]?.pincode || 'N/A'}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {pincodeGroups[0] ? `${pincodeGroups[0].count} req (${pincodeGroups[0].city})` : 'No data'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Grouped Breakdown: Cities & Pincodes */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* City Groups */}
+                      <div className="bg-card p-4 md:p-5 rounded-2xl border shadow-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-primary" />
+                            Demand by City ({cityGroups.length})
+                          </h4>
+                          <span className="text-[10px] text-muted-foreground">Click to filter</span>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1">
+                          {cityGroups.map(c => {
+                            const isSelected = selectedCityFilter?.toLowerCase() === c.city.toLowerCase();
+                            return (
+                              <button
+                                key={c.city}
+                                onClick={() => {
+                                  setSelectedCityFilter(isSelected ? null : c.city);
+                                  setVisibleRequestsCount(50);
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 flex items-center gap-2",
+                                  isSelected 
+                                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                    : "bg-muted/30 hover:bg-muted text-foreground border-border/60 hover:border-primary/40"
+                                )}
+                              >
+                                <span>{c.city}</span>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded-md text-[10px] font-black",
+                                  isSelected ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
+                                )}>
+                                  {c.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Pincode Hotspots */}
+                      <div className="bg-card p-4 md:p-5 rounded-2xl border shadow-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-emerald-500" />
+                            Demand by Pincode ({pincodeGroups.length})
+                          </h4>
+                          <span className="text-[10px] text-muted-foreground">Click to filter</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1">
+                          {pincodeGroups.map(p => {
+                            const isSelected = selectedPincodeFilter === p.pincode;
+                            return (
+                              <button
+                                key={p.pincode}
+                                onClick={() => {
+                                  setSelectedPincodeFilter(isSelected ? null : p.pincode);
+                                  setVisibleRequestsCount(50);
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 flex items-center gap-2",
+                                  isSelected 
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                                    : "bg-muted/30 hover:bg-muted text-foreground border-border/60 hover:border-emerald-500/40"
+                                )}
+                              >
+                                <span className="font-mono">{p.pincode}</span>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded-md text-[10px] font-black",
+                                  isSelected ? "bg-white/20 text-white" : "bg-emerald-500/10 text-emerald-600"
+                                )}>
+                                  {p.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Active Filter Bar and Search Input */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap min-h-[32px]">
+                        {(selectedCityFilter || selectedPincodeFilter || searchQuery) ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-muted-foreground">Active Filter:</span>
+                            {selectedCityFilter && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold border border-primary/20">
+                                City: {selectedCityFilter}
+                                <button onClick={() => setSelectedCityFilter(null)} className="hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                            {selectedPincodeFilter && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 text-xs font-bold border border-emerald-500/20">
+                                Pincode: {selectedPincodeFilter}
+                                <button onClick={() => setSelectedPincodeFilter(null)} className="hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                            {searchQuery && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-foreground text-xs font-bold border">
+                                &quot;{searchQuery}&quot;
+                                <button onClick={() => setSearchQuery('')} className="hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => {
+                                setSelectedCityFilter(null);
+                                setSelectedPincodeFilter(null);
+                                setSearchQuery('');
+                                setVisibleRequestsCount(50);
+                              }}
+                              className="h-7 text-xs text-muted-foreground hover:text-foreground font-semibold px-2"
+                            >
+                              Clear All
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Showing recent out-of-coverage requests</span>
+                        )}
+                      </div>
+
+                      {/* Search input */}
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search city, pin, user..." 
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setVisibleRequestsCount(50);
+                          }}
+                          className="pl-8 h-9 text-xs rounded-xl bg-card"
+                        />
+                        {searchQuery && (
+                          <button 
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Empty state for filtered results */}
+                  {filteredOutOfZoneRequests.length === 0 ? (
+                    <div className="text-center py-16 bg-muted/5 space-y-2">
+                      <PackageSearch className="mx-auto h-10 w-10 text-muted-foreground/30" />
+                      <p className="font-bold text-base">No matching requests found</p>
+                      <p className="text-muted-foreground text-xs">Try clearing your filters or changing your search keywords.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedCityFilter(null);
+                          setSelectedPincodeFilter(null);
+                          setSearchQuery('');
+                          setVisibleRequestsCount(50);
+                        }}
+                        className="mt-2 rounded-xl text-xs"
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent border-none">
+                              <TableHead className="pl-8 py-5 text-[10px] font-black uppercase tracking-widest">User Name</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">Address Details</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">City & Pincode</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">Coordinates</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
+                              <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <AnimatePresence initial={false}>
+                              {displayedOutOfZoneRequests.map((request) => {
+                                const city = getRequestCity(request);
+                                const pincode = getRequestPincode(request);
+                                return (
+                                  <TableRow key={request.id} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
+                                    <TableCell className="pl-8 py-4 font-bold text-foreground">{request.userDisplayName || 'Guest User'}</TableCell>
+                                    <TableCell className="text-xs font-medium max-w-xs truncate">
+                                      {request.eventData?.addressLine1 || request.eventData?.city || 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-semibold text-foreground">{city}</span>
+                                        {pincode && (
+                                          <span className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px] text-muted-foreground font-bold">
+                                            {pincode}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground font-mono">
+                                      {request.eventData?.latitude?.toFixed(5) || 'N/A'}, {request.eventData?.longitude?.toFixed(5) || 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground font-semibold">
+                                      {formatActivityTimestamp(request.timestamp)}
+                                    </TableCell>
+                                    <TableCell className="pr-8 text-right">
+                                      <div className="flex justify-end gap-2">
+                                        {request.eventData?.latitude && request.eventData?.longitude ? (
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-9 w-9 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm border border-primary/10"
+                                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${request.eventData.latitude},${request.eventData.longitude}`, '_blank')}
+                                            title="Open Map"
+                                          >
+                                            <MapIcon className="h-4 w-4" />
+                                          </Button>
+                                        ) : null}
+                                        <PermissionGuard moduleId="activity_feed" action="delete">
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon"
+                                            className="h-9 w-9 rounded-xl hover:bg-destructive hover:text-destructive-foreground transition-all duration-300 shadow-sm border border-destructive/10"
+                                            disabled={!request.id || isDeletingRequest === request.id} 
+                                            onClick={() => request.id && handleDeleteRequest(request.id)}
+                                            title="Delete"
+                                          >
+                                            {isDeletingRequest === request.id ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <TrashIcon className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </PermissionGuard>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </AnimatePresence>
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Mobile Card View */}
+                      <div className="block md:hidden">
+                        <AnimatePresence initial={false}>
+                          {displayedOutOfZoneRequests.map((request) => {
+                            const city = getRequestCity(request);
+                            const pincode = getRequestPincode(request);
+                            return (
+                              <div key={request.id} className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors">
+                                <div className="flex justify-between items-start mb-4">
+                                  <div className="space-y-1">
+                                    <p className="font-bold text-base text-foreground leading-none">
+                                      {request.userDisplayName || 'Guest User'}
+                                    </p>
+                                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter mt-1">
+                                      {formatActivityTimestamp(request.timestamp)}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {request.eventData?.latitude && request.eventData?.longitude ? (
+                                      <Button 
+                                        variant="outline" 
+                                        size="icon" 
+                                        className="h-8 w-8"
+                                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${request.eventData.latitude},${request.eventData.longitude}`, '_blank')}
+                                      >
+                                        <MapIcon className="h-4 w-4 text-primary" />
+                                      </Button>
+                                    ) : null}
+                                    <PermissionGuard moduleId="activity_feed" action="delete">
+                                      <Button 
+                                        variant="destructive" 
+                                        size="icon" 
+                                        className="h-8 w-8"
+                                        disabled={!request.id || isDeletingRequest === request.id} 
+                                        onClick={() => request.id && handleDeleteRequest(request.id)}
+                                      >
+                                        {isDeletingRequest === request.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <TrashIcon className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </PermissionGuard>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="p-3 rounded-2xl bg-primary/[0.03] border border-primary/5 text-xs">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <p className="font-semibold text-muted-foreground text-[10px] uppercase tracking-wider">Address Details</p>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-bold text-foreground text-[11px]">{city}</span>
+                                        {pincode && (
+                                          <span className="px-1.5 py-0.2 rounded bg-muted font-mono text-[9px] text-muted-foreground font-bold">
+                                            {pincode}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className="font-bold text-foreground">
+                                      {request.eventData?.addressLine1 || request.eventData?.city || 'N/A'}
+                                    </p>
+                                  </div>
+                                  <div className="p-3 rounded-2xl bg-muted/20 border border-dashed border-muted-foreground/20 text-xs">
+                                    <p className="font-semibold text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Coordinates</p>
+                                    <p className="font-mono text-foreground">
+                                      {request.eventData?.latitude?.toFixed(5) || 'N/A'}, {request.eventData?.longitude?.toFixed(5) || 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* Pagination: Load More */}
+                      {filteredOutOfZoneRequests.length > visibleRequestsCount && (
+                        <div className="p-6 border-t bg-muted/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <p className="text-xs font-semibold text-muted-foreground">
+                            Showing <span className="font-bold text-foreground">{displayedOutOfZoneRequests.length}</span> of <span className="font-bold text-foreground">{filteredOutOfZoneRequests.length}</span> requests
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => setVisibleRequestsCount(prev => prev + 50)}
+                              className="rounded-xl px-5 h-9 font-bold border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm transition-all"
+                            >
+                              Load 50 More
+                            </Button>
+                            {filteredOutOfZoneRequests.length > visibleRequestsCount + 50 && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setVisibleRequestsCount(prev => prev + 100)}
+                                className="rounded-xl px-4 h-9 font-bold text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                Load 100 More
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

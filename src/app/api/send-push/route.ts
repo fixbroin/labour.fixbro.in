@@ -1,0 +1,281 @@
+// src/app/api/send-push/route.ts
+import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebaseAdmin';
+import * as admin from 'firebase-admin';
+
+import { getPushTemplate } from '@/app/actions/pushSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { verifyRequest } from '@/lib/dbSecurity';
+
+// Initialize messaging only once
+let messaging: admin.messaging.Messaging;
+try {
+    messaging = admin.messaging();
+} catch (e) {
+    // If not already initialized, the adminDb import should have handled app init.
+    // If somehow it's not ready, we can't send.
+}
+
+function determinePushType(title: string): string {
+  const lowerTitle = (title || "").toLowerCase();
+  if (lowerTitle.includes('message') || lowerTitle.includes('chat')) {
+    return 'chat_message';
+  } else if (lowerTitle.includes('withdrawal')) {
+    return 'withdrawal_status';
+  } else if (lowerTitle.includes('deposit') || lowerTitle.includes('top-up')) {
+    return 'provider_wallet_deposit';
+  } else if (lowerTitle.includes('refund') || lowerTitle.includes('adjusted')) {
+    return 'provider_wallet_refund';
+  } else if (lowerTitle.includes('dispute') || lowerTitle.includes('complaint')) {
+    return 'admin_wallet_complaint_alert';
+  } else if (lowerTitle.includes('referral') || lowerTitle.includes('welcome reward')) {
+    return 'referral_reward_completed';
+  } else if (lowerTitle.includes('new order') || lowerTitle.includes('new job') || (lowerTitle.includes('new booking') && lowerTitle.includes('received'))) {
+    return 'new_order';
+  } else if (lowerTitle.includes('technician confirmed') || lowerTitle.includes('technician accepted') || lowerTitle.includes('provider accepted')) {
+    return 'provider_accepted';
+  } else if (lowerTitle.includes('technician assigned') || lowerTitle.includes('provider assigned')) {
+    return 'provider_assigned';
+  } else if (lowerTitle.includes('confirmed') || lowerTitle.includes('booking placed') || lowerTitle.includes('booking created')) {
+    return 'booking_created';
+  } else if (lowerTitle.includes('cancelled')) {
+    return 'booking_cancelled';
+  } else if (lowerTitle.includes('completed')) {
+    return 'booking_completed';
+  } else if (lowerTitle.includes('review')) {
+    return 'new_review';
+  } else if (lowerTitle.includes('inquiry') || lowerTitle.includes('contact')) {
+    return 'new_inquiry';
+  } else if (lowerTitle.includes('custom')) {
+    return 'custom_request';
+  }
+  return 'other';
+}
+
+export async function POST(request: Request) {
+  try {
+    // 1. Rate Limiting
+    const rl = checkRateLimit(request, { max: 30, windowMs: 60 * 1000, keyPrefix: 'send-push' });
+    if (!rl.allowed) {
+      return rateLimitResponse(rl.resetTime);
+    }
+
+    // 2. Caller Authentication Verification
+    const verification = await verifyRequest(request);
+    if (!verification.isInternalBypass && !verification.isAdmin && !verification.userId) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required to dispatch push notifications.' }, { status: 401 });
+    }
+
+    const { userId, title, body, href, icon, sound, type: customType, variables } = await request.json();
+
+    if (!userId || !title || !body) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    let finalTitle = title;
+    let finalBody = body;
+
+    // Infer smart defaults so templates always have values even if caller didn't pass variables
+    const inferredSender = title.replace(/^(?:New )?(?:Chat )?Message from /i, '').trim();
+    const inferredCustomer = body.match(/From\s+([^(\n]+)/i)?.[1]?.trim() || '';
+    const inferredServiceName = body.match(/for:\s*([^\n]+)/i)?.[1]?.trim() || '';
+    const inferredBookingId = (body.match(/#?([A-Z0-9-]{4,15})/i)?.[1]) || '';
+
+    const smartVariables: Record<string, string> = {
+      title,
+      body,
+      siteName: process.env.NEXT_PUBLIC_APP_NAME || 'Fixbro',
+      senderName: inferredSender || 'Support',
+      customerName: inferredCustomer || 'Customer',
+      name: inferredCustomer || inferredSender || 'Customer',
+      messageText: body,
+      message: body,
+      subject: title,
+      serviceName: inferredServiceName || 'Requested Service',
+      bookingId: inferredBookingId || '',
+      ...(variables || {})
+    };
+
+    // Check if push notification category is enabled
+    const pushType = customType || determinePushType(title);
+    if (pushType !== 'other') {
+      const template = await getPushTemplate(pushType);
+      if (!template.isEnabled) {
+        console.log(`Push notification type "${pushType}" is disabled in settings. Skipping dispatch.`);
+        return NextResponse.json({ success: true, message: 'Push notification is disabled in settings.' });
+      }
+
+      // If database has override templates, replace placeholders
+      if (template.subject && template.body) {
+        const templatedTitle = replacePlaceholders(template.subject, smartVariables);
+        const templatedBody = replacePlaceholders(template.body, smartVariables);
+
+        // If template produced unreplaced placeholders (e.g. {unknownVar}), fall back to original title/body
+        finalTitle = (templatedTitle && !/\{[a-zA-Z0-9_]+\}/.test(templatedTitle)) ? templatedTitle : title;
+        finalBody = (templatedBody && !/\{[a-zA-Z0-9_]+\}/.test(templatedBody)) ? templatedBody : body;
+      }
+    }
+
+    // Safety clean: ensure NO leftover {placeholder} braces are ever sent to user screens
+    finalTitle = finalTitle.replace(/\{[a-zA-Z0-9_]+\}/g, '').trim() || title;
+    finalBody = finalBody.replace(/\{[a-zA-Z0-9_]+\}/g, '').trim() || body;
+
+    // 1. Get user's FCM tokens from Firestore
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const userData = userDoc.data();
+    const fcmTokensObj = userData?.fcmTokens || {};
+    const tokens = Object.keys(fcmTokensObj);
+
+    if (tokens.length === 0) {
+      return NextResponse.json({ error: 'No FCM tokens found for this user' }, { status: 200 });
+    }
+
+    // Order sound plays ONLY for receiving a new booking! Everything else gets default sound.
+    const isBookingReceiving = sound === 'order' ||
+      ['new_order', 'booking_created'].includes(pushType) ||
+      finalTitle.toLowerCase().includes('new order') ||
+      finalTitle.toLowerCase().includes('new booking') ||
+      finalTitle.toLowerCase().includes('booking received') ||
+      finalTitle.toLowerCase().includes('booking placed') ||
+      finalTitle.toLowerCase().includes('new job request');
+
+    const isOrderSound = isBookingReceiving;
+    const targetSoundName = isOrderSound ? 'order_sound' : 'default';
+
+    const isFixbro = (process.env.NEXT_PUBLIC_APP_NAME || '').toLowerCase().includes('fixbro');
+    const channelPrefix = 'fixbro';
+
+    const targetChannelId = isOrderSound
+      ? `${channelPrefix}_new_bookings_channel_v3`
+      : `${channelPrefix}_general_channel_v3`;
+
+    // 2. Prepare the message
+    // High-priority DATA message for Android ensures FirebaseMessaging.onBackgroundMessage
+    // is reliably invoked in background, closed, and locked-screen states so AwesomeNotifications
+    // can wake the screen, play custom sounds, and display heads-up alerts.
+    // Combined Notification + Data payload:
+    // - On background/locked/terminated devices: Google Play Services natively displays the notification
+    //   tray banner using android.notification settings (channel, icon, order sound, max priority)
+    // - On foreground devices: FirebaseMessaging.onMessage receives the payload and AwesomeNotifications
+    //   creates a rich heads-up alert with custom sound and full-screen intent.
+    const messagePayload = {
+      notification: {
+        title: finalTitle,
+        body: finalBody,
+      },
+      data: {
+        title: finalTitle,
+        body: finalBody,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        url: href || '/',
+        targetUrl: href || '/',
+        icon: icon || '/android-chrome-192x192.png',
+        sound: isOrderSound ? 'order' : 'default',
+        type: customType || pushType || 'order_status',
+        channelKey: targetChannelId,
+        channel_id: targetChannelId,
+        priority: 'high',
+        wakeUpScreen: 'true',
+        fullScreenIntent: isOrderSound ? 'true' : 'false',
+      },
+      android: {
+        priority: 'high' as const,
+        ttl: 60 * 60 * 24 * 1000, // 24 hours
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+          channelId: targetChannelId,
+          icon: 'ic_notification',
+          color: '#2563EB',
+          sound: isOrderSound ? 'order_sound' : 'default',
+          defaultSound: !isOrderSound,
+          defaultVibrateTimings: true,
+          priority: isOrderSound ? ('max' as const) : ('high' as const),
+          visibility: 'public' as const,
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        }
+      },
+      // Essential for background handling in modern browsers
+      webpush: {
+        headers: {
+          Urgency: 'high',
+        },
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+          icon: icon || '/android-chrome-192x192.png',
+          data: {
+            url: href || '/',
+            sound: isOrderSound ? 'order' : 'default',
+          }
+        }
+      }
+    };
+
+    // 3. Send to all registered tokens for this user
+    const deadTokens: string[] = [];
+
+    const sendPromises = tokens.map(token => 
+      messaging.send({
+        ...messagePayload,
+        token,
+      }).catch(async (err: any) => {
+        // Check if token has become dead or invalid
+        const isDeadToken = 
+            err.code === 'messaging/registration-token-not-registered' || 
+            err.code === 'messaging/invalid-argument' ||
+            err.message?.includes('unregistered') ||
+            err.message?.includes('registration-token-not-registered') ||
+            err.message?.includes('invalid-argument') ||
+            err.errorInfo?.code === 'messaging/registration-token-not-registered';
+
+        if (isDeadToken) {
+            console.warn(`[send-push] FCM token unregistered/expired for user ${userId} (${token.slice(0, 20)}...). Queued for removal.`);
+            deadTokens.push(token);
+        } else {
+            console.error(`Failed to send push to token ${token}:`, err);
+        }
+        return null;
+      })
+    );
+
+    await Promise.all(sendPromises);
+
+    // Prune dead tokens directly from MySQL user document
+    if (deadTokens.length > 0) {
+      try {
+        const freshUserDoc = await adminDb.collection('users').doc(userId).get();
+        if (freshUserDoc.exists) {
+          const freshData = freshUserDoc.data() || {};
+          const currentTokens = { ...(freshData.fcmTokens || {}) };
+          let changed = false;
+          for (const dToken of deadTokens) {
+            if (dToken in currentTokens) {
+              delete currentTokens[dToken];
+              changed = true;
+            }
+          }
+          if (changed) {
+            await adminDb.collection('users').doc(userId).update({
+              fcmTokens: currentTokens
+            });
+            console.log(`[send-push] Successfully pruned ${deadTokens.length} dead FCM token(s) for user ${userId}`);
+          }
+        }
+      } catch (pruneErr) {
+        console.error(`[send-push] Failed to prune dead tokens for user ${userId}:`, pruneErr);
+      }
+    }
+
+    return NextResponse.json({ success: true, message: `Push sent to ${tokens.length} devices.` });
+
+  } catch (error: any) {
+    console.error('Error in send-push API:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
