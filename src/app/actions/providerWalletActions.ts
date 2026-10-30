@@ -884,7 +884,7 @@ export async function sendServerPushNotification(params: {
           defaultVibrateTimings: true,
           priority: isOrderSound ? ('max' as const) : ('high' as const),
           visibility: 'public' as const,
-          clickAction: href || '/',
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         }
       },
       webpush: {
@@ -895,8 +895,13 @@ export async function sendServerPushNotification(params: {
           title: finalTitle,
           body: finalBody,
           icon: icon || '/android-chrome-192x192.png',
-          click_action: href || '/',
+          data: {
+            url: href || '/',
+          },
           requireInteraction: sound === 'order',
+        },
+        fcmOptions: {
+          link: href || '/'
         }
       }
     };

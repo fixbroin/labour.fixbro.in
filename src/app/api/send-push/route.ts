@@ -171,7 +171,8 @@ export async function POST(request: Request) {
       data: {
         title: finalTitle,
         body: finalBody,
-        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        click_action: href || '/',
+        href: href || '/',
         url: href || '/',
         targetUrl: href || '/',
         icon: icon || '/android-chrome-192x192.png',
@@ -213,6 +214,9 @@ export async function POST(request: Request) {
             url: href || '/',
             sound: isOrderSound ? 'order' : 'default',
           }
+        },
+        fcmOptions: {
+          link: href || '/'
         }
       }
     };

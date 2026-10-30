@@ -409,7 +409,7 @@ export async function sendBulkPushNotificationAction(params: {
           defaultVibrateTimings: true,
           priority: 'high' as const,
           visibility: 'public' as const,
-          clickAction: href || '/',
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         }
       },
       webpush: {

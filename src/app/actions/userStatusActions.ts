@@ -99,7 +99,7 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
                 defaultVibrateTimings: true,
                 priority: 'high' as const,
                 visibility: 'public' as const,
-                clickAction: '/auth/login',
+                clickAction: 'FLUTTER_NOTIFICATION_CLICK',
               }
             },
             webpush: {
@@ -111,6 +111,9 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
                   url: '/auth/login',
                   sound: 'default',
                 }
+              },
+              fcmOptions: {
+                link: '/auth/login'
               }
             }
           };

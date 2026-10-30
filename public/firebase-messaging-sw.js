@@ -1,4 +1,3 @@
-
 // This service worker handles background push notifications from Firebase Cloud Messaging.
 
 // Import the Firebase scripts for the service worker
@@ -20,12 +19,24 @@ if (typeof firebaseConfig !== 'undefined') {
         console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
         // Customize the notification that will be shown to the user
-        const notificationTitle = payload.notification.title;
+        const notificationTitle = payload.notification?.title || payload.data?.title || 'Fixbro';
+        
+        let targetUrl = payload.data?.url || payload.data?.targetUrl || payload.data?.href;
+        if (!targetUrl && payload.data?.click_action && payload.data.click_action !== 'FLUTTER_NOTIFICATION_CLICK') {
+            targetUrl = payload.data.click_action;
+        }
+        if (!targetUrl && payload.fcmOptions?.link) {
+            targetUrl = payload.fcmOptions.link;
+        }
+        if (!targetUrl || targetUrl === 'FLUTTER_NOTIFICATION_CLICK') {
+            targetUrl = '/';
+        }
+
         const notificationOptions = {
-            body: payload.notification.body,
-            icon: payload.notification.icon || '/android-chrome-192x192.png', // A default icon
+            body: payload.notification?.body || payload.data?.body || '',
+            icon: payload.notification?.icon || payload.data?.icon || '/android-chrome-192x192.png',
             data: {
-                url: payload.data?.click_action || payload.data?.url || '/'
+                url: targetUrl
             }
         };
 
@@ -39,21 +50,34 @@ if (typeof firebaseConfig !== 'undefined') {
         
         event.notification.close(); // Close the notification
 
-        const urlToOpen = event.notification.data.url || '/';
+        let rawUrl = event.notification.data?.url || '/';
+        if (rawUrl === 'FLUTTER_NOTIFICATION_CLICK' || !rawUrl) {
+            rawUrl = '/';
+        }
+
+        // Always resolve to full absolute URL on the current site origin
+        const fullUrl = new URL(rawUrl, self.location.origin).href;
 
         // Open the window or focus an existing one
         event.waitUntil(
             clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-                // Check if there is already a window open with this URL
+                // If there is already a window open with this exact URL, focus it
                 for (let i = 0; i < windowClients.length; i++) {
                     const client = windowClients[i];
-                    if (client.url === urlToOpen && 'focus' in client) {
+                    if (client.url === fullUrl && 'focus' in client) {
                         return client.focus();
+                    }
+                }
+                // If any window on the same origin is open, navigate it to the destination and focus
+                for (let i = 0; i < windowClients.length; i++) {
+                    const client = windowClients[i];
+                    if (client.url.startsWith(self.location.origin) && 'navigate' in client && 'focus' in client) {
+                        return client.navigate(fullUrl).then((c) => c?.focus());
                     }
                 }
                 // If no window is open, open a new one
                 if (clients.openWindow) {
-                    return clients.openWindow(urlToOpen);
+                    return clients.openWindow(fullUrl);
                 }
             })
         );

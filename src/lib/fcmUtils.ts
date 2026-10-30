@@ -205,9 +205,15 @@ export const onForegroundMessage = async () => {
 
         notification.onclick = (event) => {
           event.preventDefault();
-          const url = payload.data?.click_action || payload.data?.url || '/';
+          let rawUrl = payload.data?.url || payload.data?.targetUrl || payload.data?.href;
+          if (!rawUrl && payload.data?.click_action && payload.data.click_action !== 'FLUTTER_NOTIFICATION_CLICK') {
+            rawUrl = payload.data.click_action;
+          }
+          if (!rawUrl || rawUrl === 'FLUTTER_NOTIFICATION_CLICK') {
+            rawUrl = '/';
+          }
           window.focus();
-          window.location.href = url;
+          window.location.href = rawUrl;
           notification.close();
         };
       }
