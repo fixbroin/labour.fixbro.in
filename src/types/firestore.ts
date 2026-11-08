@@ -325,6 +325,8 @@ export interface FirestoreUser {
   totalEarnings?: number; // Lifetime gross earnings
   totalCommissionPaid?: number; // Lifetime commission paid to admin
   withdrawalPending?: boolean; // True if a withdrawal request is active
+  savedWithdrawalMethods?: SavedWithdrawalMethod[];
+  bankDetails?: BankDetails;
   
   referralStatus?: {
     totalReferred: number;
@@ -671,6 +673,7 @@ export interface AppSettings {
   isCancelledChequeCompulsory?: boolean; // For toggling cheque compulsory status
   enableCancelledChequeUpload?: boolean; // Toggle to completely enable/disable cancelled cheque section
   enableSignatureUpload?: boolean; // Toggle to completely enable/disable signature section
+  enableBankDetailsSection?: boolean; // Toggle to completely enable/disable the bank account details section in Step 4
   customBankFields?: CustomBankField[]; // Dynamic custom bank details fields
   enableDefaultIndianKyc?: boolean; // For toggling Aadhaar and PAN defaults
   maxProviderRadiusKm?: number; // New for provider work area
@@ -1443,7 +1446,9 @@ export interface ProviderApplication {
   email?: string;
   mobileNumber?: string;
   address?: string;
+  dob?: string;
   age?: number;
+  gender?: 'Male' | 'Female' | 'Other' | string;
   qualificationId?: string;
   qualificationLabel?: string; // Denormalized
   alternateMobile?: string;
@@ -1471,6 +1476,7 @@ export interface ProviderApplication {
   adminReviewNotes?: string;
   kycUpdateRequest?: boolean;
   kycUpdateNotes?: string;
+  locationChangeRequest?: LocationChangeRequest;
   submittedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
@@ -1479,9 +1485,44 @@ export interface ProviderApplication {
   withdrawableBalance?: number;
   totalEarnings?: number;
   totalDeductions?: number;
+
+  // Provider ID Card Generation, Purchase & Download Tracking
+  idCardNumber?: string;
+  idCardSeq?: number;
+  idCardGenerated?: boolean;
+  idCardGeneratedAt?: Timestamp | any;
+  idCardUnlocked?: boolean;
+  idCardUnlockedAt?: Timestamp | any;
+  idCardExpiresAt?: Timestamp | any;
+  idCardPaymentId?: string | null;
+  idCardOrderId?: string | null;
+  idCardPaidAmount?: number;
+  idCardDownloadCount?: number;
+  idCardPdfDownloadCount?: number;
+  idCardFrontPngDownloadCount?: number;
+  idCardBackPngDownloadCount?: number;
+  idCardLastDownloadedAt?: Timestamp | any;
+  idCardDownloads?: Array<{
+    type: 'pdf' | 'front_png' | 'back_png';
+    downloadedAt: number;
+    id?: string;
+  }>;
 }
 
 
+
+export interface LocationChangeRequest {
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requestedAt: Timestamp | any;
+  resolvedAt?: Timestamp | any;
+  previousAddress: string;
+  previousCenter?: { latitude: number; longitude: number };
+  previousRadiusKm?: number;
+  newAddress: string;
+  newCenter: { latitude: number; longitude: number };
+  newRadiusKm: number;
+  rejectionReason?: string;
+}
 
 // This would be the main profile for an approved provider
 export interface ProviderProfile extends Omit<ProviderApplication, 'status' | 'submittedAt' | 'adminReviewNotes'> {
@@ -1608,6 +1649,22 @@ export interface EnrichedReferral extends Referral {
 export type WithdrawalMethodType = 'bank_transfer' | 'upi' | 'amazon_gift_card' | 'other';
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected' | 'processing' | 'completed' | 're_submit';
 
+export interface SavedWithdrawalMethod {
+  id: string;
+  type: WithdrawalMethodType;
+  title?: string;
+  isDefault?: boolean;
+  createdAt?: any;
+  details: {
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+    email?: string;
+  };
+}
+
 export interface SystemStats {
   totalBookings: number;
   completedBookings: number;
@@ -1671,6 +1728,7 @@ export interface PinCodeAreaMapping {
 }
 
 export interface AppUpdateTargetConfig {
+  // Android configuration
   enabled: boolean;
   forceUpdate: boolean;
   minVersionCode: number;
@@ -1678,12 +1736,33 @@ export interface AppUpdateTargetConfig {
   playStoreUrl: string;
   title: string;
   message: string;
+
+  // iOS configuration
+  iosEnabled?: boolean;
+  iosForceUpdate?: boolean;
+  iosMinVersionCode?: number;
+  iosLatestVersionName?: string;
+  appStoreUrl?: string;
+  iosTitle?: string;
+  iosMessage?: string;
+
   updatedAt?: any;
 }
 
 export interface AppUpdateSettings {
   customer: AppUpdateTargetConfig;
   provider: AppUpdateTargetConfig;
+  updatedAt?: any;
+}
+
+export type AppDownloadMode = 'pwa' | 'native_stores' | 'disabled';
+
+export interface AppDownloadSettings {
+  mode: AppDownloadMode;
+  androidUserUrl: string;
+  androidProviderUrl: string;
+  iosUserUrl: string;
+  iosProviderUrl: string;
   updatedAt?: any;
 }
 

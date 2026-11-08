@@ -23,6 +23,7 @@ export const PERMISSION_MODULES = [
   { id: 'provider_applications', label: 'Provider Applications', paths: ['/admin/provider-applications'] },
   { id: 'provider_withdrawals', label: 'Provider Withdrawals', paths: ['/admin/provider-withdrawals'] },
   { id: 'provider_controls', label: 'Provider Controls', paths: ['/admin/provider-controls'] },
+  { id: 'provider_id_cards', label: 'Provider ID Cards', paths: ['/admin/provider-id-cards'] },
   { id: 'join_provider_settings', label: 'Join Provider Page', paths: ['/admin/join-provider-settings'] },
   { id: 'marketplace_furniture', label: 'Furniture Listings', paths: ['/admin/furniture'] },
   { id: 'marketplace_rentals', label: 'Home Rentals', paths: ['/admin/rentals'] },
@@ -62,6 +63,7 @@ export const PERMISSION_MODULES = [
   { id: 'cookie_settings', label: 'Cookie Settings', paths: ['/admin/cookie-settings'] },
   { id: 'database_tools', label: 'Database Tools', paths: ['/admin/database-tools'] },
   { id: 'app_update', label: 'App Update', paths: ['/admin/app-update'] },
+  { id: 'app_download_settings', label: 'App Download Settings', paths: ['/admin/app-download-settings'] },
   { id: 'system_logs', label: 'System Logs', paths: ['/admin/system-logs'] },
 ];
 

@@ -1,15 +1,17 @@
 'use server';
 
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
+import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getPushTemplate } from '@/app/actions/pushSettingsActions';
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getTimestampMillis } from '@/lib/utils';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
-import { doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
+import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
 
 export interface WalletProviderSettings {
   minDepositAmount: number;
@@ -43,9 +45,26 @@ const DEFAULT_SETTINGS: WalletProviderSettings = {
 // 1. Fetch wallet settings (MySQL)
 export async function getProviderWalletSettingsAction(): Promise<WalletProviderSettings> {
   try {
+    const adminSnap = await adminDb.collection('appConfiguration').doc('wallet_provider').get();
+    if (adminSnap.exists) {
+      const data = adminSnap.data() as any;
+      return {
+        minDepositAmount: Number(data.minDepositAmount ?? DEFAULT_SETTINGS.minDepositAmount),
+        maxDepositAmount: Number(data.maxDepositAmount ?? DEFAULT_SETTINGS.maxDepositAmount),
+        depositBonusPercentage: Number(data.depositBonusPercentage ?? DEFAULT_SETTINGS.depositBonusPercentage),
+        minBalanceForJobs: Number(data.minBalanceForJobs ?? DEFAULT_SETTINGS.minBalanceForJobs),
+      };
+    }
+
     const settingsDoc = await getDoc(doc(db, 'appConfiguration', 'wallet_provider'));
     if (settingsDoc.exists()) {
-      return { ...DEFAULT_SETTINGS, ...settingsDoc.data() } as WalletProviderSettings;
+      const data = settingsDoc.data() as any;
+      return {
+        minDepositAmount: Number(data.minDepositAmount ?? DEFAULT_SETTINGS.minDepositAmount),
+        maxDepositAmount: Number(data.maxDepositAmount ?? DEFAULT_SETTINGS.maxDepositAmount),
+        depositBonusPercentage: Number(data.depositBonusPercentage ?? DEFAULT_SETTINGS.depositBonusPercentage),
+        minBalanceForJobs: Number(data.minBalanceForJobs ?? DEFAULT_SETTINGS.minBalanceForJobs),
+      };
     }
     return DEFAULT_SETTINGS;
   } catch (error) {
@@ -57,21 +76,32 @@ export async function getProviderWalletSettingsAction(): Promise<WalletProviderS
 // 2. Save wallet settings (MySQL)
 export async function saveProviderWalletSettingsAction(settings: WalletProviderSettings) {
   try {
-    const docRef = doc(db, 'appConfiguration', 'wallet_provider');
-    // Set settings
-    const exists = (await getDoc(docRef)).exists();
-    if (exists) {
-      await updateDoc(docRef, {
-        ...settings,
-        updatedAt: Timestamp.now()
-      });
-    } else {
-      // Use addDoc or setDoc structure
-      await updateDoc(docRef, {
-        ...settings,
-        updatedAt: Timestamp.now()
-      });
+    const cleanSettings = {
+      minDepositAmount: Number(settings.minDepositAmount),
+      maxDepositAmount: Number(settings.maxDepositAmount),
+      depositBonusPercentage: Number(settings.depositBonusPercentage),
+      minBalanceForJobs: Number(settings.minBalanceForJobs),
+      updatedAt: Timestamp.now()
+    };
+
+    // Save directly via adminDb into MySQL
+    await adminDb.collection('appConfiguration').doc('wallet_provider').set(cleanSettings, { merge: true });
+
+    // Also persist via client SDK reference to ensure cache synchronization
+    try {
+      const docRef = doc(db, 'appConfiguration', 'wallet_provider');
+      await setDoc(docRef, cleanSettings, { merge: true });
+    } catch (sdkError) {
+      // adminDb write already committed directly to the database
     }
+
+    revalidatePath('/admin/provider-withdrawals');
+    revalidatePath('/provider/wallet');
+    triggerRefresh('/admin/provider-withdrawals');
+    triggerRefresh('/provider/wallet');
+    triggerRefresh('wallet-provider-config');
+    triggerRefresh('global-cache');
+
     return { success: true, message: "Wallet settings saved successfully." };
   } catch (error: any) {
     console.error("Error saving wallet settings:", error);
@@ -267,10 +297,104 @@ export async function depositProviderWalletAction(
     }
 
     revalidatePath('/provider/wallet');
-    return { success: true, message: `Successfully deposited ${symbol}${finalCredit.toFixed(2)} to your wallet.` };
+    return { 
+      success: true, 
+      message: `Successfully deposited ${symbol}${finalCredit.toFixed(2)} to your wallet.`,
+      newBalance: finalBalance
+    };
   } catch (error: any) {
     console.error("Error depositing to provider wallet:", error);
     return { success: false, message: error.message || "Deposit transaction failed." };
+  }
+}
+
+// 4b. Verify pending Razorpay wallet deposit (used on app resume / auto-recovery)
+export async function verifyPendingProviderWalletDepositAction(
+  orderId: string,
+  providerId: string,
+  expectedAmount?: number
+): Promise<{
+  success: boolean;
+  verified: boolean;
+  alreadyCredited?: boolean;
+  creditedNow?: boolean;
+  paymentId?: string;
+  amount?: number;
+  newBalance?: number;
+  message?: string;
+}> {
+  try {
+    if (!orderId || !providerId) {
+      return { success: false, verified: false, message: 'Invalid order or provider ID' };
+    }
+
+    // 1. Check if already recorded in providerWalletTransactions (e.g. credited via webhook)
+    const txQuery = query(
+      collection(db, 'providerWalletTransactions'),
+      where('razorpay_order_id', '==', orderId)
+    );
+    const txSnap = await getDocs(txQuery);
+    if (!txSnap.empty) {
+      const txData = txSnap.docs[0].data() as any;
+      const userRef = doc(db, 'users', providerId);
+      const userSnap = await getDoc(userRef);
+      const curBalance = userSnap.exists() ? Number(userSnap.data()?.providerWalletBalance || 0) : 0;
+      return {
+        success: true,
+        verified: true,
+        alreadyCredited: true,
+        paymentId: txData.razorpay_payment_id || txData.razorpayPaymentId || undefined,
+        amount: Number(txData.amount) || expectedAmount || 0,
+        newBalance: curBalance,
+        message: 'Deposit already credited to wallet',
+      };
+    }
+
+    // 2. Query Razorpay API to check if the order has been paid
+    const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
+    const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
+    const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
+    const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      return { success: false, verified: false, message: 'Razorpay configuration missing' };
+    }
+
+    const instance = new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    });
+
+    const payments: any = await instance.orders.fetchPayments(orderId);
+    const capturedPayment = payments?.items?.find((p: any) => p.status === 'captured' || p.status === 'authorized');
+
+    if (capturedPayment) {
+      const paymentAmount = capturedPayment.amount ? capturedPayment.amount / 100 : (expectedAmount || 0);
+      const depositResult = await depositProviderWalletAction(providerId, paymentAmount, {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: capturedPayment.id,
+        payment_method: 'Razorpay',
+      });
+
+      const userRef = doc(db, 'users', providerId);
+      const userSnap = await getDoc(userRef);
+      const curBalance = userSnap.exists() ? Number(userSnap.data()?.providerWalletBalance || 0) : 0;
+
+      return {
+        success: true,
+        verified: true,
+        creditedNow: true,
+        paymentId: capturedPayment.id,
+        amount: paymentAmount,
+        newBalance: curBalance,
+        message: depositResult.message || 'Deposit confirmed successfully',
+      };
+    }
+
+    return { success: false, verified: false, message: 'Payment not yet confirmed by Razorpay' };
+  } catch (error: any) {
+    console.error('Error verifying pending provider wallet deposit:', error);
+    return { success: false, verified: false, message: error.message || 'Verification failed' };
   }
 }
 
@@ -1075,6 +1199,301 @@ export async function recalculateProviderStatsAction(providerId: string) {
   } catch (error: any) {
     console.error("Error in recalculateProviderStatsAction:", error);
     return { success: false, message: error.message || "Failed to recalculate provider stats." };
+  }
+}
+
+// 13. Create Direct Payout from Admin (MySQL)
+export async function createAdminDirectPayoutAction(params: {
+  providerId: string;
+  amount: number;
+  method: 'bank_transfer' | 'upi' | 'cash' | 'amazon_gift_card';
+  details?: {
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+    email?: string;
+    notes?: string;
+  };
+  referenceNotes?: string;
+}) {
+  try {
+    const { providerId, amount, method, details = {}, referenceNotes = '' } = params;
+    const numAmount = Number(amount);
+    if (!providerId || isNaN(numAmount) || numAmount <= 0) {
+      return { success: false, message: "Valid provider and positive numeric amount are required." };
+    }
+
+    const providerUserRef = doc(db, 'users', providerId);
+    const providerUserSnap = await getDoc(providerUserRef);
+    if (!providerUserSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+    const providerUser = providerUserSnap.data() as any;
+
+    const requestData = {
+      providerId,
+      providerName: providerUser.displayName || "Provider",
+      providerEmail: providerUser.email || "",
+      amount: numAmount,
+      method,
+      details: {
+        accountHolderName: details.accountHolderName || providerUser.displayName || "",
+        bankName: details.bankName || "",
+        accountNumber: details.accountNumber || "",
+        ifscCode: details.ifscCode || "",
+        upiId: details.upiId || "",
+        email: details.email || "",
+        notes: referenceNotes || "Direct Payout recorded by Admin",
+      },
+      status: 'completed',
+      requestedAt: Timestamp.now(),
+      processedAt: Timestamp.now(),
+      adminNotes: referenceNotes || "Direct payout processed by Admin",
+    };
+
+    // 1. Write completed withdrawal request
+    await addDoc(collection(db, 'withdrawalRequests'), requestData);
+
+    // 2. Update user totals (withdrawableBalance & totalPaidOut)
+    const currentTotalPaidOut = Number(providerUser.totalPaidOut) || 0;
+    const currentBalance = Number(providerUser.withdrawableBalance) || 0;
+    const newBalance = Math.max(0, currentBalance - numAmount);
+
+    await updateDoc(providerUserRef, {
+      totalPaidOut: currentTotalPaidOut + numAmount,
+      withdrawableBalance: newBalance,
+      withdrawalPending: false,
+    });
+
+    // 3. Write in-app notification to provider
+    try {
+      await addDoc(collection(db, 'userNotifications'), {
+        userId: providerId,
+        title: "Payout Received",
+        message: `A direct payout of ₹${numAmount.toFixed(2)} has been recorded via ${method.replace('_', ' ').toUpperCase()}.${referenceNotes ? ` Reference: ${referenceNotes}` : ''}`,
+        type: 'success',
+        href: '/provider/withdrawal',
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    } catch (e) {
+      console.warn("Could not send payout notification:", e);
+    }
+
+    // 4. Synchronize provider stats and earnings
+    await recalculateProviderStatsAction(providerId);
+
+    revalidatePath('/admin/provider-withdrawals');
+    revalidatePath('/provider/earnings');
+    revalidatePath('/provider/withdrawal');
+
+    return {
+      success: true,
+      message: `Successfully recorded direct payout of ₹${numAmount.toFixed(2)} for ${providerUser.displayName || 'Provider'}.`
+    };
+  } catch (error: any) {
+    console.error("Error in createAdminDirectPayoutAction:", error);
+    return { success: false, message: error.message || "Failed to record direct payout." };
+  }
+}
+
+// 14. Save Provider Withdrawal Method (MySQL/Firestore)
+export async function saveProviderWithdrawalMethodAction(params: {
+  providerId: string;
+  method: {
+    id?: string;
+    type: 'bank_transfer' | 'upi' | 'amazon_gift_card' | 'other';
+    title?: string;
+    isDefault?: boolean;
+    details: {
+      accountHolderName?: string;
+      bankName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      upiId?: string;
+      email?: string;
+    };
+  };
+}) {
+  try {
+    const { providerId, method } = params;
+    if (!providerId || !method?.type) {
+      return { success: false, message: "Provider ID and method type are required." };
+    }
+
+    const userRef = doc(db, 'users', providerId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+
+    const userData = userSnap.data() as any;
+    let existingMethods = (userData.savedWithdrawalMethods || []) as any[];
+
+    const methodId = method.id || 'mth_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+    const isDefault = Boolean(method.isDefault) || existingMethods.length === 0;
+
+    if (isDefault) {
+      existingMethods = existingMethods.map(m => m.type === method.type ? { ...m, isDefault: false } : m);
+    }
+
+    const serializeMethod = (m: any) => ({
+      id: String(m.id || ''),
+      type: m.type,
+      title: m.title || '',
+      isDefault: Boolean(m.isDefault),
+      details: {
+        accountHolderName: m.details?.accountHolderName || '',
+        bankName: m.details?.bankName || '',
+        accountNumber: m.details?.accountNumber || '',
+        ifscCode: m.details?.ifscCode || '',
+        upiId: m.details?.upiId || '',
+        email: m.details?.email || '',
+      },
+      createdAt: m.createdAt?.toDate ? m.createdAt.toDate().toISOString() : (m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000).toISOString() : (typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString()))
+    });
+
+    const newOrUpdatedMethod = {
+      id: methodId,
+      type: method.type,
+      title: method.title?.trim() || (
+        method.type === 'bank_transfer' 
+          ? (method.details.bankName ? `${method.details.bankName} Account` : 'Bank Account')
+          : method.type === 'upi'
+          ? (method.details.upiId ? `UPI (${method.details.upiId})` : 'UPI ID')
+          : (method.details.email ? `Amazon (${method.details.email})` : 'Gift Card')
+      ),
+      isDefault,
+      details: {
+        accountHolderName: method.details.accountHolderName?.trim() || '',
+        bankName: method.details.bankName?.trim() || '',
+        accountNumber: method.details.accountNumber?.trim() || '',
+        ifscCode: method.details.ifscCode?.trim().toUpperCase() || '',
+        upiId: method.details.upiId?.trim().toLowerCase() || '',
+        email: method.details.email?.trim().toLowerCase() || '',
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    const existingIndex = existingMethods.findIndex(m => m.id === methodId);
+    if (existingIndex >= 0) {
+      existingMethods[existingIndex] = { ...existingMethods[existingIndex], ...newOrUpdatedMethod };
+    } else {
+      existingMethods.push(newOrUpdatedMethod);
+    }
+
+    const cleanMethods = existingMethods.map(serializeMethod);
+
+    // Also update bankDetails on user if bank_transfer and bankDetails is missing or has empty account
+    const updatePayload: any = {
+      savedWithdrawalMethods: cleanMethods,
+    };
+    if (method.type === 'bank_transfer' && (!userData.bankDetails || !userData.bankDetails.accountNumber)) {
+      updatePayload.bankDetails = {
+        ...(userData.bankDetails || {}),
+        accountHolderName: method.details.accountHolderName || '',
+        bankName: method.details.bankName || '',
+        accountNumber: method.details.accountNumber || '',
+        ifscCode: method.details.ifscCode || '',
+      };
+    }
+
+    await updateDoc(userRef, updatePayload);
+
+    revalidatePath('/provider/withdrawal');
+    revalidatePath('/admin/provider-withdrawals');
+
+    return JSON.parse(JSON.stringify({ 
+      success: true, 
+      message: "Withdrawal method saved successfully.", 
+      savedMethod: serializeMethod(newOrUpdatedMethod),
+      methods: cleanMethods 
+    }));
+  } catch (error: any) {
+    console.error("Error in saveProviderWithdrawalMethodAction:", error);
+    return { success: false, message: error.message || "Failed to save withdrawal method." };
+  }
+}
+
+// 15. Delete Provider Withdrawal Method (MySQL/Firestore)
+export async function deleteProviderWithdrawalMethodAction(params: {
+  providerId: string;
+  methodId: string;
+}) {
+  try {
+    const { providerId, methodId } = params;
+    if (!providerId || !methodId) {
+      return { success: false, message: "Provider ID and method ID are required." };
+    }
+
+    const userRef = doc(db, 'users', providerId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+
+    const userData = userSnap.data() as any;
+    const existingMethods = (userData.savedWithdrawalMethods || []) as any[];
+    const serializeMethod = (m: any) => ({
+      id: String(m.id || ''),
+      type: m.type,
+      title: m.title || '',
+      isDefault: Boolean(m.isDefault),
+      details: {
+        accountHolderName: m.details?.accountHolderName || '',
+        bankName: m.details?.bankName || '',
+        accountNumber: m.details?.accountNumber || '',
+        ifscCode: m.details?.ifscCode || '',
+        upiId: m.details?.upiId || '',
+        email: m.details?.email || '',
+      },
+      createdAt: m.createdAt?.toDate ? m.createdAt.toDate().toISOString() : (m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000).toISOString() : (typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString()))
+    });
+
+    const methodToDelete = existingMethods.find(m => m.id === methodId);
+    const updatedMethods = existingMethods.filter(m => m.id !== methodId).map(serializeMethod);
+
+    const updatePayload: any = {
+      savedWithdrawalMethods: updatedMethods,
+    };
+
+    // If deleting profile_bank or if deleted method matches bankDetails, clear bankDetails so it doesn't resurrect
+    if (
+      methodId === 'profile_bank' ||
+      (methodToDelete && methodToDelete.type === 'bank_transfer' && userData.bankDetails?.accountNumber === methodToDelete.details?.accountNumber) ||
+      updatedMethods.filter(m => m.type === 'bank_transfer').length === 0
+    ) {
+      updatePayload.bankDetails = null;
+    }
+
+    // If deleting profile_upi or if deleted method matches bankDetails.upiId
+    if (
+      methodId === 'profile_upi' ||
+      (methodToDelete && methodToDelete.type === 'upi' && userData.bankDetails?.upiId === methodToDelete.details?.upiId)
+    ) {
+      if (updatePayload.bankDetails !== null) {
+        updatePayload.bankDetails = {
+          ...(userData.bankDetails || {}),
+          upiId: null,
+        };
+      }
+    }
+
+    await updateDoc(userRef, updatePayload);
+
+    revalidatePath('/provider/withdrawal');
+    revalidatePath('/admin/provider-withdrawals');
+
+    return JSON.parse(JSON.stringify({ 
+      success: true, 
+      message: "Withdrawal method deleted successfully.", 
+      methods: updatedMethods 
+    }));
+  } catch (error: any) {
+    console.error("Error in deleteProviderWithdrawalMethodAction:", error);
+    return { success: false, message: error.message || "Failed to delete withdrawal method." };
   }
 }
 

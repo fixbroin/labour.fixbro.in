@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ProviderLocationChangesTab from '@/components/admin/ProviderLocationChangesTab';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Users2, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown } from "lucide-react";
+import { Users2, MapPin, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown } from "lucide-react";
 import type { ProviderApplication, ProviderApplicationStatus, FirestoreNotification } from '@/types/firestore';
 import { db, storage } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -47,6 +49,12 @@ export default function AdminProviderApplicationsPage() {
   const [isFilterStatusPickerOpen, setIsFilterStatusPickerOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'location_changes' ? 'location_changes' : 'applications');
+
+  const pendingLocationChangesCount = useMemo(() => {
+    return applications.filter(a => a.locationChangeRequest?.status === 'pending').length;
+  }, [applications]);
 
   const [selectedApplication, setSelectedApplication] = useState<ProviderApplication | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -421,7 +429,25 @@ export default function AdminProviderApplicationsPage() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="applications" className="flex items-center gap-2">
+            <Users2 className="h-4 w-4" />
+            All Applications
+          </TabsTrigger>
+          <TabsTrigger value="location_changes" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Service Area Requests
+            {pendingLocationChangesCount > 0 && (
+              <Badge className="ml-1.5 h-5 px-1.5 bg-amber-500 text-white font-bold text-[10px] rounded-full">
+                {pendingLocationChangesCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="applications" className="space-y-6 mt-0">
+          <Card>
         <CardHeader className="sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-2xl flex items-center">
@@ -647,6 +673,26 @@ export default function AdminProviderApplicationsPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="location_changes" className="space-y-6 mt-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Service Area & Coverage Change Requests
+              </CardTitle>
+              <CardDescription>
+                Review and approve or reject operational base and radius updates requested by service providers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProviderLocationChangesTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
       {selectedApplication && (
         <ProviderApplicationDetailsModal
           application={selectedApplication}

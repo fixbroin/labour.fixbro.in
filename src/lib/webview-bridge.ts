@@ -44,7 +44,18 @@ if (typeof window !== 'undefined') {
 
   // Native Razorpay Proxy for seamless drop-in integration
   (window as any)._setupNativeRazorpayProxy = () => {
-    if ((window as any).isFlutterNativeApp) {
+    let isNative = Boolean(
+      (window as any).isFlutterNativeApp || 
+      (window as any).FlutterBridge || 
+      (window as any).flutter_inappwebview
+    );
+    try {
+      if (!isNative && sessionStorage.getItem('is_flutter_app') === 'true') {
+        isNative = true;
+      }
+    } catch (e) {}
+
+    if (isNative) {
       (window as any).Razorpay = function (options: any) {
         activeRazorpayOptions = options;
         return {
@@ -72,8 +83,16 @@ if (typeof window !== 'undefined') {
           }
         };
       };
+      (window as any)._isNativeRazorpayProxyActive = true;
     }
   };
+
+  // Run proxy setup if Flutter is already ready or detected in session
+  try {
+    if ((window as any).isFlutterNativeApp || (window as any).FlutterBridge || sessionStorage.getItem('is_flutter_app') === 'true') {
+      (window as any)._setupNativeRazorpayProxy();
+    }
+  } catch (e) {}
 
   // Run proxy setup if Flutter is already ready
   if ((window as any).isFlutterNativeApp) {
@@ -96,18 +115,29 @@ export const isWebView = (): boolean => {
     (window as any).FlutterBridge ||
     (window as any).flutter_inappwebview
   ) {
-    try { sessionStorage.setItem('is_flutter_app', 'true'); } catch (e) {}
+    try {
+      sessionStorage.setItem('is_flutter_app', 'true');
+      localStorage.setItem('is_flutter_app', 'true');
+    } catch (e) {}
     return true;
   }
 
   const ua = (navigator.userAgent || '').toLowerCase();
-  if (ua.includes('fixbroapp') || ua.includes('fixbro') || ua.includes('flutter')) {
-    try { sessionStorage.setItem('is_flutter_app', 'true'); } catch (e) {}
+  if (ua.includes('fixbroapp') || ua.includes('fixbroproviderapp') || ua.includes('fixbro') || ua.includes('flutter')) {
+    try {
+      sessionStorage.setItem('is_flutter_app', 'true');
+      localStorage.setItem('is_flutter_app', 'true');
+    } catch (e) {}
     return true;
   }
 
   try {
     if (sessionStorage.getItem('is_flutter_app') === 'true') return true;
+  } catch (e) {}
+
+  try {
+    if (localStorage.getItem('is_flutter_app') === 'true') return true;
+    if (Boolean(localStorage.getItem('fixbro_native_fcm_token'))) return true;
   } catch (e) {}
 
   return false;

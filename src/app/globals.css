@@ -104,6 +104,8 @@
 
 html, body {
   overflow-x: hidden;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Fix for Google Maps Places Autocomplete dropdown z-index */

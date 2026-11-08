@@ -163,6 +163,24 @@ export default async function RootLayout({
         />
         
 
+        <script
+          id="fixbro-pwa-early-capture"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.__deferredInstallPrompt = null;
+              window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.__deferredInstallPrompt = e;
+                try {
+                  window.dispatchEvent(new CustomEvent('pwa-prompt-available'));
+                } catch (_) {}
+              });
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(function(){});
+              }
+            `,
+          }}
+        />
         <ThemeInjector />
         <AuthProvider>
           <LoadingProvider>

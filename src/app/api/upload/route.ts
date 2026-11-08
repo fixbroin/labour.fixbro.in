@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
     
     const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const prefix = `${dateStr}-${label}-fixbro-`;
+    const uniqueSuffix = nanoid(8).toLowerCase();
     
     let counter = 1;
     try {
@@ -127,20 +128,8 @@ export async function POST(req: NextRequest) {
       counter = matchingFiles.length + 1;
     } catch {}
 
-    let filename = `${prefix}${counter}${fileExt}`;
-    let fullPath = path.join(targetDir, filename);
-
-    // Ensure no collisions by checking file access
-    try {
-      while (true) {
-        await fs.access(fullPath);
-        counter++;
-        filename = `${prefix}${counter}${fileExt}`;
-        fullPath = path.join(targetDir, filename);
-      }
-    } catch {
-      // File does not exist, safe to write!
-    }
+    const filename = `${prefix}${counter}-${uniqueSuffix}${fileExt}`;
+    const fullPath = path.join(targetDir, filename);
 
     await fs.writeFile(fullPath, buffer);
 

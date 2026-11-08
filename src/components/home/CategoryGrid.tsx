@@ -47,7 +47,7 @@ const CategoryGrid = () => {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6 md:gap-6">
         {[...Array(6)].map((_, i) => (
           <Card className="overflow-hidden h-full flex flex-col group" key={i}>
             <Skeleton className="w-full aspect-square bg-muted" />
@@ -69,9 +69,9 @@ const CategoryGrid = () => {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-      {categories.map((category) => (
-        <CategoryCard key={category.id} category={category} />
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6 md:gap-6">
+      {categories.map((category, index) => (
+        <CategoryCard key={category.id} category={category} priority={index < 6} index={index} />
       ))}
     </div>
   );

@@ -212,6 +212,7 @@ export default function CategoryPageClient({
 
   // State for scroll-responsive header sync
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const isHeaderVisibleRef = useRef(true);
   const lastScrollY = useRef(0);
   const [headerHeight, setHeaderHeight] = useState(64);
 
@@ -281,22 +282,36 @@ export default function CategoryPageClient({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const controlHeader = () => {
-      const currentScrollY = window.scrollY;
-      // Re-measure header if needed
-      if (currentScrollY < 100) {
-          const headerElement = document.querySelector('[data-site-header]');
-          if (headerElement && headerElement.clientHeight > 0) {
-              setHeaderHeight(headerElement.clientHeight);
-          }
-      }
+    let ticking = false;
+    let cachedHeaderElement: HTMLElement | null = null;
 
-      if (currentScrollY < lastScrollY.current || currentScrollY < 80) {
-        setIsHeaderVisible(true);
-      } else {
-        setIsHeaderVisible(false);
+    const controlHeader = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          const delta = Math.abs(currentScrollY - lastScrollY.current);
+
+          if (currentScrollY < 100) {
+            if (!cachedHeaderElement) {
+              cachedHeaderElement = document.querySelector('[data-site-header]');
+            }
+            if (cachedHeaderElement && cachedHeaderElement.clientHeight > 0) {
+              setHeaderHeight(cachedHeaderElement.clientHeight);
+            }
+          }
+
+          if (delta > 6 || currentScrollY < 80) {
+            const shouldBeVisible = currentScrollY < lastScrollY.current || currentScrollY < 80;
+            if (shouldBeVisible !== isHeaderVisibleRef.current) {
+              isHeaderVisibleRef.current = shouldBeVisible;
+              setIsHeaderVisible(shouldBeVisible);
+            }
+            lastScrollY.current = currentScrollY;
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
-      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', controlHeader, { passive: true });

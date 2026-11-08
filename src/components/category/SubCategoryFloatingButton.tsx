@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SubCategoryCard from './SubCategoryCard';
@@ -22,13 +22,21 @@ export default function SubCategoryFloatingButton({
 }: SubCategoryFloatingButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const isVisibleRef = useRef(false);
 
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      if (window.scrollY > 300) {
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const shouldBeVisible = window.scrollY > 300;
+          if (shouldBeVisible !== isVisibleRef.current) {
+            isVisibleRef.current = shouldBeVisible;
+            setIsVisible(shouldBeVisible);
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 

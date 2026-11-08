@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { depositProviderWalletAction } from '@/app/actions/providerWalletActions';
+import { unlockProviderIdCardAction } from '@/app/actions/providerIdCardActions';
 import { db } from '@/lib/mysqlDb';
 import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
@@ -146,6 +147,17 @@ export async function POST(req: NextRequest) {
           razorpay_order_id: orderId,
           razorpay_payment_id: paymentId,
           payment_method: 'Razorpay'
+        });
+      } else if (type === 'provider_id_card_unlock' && providerId) {
+        const parsedAmount = amountStr ? parseFloat(amountStr) : 0;
+        const orderId = order.order_id || order.id;
+        const paymentId = order.id;
+
+        // Unlock ID card using our unlockProviderIdCardAction server action
+        await unlockProviderIdCardAction(providerId, {
+          razorpay_order_id: orderId,
+          razorpay_payment_id: paymentId,
+          amount: parsedAmount
         });
       } else if (type === 'cancellation_fee' && bookingId && amountStr) {
         const parsedAmount = parseFloat(amountStr);

@@ -71,8 +71,9 @@ export const defaultAppSettings: AppSettings = {
   
   isProviderRegistrationEnabled: true, // Added default
   isCancelledChequeCompulsory: false, // Added default (optional)
-  enableCancelledChequeUpload: true,
+  enableCancelledChequeUpload: false, // Default disabled as requested
   enableSignatureUpload: true,
+  enableBankDetailsSection: false, // Default disabled as requested
   customBankFields: [
     { id: 'ifsc', name: 'IFSC Code', type: 'alphanumeric', required: true, placeholder: 'Enter IFSC code' }
   ],

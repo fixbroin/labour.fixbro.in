@@ -1,16 +1,16 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
-import { CalendarDays, MapPin, CreditCard, ChevronRight, Loader2, Info, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { CalendarDays, MapPin, CreditCard, HandCoins, ChevronRight, Loader2, Info, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { usePaymentOptions } from '@/hooks/usePaymentOptions';
 import { getActiveCheckoutEntries } from '@/lib/cartManager';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import CheckoutStepper from '@/components/checkout/CheckoutStepper';
@@ -39,6 +39,7 @@ export default function CheckoutPage() {
   const { showLoading, hideLoading } = useLoading();
   const router = useRouter();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const { paymentOptions, isLoading: isLoadingPaymentOptions } = usePaymentOptions();
 
   // Refs for scrolling
   const scheduleSectionRef = useRef<HTMLDivElement>(null);
@@ -58,6 +59,19 @@ export default function CheckoutPage() {
   // Modals state
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+  // Auto-select single payment option if only one available
+  useEffect(() => {
+    if (isLoadingPaymentOptions || paymentOptions.length === 0) return;
+
+    if (paymentOptions.length === 1) {
+      const singleOption = paymentOptions[0].value;
+      if (paymentMethod !== singleOption) {
+        setPaymentMethod(singleOption);
+      }
+    }
+  }, [isLoadingPaymentOptions, paymentOptions, paymentMethod]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -139,10 +153,24 @@ export default function CheckoutPage() {
         setIsAddressModalOpen(true);
       }, 300); // Small delay for smooth transition
     } else {
-      // Scroll to payment section if address already exists
-      setTimeout(() => {
-        paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 500);
+      // Check available payment options
+      if (paymentOptions.length === 1) {
+        // Single payment option: auto-select and scroll to book button
+        setPaymentMethod(paymentOptions[0].value);
+        setTimeout(() => {
+          orderSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      } else if (paymentOptions.length > 1) {
+        // Multiple payment options: open payment modal and scroll to payment
+        setTimeout(() => {
+          setIsPaymentModalOpen(true);
+          paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      } else {
+        setTimeout(() => {
+          paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      }
     }
   };
 
@@ -175,15 +203,28 @@ export default function CheckoutPage() {
         setIsScheduleModalOpen(true);
       }, 300); // Small delay for smooth transition
     } else {
-      // Scroll to payment section
-      setTimeout(() => {
-        paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 500);
+      // Check payment options
+      if (paymentOptions.length === 1) {
+        setPaymentMethod(paymentOptions[0].value);
+        setTimeout(() => {
+          orderSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      } else if (paymentOptions.length > 1 && !paymentMethod) {
+        setTimeout(() => {
+          setIsPaymentModalOpen(true);
+          paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      } else {
+        setTimeout(() => {
+          paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      }
     }
   };
 
   const handlePaymentMethodSelect = (method: string) => {
     setPaymentMethod(method);
+    setIsPaymentModalOpen(false);
 
     // Log payment method selection activity
     logUserActivity(
@@ -200,7 +241,7 @@ export default function CheckoutPage() {
     // Scroll to book button in order summary
     setTimeout(() => {
       orderSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 300);
+    }, 400);
   };
 
   const formatDate = (date: Date | null) => {
@@ -295,18 +336,52 @@ export default function CheckoutPage() {
 
           {/* Payment Section */}
           <div ref={paymentSectionRef}>
-            <Card className="border-none shadow-md">
-              <CardHeader className="bg-muted/30 py-4">
+            <Card className="overflow-hidden border-none shadow-md">
+              <CardHeader className="bg-muted/30 py-4 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" />
                   <CardTitle className="text-lg">Payment Method</CardTitle>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsPaymentModalOpen(true)} 
+                  className="text-primary border-primary/20 hover:border-primary/40 hover:bg-primary/5 hover:text-primary font-bold h-8 px-3 rounded-md"
+                >
+                  {paymentMethod ? "Change" : "Select"}
+                </Button>
               </CardHeader>
-              <CardContent className="py-6">
-                <PaymentMethods 
-                  selectedMethod={paymentMethod}
-                  onSelect={handlePaymentMethodSelect}
-                />
+              <CardContent className="py-4">
+                {paymentMethod ? (
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary/10 p-3 rounded-full">
+                      {paymentMethod === 'online' ? (
+                        <CreditCard className="h-6 w-6 text-primary" />
+                      ) : (
+                        <HandCoins className="h-6 w-6 text-primary" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-bold">
+                        {paymentMethod === 'online' ? 'Pay Online (UPI, Card, or More)' : 'Pay After Service'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {paymentMethod === 'online' 
+                          ? 'Instant secure payment via UPI, Cards, Netbanking' 
+                          : 'Pay with cash or UPI after service completion'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    className="flex flex-col items-center py-4 text-center cursor-pointer" 
+                    onClick={() => setIsPaymentModalOpen(true)}
+                  >
+                    <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
+                    <p className="font-medium">No payment method selected</p>
+                    <p className="text-sm text-muted-foreground">Click to choose a payment method</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -375,6 +450,24 @@ export default function CheckoutPage() {
             onSelect={handleAddressSelect}
             initialAddressId={selectedAddress?.id}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Method Modal */}
+      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        <DialogContent className="max-w-md w-[95vw] overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Select Payment Method</DialogTitle>
+            <DialogDescription>
+              Choose how you would like to pay for your service.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <PaymentMethods 
+              selectedMethod={paymentMethod}
+              onSelect={handlePaymentMethodSelect}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

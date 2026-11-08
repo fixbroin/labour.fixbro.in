@@ -86,9 +86,9 @@ export default async function AllCategoriesPage() {
             <p className="text-muted-foreground">We are currently updating our services. Please check back soon!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 md:gap-8">
-            {categories.map((category) => (
-              <CategoryCard key={category.id} category={category} />
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6 md:gap-6">
+            {categories.map((category, index) => (
+              <CategoryCard key={category.id} category={category} priority={index < 6} index={index} />
             ))}
           </div>
         )}

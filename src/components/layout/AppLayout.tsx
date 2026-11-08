@@ -21,6 +21,7 @@ import CookieConsentBanner from '@/components/shared/CookieConsentBanner';
 import CompleteProfileDialog from '@/components/auth/CompleteProfileDialog';
 import AdminCompleteProfileDialog from '@/components/admin/AdminCompleteProfileDialog';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
+import { isWebView } from '@/lib/webview-bridge';
 import type { SiloData } from '@/lib/seoServerUtils';
 
 interface AppLayoutProps {
@@ -48,6 +49,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   const [showFooter, setShowFooter] = useState(!isHiddenRoute);
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const isHeaderVisibleRef = useRef(true);
   const lastScrollY = useRef(0);
 
   const { user, isLoading: authIsLoading, isCompletingProfile, isCompletingProfileAsAdmin, userCredentialForProfileCompletion, completeProfileSetup, cancelProfileCompletion } = useAuth();
@@ -191,6 +193,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     const preventRightClick = (e: MouseEvent) => e.preventDefault();
     document.addEventListener('contextmenu', preventRightClick);
 
+    // --- PREVENT ACCIDENTAL PINCH-TO-ZOOM ON IOS ---
+    const preventGesture = (e: Event) => {
+      e.preventDefault();
+    };
+    const preventMultiTouch = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('gesturestart', preventGesture, { passive: false });
+    document.addEventListener('gesturechange', preventGesture, { passive: false });
+    document.addEventListener('gestureend', preventGesture, { passive: false });
+    document.addEventListener('touchmove', preventMultiTouch, { passive: false });
+
     // --- SERVICE WORKER REGISTRATION ---
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       window.addEventListener('load', function() {
@@ -203,20 +220,39 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     }
     // --- END SERVICE WORKER REGISTRATION ---
 
-    return () => document.removeEventListener('contextmenu', preventRightClick);
+    return () => {
+      document.removeEventListener('contextmenu', preventRightClick);
+      document.removeEventListener('gesturestart', preventGesture);
+      document.removeEventListener('gesturechange', preventGesture);
+      document.removeEventListener('gestureend', preventGesture);
+      document.removeEventListener('touchmove', preventMultiTouch);
+    };
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    let ticking = false;
+
     const controlHeader = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY < lastScrollY.current || currentScrollY < 80) {
-        setIsHeaderVisible(true);
-      } else {
-        setIsHeaderVisible(false);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          const diff = Math.abs(currentScrollY - lastScrollY.current);
+
+          // Only trigger if scroll delta exceeds 6px or near top
+          if (diff > 6 || currentScrollY < 80) {
+            const shouldBeVisible = currentScrollY < lastScrollY.current || currentScrollY < 80;
+            if (shouldBeVisible !== isHeaderVisibleRef.current) {
+              isHeaderVisibleRef.current = shouldBeVisible;
+              setIsHeaderVisible(shouldBeVisible);
+            }
+            lastScrollY.current = currentScrollY;
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
-      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', controlHeader, { passive: true });
@@ -314,7 +350,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/') && !isMarketplaceRoute;
   const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
   const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
-  const shouldShowPwaInstallButton = isClientMounted && !pathname.startsWith('/category/') && !pathname.includes('/category/') && !isMarketplaceRoute;
+  const shouldShowPwaInstallButton = isClientMounted && !isWebView() && !pathname.startsWith('/category/') && !pathname.includes('/category/') && !isMarketplaceRoute;
 
   const bottomNavActivePaths = ['/', '/chat', '/notifications', '/my-bookings', '/profile', '/referral','/checkout/schedule', '/custom-service',
     '/checkout/address', '/checkout/payment', '/checkout/thank-you', '/cart', '/categories', '/my-address', '/about-us', '/contact-us', '/terms-and-conditions', 

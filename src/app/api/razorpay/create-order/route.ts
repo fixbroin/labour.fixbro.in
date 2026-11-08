@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
+import { getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 
 function calculateServerCancellationFee(bookingData: any, appConfig: any) {
   if (!appConfig?.enableCancellationPolicy) {
@@ -138,11 +139,17 @@ export async function POST(req: NextRequest) {
         console.error('Error calculating direct cart entries in Razorpay order:', err);
       }
     } else if (type === 'wallet_topup' && providerId) {
-      const minDeposit = appConfig?.minDepositAmount || 500;
-      const maxDeposit = appConfig?.maxDepositAmount || 10000;
+      const walletSettings = await getProviderWalletSettingsAction();
+      const minDeposit = walletSettings.minDepositAmount || 500;
+      const maxDeposit = walletSettings.maxDepositAmount || 10000;
       if ((amount / 100) < minDeposit || (amount / 100) > maxDeposit) {
         return NextResponse.json({ success: false, error: `Deposit must be between ${minDeposit} and ${maxDeposit}.` }, { status: 400 });
       }
+    } else if (type === 'id_card_fee' && providerId) {
+      const idCardSnap = await adminDb.collection('appConfiguration').doc('provider_id_card').get();
+      const idCardData = idCardSnap.exists ? idCardSnap.data() : null;
+      const fee = Number(idCardData?.downloadFee ?? 0);
+      reconciledBaseAmount = fee;
     }
 
     const reconciledAmountPaise = Math.round(reconciledBaseAmount * 100);

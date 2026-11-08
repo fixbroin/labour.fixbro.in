@@ -156,7 +156,7 @@ export const getDashboardData = cache(
             timestamp: serializeFirestoreData<string>(data.createdAt),
             title: 'New Booking',
             description: `ID: ${data.bookingId.substring(0, 8)} • ${data.customerName}`,
-            href: `/admin/bookings/edit/${doc.id}`,
+            href: `/admin/bookings?openBookingId=${encodeURIComponent(doc.id)}&search=${encodeURIComponent(data.bookingId || doc.id)}`,
           };
         }),
         ...recentUsers.docs.map(doc => {

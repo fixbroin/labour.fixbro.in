@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
+import { getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 
 const getCurrencySubunitDecimals = (currencyCode: string): number => {
   const c = currencyCode.toUpperCase();
@@ -123,8 +124,9 @@ export async function POST(req: NextRequest) {
         reconciledAmount = calculateServerCancellationFee(bookingData, appConfig);
       }
     } else if (type === 'wallet_topup' && providerId) {
-      const minDeposit = appConfig?.minDepositAmount || 500;
-      const maxDeposit = appConfig?.maxDepositAmount || 10000;
+      const walletSettings = await getProviderWalletSettingsAction();
+      const minDeposit = walletSettings.minDepositAmount || 500;
+      const maxDeposit = walletSettings.maxDepositAmount || 10000;
       if (amount < minDeposit || amount > maxDeposit) {
         return NextResponse.json({ success: false, error: `Deposit must be between ${minDeposit} and ${maxDeposit}.` }, { status: 400 });
       }

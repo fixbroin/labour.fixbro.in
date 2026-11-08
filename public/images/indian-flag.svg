@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600">
+  <!-- Indian National Flag (Tiranga) Standard 3:2 Ratio -->
+  <rect width="900" height="200" fill="#FF9933"/>
+  <rect y="200" width="900" height="200" fill="#FFFFFF"/>
+  <rect y="400" width="900" height="200" fill="#138808"/>
+  <g transform="translate(450, 300)">
+    <circle r="80" fill="none" stroke="#000080" stroke-width="14"/>
+    <circle r="16" fill="#000080"/>
+    <!-- 24 Spokes -->
+    <g stroke="#000080" stroke-width="6">
+      <line y1="-80" y2="80"/>
+      <line x1="-80" x2="80"/>
+      <line x1="-56.57" y1="-56.57" x2="56.57" y2="56.57"/>
+      <line x1="-56.57" y1="56.57" x2="56.57" y2="-56.57"/>
+      <line x1="-73.91" y1="-30.61" x2="73.91" y2="30.61"/>
+      <line x1="-73.91" y1="30.61" x2="73.91" y2="-30.61"/>
+      <line x1="-30.61" y1="-73.91" x2="30.61" y2="73.91"/>
+      <line x1="-30.61" y1="73.91" x2="30.61" y2="-73.91"/>
+      <line x1="-78.75" y1="-14.07" x2="78.75" y2="14.07"/>
+      <line x1="-78.75" y1="14.07" x2="78.75" y2="-14.07"/>
+      <line x1="-14.07" y1="-78.75" x2="14.07" y2="78.75"/>
+      <line x1="-14.07" y1="78.75" x2="14.07" y2="-78.75"/>
+    </g>
+  </g>
+</svg>

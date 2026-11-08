@@ -107,7 +107,7 @@ export default function AdminDashboardPage() {
           title: 'New Booking',
           description: `Booking ID: ${booking.bookingId.substring(0,12)}... by ${booking.customerName}`,
           icon: <TagIcon className="h-5 w-5 text-primary" />,
-          href: `/admin/bookings/edit/${docSnap.id}`,
+          href: `/admin/bookings?openBookingId=${encodeURIComponent(docSnap.id)}&search=${encodeURIComponent(booking.bookingId || docSnap.id)}`,
         };
       });
       bookingsLoaded = true;

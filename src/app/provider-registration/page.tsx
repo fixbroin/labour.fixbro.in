@@ -415,7 +415,7 @@ export default function ProviderRegistrationPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen" ref={formContainerRef}>
+    <div className="container mx-auto px-2 py-8 min-h-screen" ref={formContainerRef}>
       <Card className="max-w-3xl mx-auto shadow-xl scroll-mt-20">
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl font-headline text-center">

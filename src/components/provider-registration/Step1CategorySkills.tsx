@@ -200,14 +200,14 @@ export default function Step1CategorySkills({
                           <Button
                             key={cat.id}
                             variant="ghost"
-                            className="w-full justify-between font-normal h-11 px-3"
+                            className="w-full justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
                             onClick={() => {
                               field.onChange(cat.id);
                               setIsCategoryDialogOpen(false);
                             }}
                           >
-                            <span>{cat.name}</span>
-                            {field.value === cat.id && <Check className="h-4 w-4 text-primary" />}
+                            <span className="text-sm leading-snug break-words text-left flex-1 mr-2">{cat.name}</span>
+                            {field.value === cat.id && <Check className="h-4 w-4 text-primary shrink-0" />}
                           </Button>
                         ))}
                       </div>
@@ -256,14 +256,14 @@ export default function Step1CategorySkills({
                           <Button
                             key={level.id}
                             variant="ghost"
-                            className="w-full justify-between font-normal h-11 px-3"
+                            className="w-full justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
                             onClick={() => {
                               field.onChange(level.id);
                               setIsExperienceDialogOpen(false);
                             }}
                           >
-                            <span>{level.label}</span>
-                            {field.value === level.id && <Check className="h-4 w-4 text-primary" />}
+                            <span className="text-sm leading-snug break-words text-left flex-1 mr-2">{level.label}</span>
+                            {field.value === level.id && <Check className="h-4 w-4 text-primary shrink-0" />}
                           </Button>
                         ))}
                       </div>
@@ -312,14 +312,14 @@ export default function Step1CategorySkills({
                           <Button
                             key={level.id}
                             variant="ghost"
-                            className="w-full justify-between font-normal h-11 px-3"
+                            className="w-full justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
                             onClick={() => {
                               field.onChange(level.id);
                               setIsSkillDialogOpen(false);
                             }}
                           >
-                            <span>{level.label}</span>
-                            {field.value === level.id && <Check className="h-4 w-4 text-primary" />}
+                            <span className="text-sm leading-snug break-words text-left flex-1 mr-2">{level.label}</span>
+                            {field.value === level.id && <Check className="h-4 w-4 text-primary shrink-0" />}
                           </Button>
                         ))}
                       </div>

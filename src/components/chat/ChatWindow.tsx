@@ -643,14 +643,14 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
                         className={cn(
                           "relative px-3 py-2 rounded-lg text-sm shadow-sm transition-all",
                           isUser 
-                            ? "bg-primary text-primary-foreground rounded-br-none" 
-                            : "bg-secondary text-secondary-foreground rounded-bl-none border border-border/40"
+                            ? "bg-primary text-primary-foreground rounded-br-none [&_a]:text-white [&_a]:decoration-white/80 hover:[&_a]:text-white/80" 
+                            : "bg-secondary text-secondary-foreground rounded-bl-none border border-border/40 [&_a]:text-primary [&_a]:decoration-primary/60 hover:[&_a]:text-primary/80"
                         )}
                       >
                         {msg.text && (
                           <div 
-                            className="whitespace-pre-wrap leading-relaxed" 
-                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text) }} 
+                            className="whitespace-pre-wrap leading-relaxed break-words" 
+                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text, isUser) }} 
                           />
                         )}
                       </div>

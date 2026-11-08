@@ -31,6 +31,23 @@ if (fs.existsSync(standalonePath)) {
   console.log('[Postbuild] Copying essential assets to standalone (excluding uploads)...');
   copyDirFiltered(path.join(root, 'public'), path.join(standalonePath, 'public'), 'uploads');
   
+  // Symlink standalone public/uploads -> root public/uploads so both paths always point to identical files
+  const standaloneUploads = path.join(standalonePath, 'public', 'uploads');
+  try {
+    if (fs.existsSync(standaloneUploads)) {
+      const stat = fs.lstatSync(standaloneUploads);
+      if (stat.isDirectory() && !stat.isSymbolicLink()) {
+        fs.rmSync(standaloneUploads, { recursive: true, force: true });
+      }
+    }
+    if (!fs.existsSync(standaloneUploads)) {
+      fs.symlinkSync(path.join('..', '..', 'public', 'uploads'), standaloneUploads, 'junction');
+      console.log('[Postbuild] Successfully symlinked standalone public/uploads -> root public/uploads');
+    }
+  } catch (symErr) {
+    console.warn('[Postbuild] Notice: uploads symlink skipped or not supported:', symErr.message);
+  }
+
   const staticSrc = path.join(root, '.next', 'static');
   const staticDest = path.join(standalonePath, '.next', 'static');
   if (fs.existsSync(staticSrc)) {

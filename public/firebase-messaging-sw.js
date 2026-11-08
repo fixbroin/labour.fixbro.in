@@ -5,7 +5,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
 
 // Import the dynamic config served by our API route
-// This is necessary because service workers cannot access environment variables directly.
+// This is necessary because service workers cannot access environment variables directly. 
 importScripts('/api/firebase-config');
 
 // Initialize the Firebase app in the service worker with the fetched config

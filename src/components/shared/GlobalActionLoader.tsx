@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useLoading } from '@/contexts/LoadingContext';
@@ -16,6 +15,7 @@ const GlobalActionLoader: React.FC<GlobalActionLoaderProps> = ({ initialLoaderTy
   const previousPathnameRef = useRef(pathname);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showCenterSpinner, setShowCenterSpinner] = useState(false);
 
   // Smooth percentage progress animation (0% -> 30% -> 70% -> 90% -> 100%)
   useEffect(() => {
@@ -34,6 +34,21 @@ const GlobalActionLoader: React.FC<GlobalActionLoaderProps> = ({ initialLoaderTy
       const timer = setTimeout(() => setProgress(0), 200);
       return () => clearTimeout(timer);
     }
+  }, [isLoading]);
+
+  // Debounce center spinner overlay: fast transitions (<280ms) stay silky smooth with just top progress bar
+  useEffect(() => {
+    let spinnerTimer: NodeJS.Timeout | null = null;
+    if (isLoading) {
+      spinnerTimer = setTimeout(() => {
+        setShowCenterSpinner(true);
+      }, 280);
+    } else {
+      setShowCenterSpinner(false);
+    }
+    return () => {
+      if (spinnerTimer) clearTimeout(spinnerTimer);
+    };
   }, [isLoading]);
 
   // 1. Hide loader ONLY AFTER the new page pathname has officially changed and painted
@@ -70,17 +85,17 @@ const GlobalActionLoader: React.FC<GlobalActionLoaderProps> = ({ initialLoaderTy
 
   return (
     <>
-      {/* Dynamic Top Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1.5 z-[999999] bg-muted/30 overflow-hidden">
+      {/* Dynamic Top Progress Bar with hardware acceleration */}
+      <div className="fixed top-0 left-0 right-0 h-1.5 z-[999999] pointer-events-none bg-muted/20 overflow-hidden">
         <div 
-          className="h-full bg-gradient-to-r from-teal-500 via-primary to-emerald-400 transition-all duration-300 ease-out shadow-lg shadow-primary/50"
+          className="h-full bg-gradient-to-r from-teal-500 via-primary to-emerald-400 transition-all duration-300 ease-out shadow-sm shadow-primary/40 will-change-transform transform-gpu"
           style={{ width: `${progress}%` }}
         />
       </div>
       
-      {/* Non-blocking loader overlay */}
-      {isLoading && (
-        <div className="pointer-events-auto">
+      {/* Center loader overlay - only displayed for longer operations (>280ms) */}
+      {isLoading && showCenterSpinner && (
+        <div className="pointer-events-none animate-in fade-in duration-200">
           <AppLoader text={`Loading ${progress}% ...`} initialLoaderType={initialLoaderType} />
         </div>
       )}

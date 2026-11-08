@@ -24,8 +24,9 @@ export default function ProviderRegistrationToggleTab() {
   const [isChequeCompulsory, setIsChequeCompulsory] = useState(false);
   const [enableDefaultIndianKyc, setEnableDefaultIndianKyc] = useState(true);
   
-  const [enableCancelledChequeUpload, setEnableCancelledChequeUpload] = useState(true);
+  const [enableCancelledChequeUpload, setEnableCancelledChequeUpload] = useState(false);
   const [enableSignatureUpload, setEnableSignatureUpload] = useState(true);
+  const [enableBankDetailsSection, setEnableBankDetailsSection] = useState(false);
   const [customBankFields, setCustomBankFields] = useState<CustomBankField[]>([]);
 
   // New field form state
@@ -39,8 +40,9 @@ export default function ProviderRegistrationToggleTab() {
       setIsRegistrationEnabled(appConfig.isProviderRegistrationEnabled === undefined ? true : appConfig.isProviderRegistrationEnabled);
       setIsChequeCompulsory(appConfig.isCancelledChequeCompulsory === undefined ? false : appConfig.isCancelledChequeCompulsory);
       setEnableDefaultIndianKyc(appConfig.enableDefaultIndianKyc === undefined ? true : appConfig.enableDefaultIndianKyc);
-      setEnableCancelledChequeUpload(appConfig.enableCancelledChequeUpload === undefined ? true : appConfig.enableCancelledChequeUpload);
+      setEnableCancelledChequeUpload(appConfig.enableCancelledChequeUpload === undefined ? false : appConfig.enableCancelledChequeUpload);
       setEnableSignatureUpload(appConfig.enableSignatureUpload === undefined ? true : appConfig.enableSignatureUpload);
+      setEnableBankDetailsSection(appConfig.enableBankDetailsSection === undefined ? false : appConfig.enableBankDetailsSection);
       setCustomBankFields(appConfig.customBankFields || [
         { id: 'ifsc', name: 'IFSC Code', type: 'alphanumeric', required: true, placeholder: 'Enter IFSC code' }
       ]);
@@ -84,10 +86,12 @@ export default function ProviderRegistrationToggleTab() {
         enableDefaultIndianKyc: enableDefaultIndianKyc,
         enableCancelledChequeUpload: enableCancelledChequeUpload,
         enableSignatureUpload: enableSignatureUpload,
+        enableBankDetailsSection: enableBankDetailsSection,
         customBankFields: customBankFields,
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
+      await triggerRefresh('app-settings');
       await triggerRefresh('global-cache');
       toast({ title: "Success", description: "Provider registration settings updated." });
     } catch (error) {
@@ -133,6 +137,24 @@ export default function ProviderRegistrationToggleTab() {
               onCheckedChange={handleToggleChange}
               disabled={isSaving}
               aria-label="Toggle provider registration"
+            />
+          </div>
+
+          <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+            <div className="space-y-0.5">
+              <label htmlFor="bank-details-toggle" className="text-base font-medium">
+                Enable Bank Account Details Section
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {enableBankDetailsSection ? "Enabled: Bank account fields (Bank Name, Account Number, IFSC) are shown in Step 4." : "Disabled: Completely hides the bank account details section from Step 4."}
+              </p>
+            </div>
+            <Switch
+              id="bank-details-toggle"
+              checked={enableBankDetailsSection}
+              onCheckedChange={(checked) => setEnableBankDetailsSection(checked)}
+              disabled={isSaving}
+              aria-label="Toggle bank account details section"
             />
           </div>
 
@@ -210,13 +232,14 @@ export default function ProviderRegistrationToggleTab() {
             />
           </div>
 
-          <div className="rounded-lg border p-4 shadow-sm space-y-4">
-            <div>
-              <h3 className="text-lg font-medium">Custom Bank Fields</h3>
-              <p className="text-sm text-muted-foreground">
-                Add or remove bank details fields (e.g. SWIFT Code, IFSC Code, Bank Code) to show in Step 4.
-              </p>
-            </div>
+          {enableBankDetailsSection && (
+            <div className="rounded-lg border p-4 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-lg font-medium">Custom Bank Fields</h3>
+                <p className="text-sm text-muted-foreground">
+                  Add or remove bank details fields (e.g. SWIFT Code, IFSC Code, Bank Code) to show in Step 4.
+                </p>
+              </div>
             
             <div className="space-y-3">
               {customBankFields.map((field) => (
@@ -307,6 +330,7 @@ export default function ProviderRegistrationToggleTab() {
               </Button>
             </div>
           </div>
+          )}
         </div>
       </CardContent>
       <CardFooter className="border-t px-6 py-4">

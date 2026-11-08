@@ -10,7 +10,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 import { getCache, setCache } from '@/lib/client-cache';
 
 const getItemsLimit = (width: number): number => {
-  if (width < 640) return 5; // Mobile
+  if (width < 640) return 8; // Mobile
   if (width < 1024) return 9; // Tablet
   return 11; // Desktop
 };
@@ -96,7 +96,7 @@ const HomeCategoriesSection = ({ initialCategories }: HomeCategoriesSectionProps
     <>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6 md:gap-6">
         {displayedCategories.map((category, index) => (
-          <CategoryCard key={category.id} category={category} priority={index < 6} index={index} />
+          <CategoryCard key={category.id} category={category} priority={index < 9} index={index} />
         ))}
 
         {!showAll && categories.length > itemsLimit && (

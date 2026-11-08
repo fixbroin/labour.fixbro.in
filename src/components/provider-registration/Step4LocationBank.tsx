@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { storage, db } from '@/lib/firebase';
 import { ref as storageRefStandard, uploadBytesResumable, getDownloadURL, deleteObject } from '@/lib/mysqlStorage';
 import { Progress } from "@/components/ui/progress";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Timestamp, doc, getDoc } from '@/lib/mysqlDb';
 import { nanoid } from 'nanoid';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
@@ -42,7 +42,7 @@ const isValidImageSrc = (url: string | null | undefined): url is string => {
 };
 
 const DEFAULT_MAP_CENTER = { lat: 12.9716, lng: 77.5946 }; // Bangalore
-const createStep4Schema = (maxRadius: number) => z.object({
+const createStep4Schema = (maxRadius: number, enableBankDetails: boolean = false) => z.object({
   workAreaCenter: z.object({
     lat: z.number({ required_error: "Please select a location on the map." }),
     lng: z.number({ required_error: "Please select a location on the map." }),
@@ -51,20 +51,25 @@ const createStep4Schema = (maxRadius: number) => z.object({
   }),
   workAreaRadiusKm: z.coerce.number().min(1, "Radius must be at least 1 km.").max(maxRadius, `Radius cannot exceed the maximum of ${maxRadius} km.`),
   workAreaAddress: z.string().optional(),
-  bankName: z.string().min(2, "Bank name is required.").max(100),
-  accountHolderName: z.string().min(2, "Account holder name is required.").max(100),
-  accountNumber: z.string().min(5, "Account number seems too short.").max(25, "Account number too long."),
-  confirmAccountNumber: z.string(),
+  bankName: enableBankDetails ? z.string().min(2, "Bank name is required.").max(100) : z.string().optional(),
+  accountHolderName: enableBankDetails ? z.string().min(2, "Account holder name is required.").max(100) : z.string().optional(),
+  accountNumber: enableBankDetails ? z.string().min(5, "Account number seems too short.").max(25, "Account number too long.") : z.string().optional(),
+  confirmAccountNumber: z.string().optional(),
   ifscCode: z.string().optional(),
   cancelledChequeUrl: z.string().optional().nullable(),
   signatureUrl: z.string().optional().nullable(),
   termsConfirmation: z.boolean().refine(value => value === true, {
     message: "You must agree to the terms and conditions.",
   }),
-  customFields: z.record(z.string().optional()),
-}).refine(data => data.accountNumber === data.confirmAccountNumber, {
-  message: "Account numbers do not match.",
-  path: ["confirmAccountNumber"],
+  customFields: z.record(z.string().optional()).optional(),
+}).superRefine((data, ctx) => {
+  if (enableBankDetails && data.accountNumber && data.accountNumber !== data.confirmAccountNumber) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Account numbers do not match.",
+      path: ["confirmAccountNumber"],
+    });
+  }
 });
 
 type Step4FormData = z.infer<ReturnType<typeof createStep4Schema>>;
@@ -113,10 +118,11 @@ export default function Step4LocationBank({
   const [signatureStatusMessage, setSignatureStatusMessage] = useState("");
   const [isFormBusyForSignature, setIsFormBusyForSignature] = useState(false);
 
-  const maxRadius = appConfig.maxProviderRadiusKm || 50;
-  const step4Schema = createStep4Schema(maxRadius);
-  const enableCancelledCheque = appConfig?.enableCancelledChequeUpload !== false;
+  const enableBankDetails = appConfig?.enableBankDetailsSection === true;
+  const enableCancelledCheque = appConfig?.enableCancelledChequeUpload === true;
   const enableSignature = appConfig?.enableSignatureUpload !== false;
+  const maxRadius = appConfig.maxProviderRadiusKm || 50;
+  const step4Schema = useMemo(() => createStep4Schema(maxRadius, enableBankDetails), [maxRadius, enableBankDetails]);
   
   const form = useForm<Step4FormData>({
     resolver: zodResolver(step4Schema),
@@ -320,54 +326,57 @@ export default function Step4LocationBank({
         return;
     }
     
-    const errors: string[] = [];
-    if (appConfig.isCancelledChequeCompulsory && !selectedChequeFile && !data.cancelledChequeUrl && !initialData.bankDetails?.cancelledChequeUrl) {
-        errors.push("Cancelled Cheque Image");
-    }
-    if (!selectedSignatureFile && !data.signatureUrl && !initialData.signatureUrl) {
-        errors.push("Signature Image");
-    }
-
-    const enableCancelledCheque = appConfig.enableCancelledChequeUpload !== false;
+    const enableBankDetails = appConfig?.enableBankDetailsSection === true;
+    const enableCancelledCheque = appConfig.enableCancelledChequeUpload === true;
     const isChequeCompulsory = appConfig.isCancelledChequeCompulsory === true;
     const enableSignature = appConfig.enableSignatureUpload !== false;
 
-    // A. Validate dynamic custom bank fields
-    let hasCustomErrors = false;
-    customFields.forEach(f => {
-      const val = data.customFields?.[f.id] || "";
-      if (f.required && !val.trim()) {
-        form.setError(`customFields.${f.id}` as any, {
-          type: "manual",
-          message: `${f.name} is required.`
-        });
-        hasCustomErrors = true;
-      } else if (val.trim()) {
-        if (f.type === 'number' && !/^\d+$/.test(val.trim())) {
-          form.setError(`customFields.${f.id}` as any, {
-            type: "manual",
-            message: `${f.name} must contain only numbers.`
-          });
-          hasCustomErrors = true;
-        } else if (f.type === 'text' && !/^[A-Za-z\s]+$/.test(val.trim())) {
-          form.setError(`customFields.${f.id}` as any, {
-            type: "manual",
-            message: `${f.name} must contain only letters.`
-          });
-          hasCustomErrors = true;
-        } else if (f.type === 'alphanumeric' && !/^[a-zA-Z0-9\s]+$/.test(val.trim())) {
-          form.setError(`customFields.${f.id}` as any, {
-            type: "manual",
-            message: `${f.name} must contain only letters and numbers.`
-          });
-          hasCustomErrors = true;
-        }
-      }
-    });
+    const errors: string[] = [];
+    if (enableCancelledCheque && isChequeCompulsory && !selectedChequeFile && !data.cancelledChequeUrl && !initialData.bankDetails?.cancelledChequeUrl) {
+        errors.push("Cancelled Cheque Image");
+    }
+    if (enableSignature && !selectedSignatureFile && !data.signatureUrl && !initialData.signatureUrl) {
+        errors.push("Signature Image");
+    }
 
-    if (hasCustomErrors) {
-      toast({ title: "Validation Error", description: "Please complete all bank fields correctly.", variant: "destructive" });
-      return;
+    // A. Validate dynamic custom bank fields (only if bank details enabled)
+    let hasCustomErrors = false;
+    if (enableBankDetails) {
+      customFields.forEach(f => {
+        const val = data.customFields?.[f.id] || "";
+        if (f.required && !val.trim()) {
+          form.setError(`customFields.${f.id}` as any, {
+            type: "manual",
+            message: `${f.name} is required.`
+          });
+          hasCustomErrors = true;
+        } else if (val.trim()) {
+          if (f.type === 'number' && !/^\d+$/.test(val.trim())) {
+            form.setError(`customFields.${f.id}` as any, {
+              type: "manual",
+              message: `${f.name} must contain only numbers.`
+            });
+            hasCustomErrors = true;
+          } else if (f.type === 'text' && !/^[A-Za-z\s]+$/.test(val.trim())) {
+            form.setError(`customFields.${f.id}` as any, {
+              type: "manual",
+              message: `${f.name} must contain only letters.`
+            });
+            hasCustomErrors = true;
+          } else if (f.type === 'alphanumeric' && !/^[a-zA-Z0-9\s]+$/.test(val.trim())) {
+            form.setError(`customFields.${f.id}` as any, {
+              type: "manual",
+              message: `${f.name} must contain only letters and numbers.`
+            });
+            hasCustomErrors = true;
+          }
+        }
+      });
+
+      if (hasCustomErrors) {
+        toast({ title: "Validation Error", description: "Please complete all bank fields correctly.", variant: "destructive" });
+        return;
+      }
     }
 
     // B. Check Cancelled Cheque upload if required
@@ -426,16 +435,24 @@ export default function Step4LocationBank({
         return;
       }
 
-      const bankDetailsData: BankDetails = {
-        bankName: data.bankName,
-        accountHolderName: data.accountHolderName,
-        accountNumber: data.accountNumber,
+      const bankDetailsData: BankDetails | undefined = enableBankDetails ? {
+        bankName: data.bankName || "",
+        accountHolderName: data.accountHolderName || "",
+        accountNumber: data.accountNumber || "",
         ifscCode: (data.customFields?.['ifsc'] || data.ifscCode || "").toUpperCase(),
-        customFields: data.customFields as Record<string, string>,
+        customFields: (data.customFields as Record<string, string>) || {},
         cancelledChequeUrl: enableCancelledCheque ? (finalChequeUrl || undefined) : undefined,
         cancelledChequeFileName: enableCancelledCheque ? (finalChequeFileName || undefined) : undefined,
         verified: initialData.bankDetails?.verified || false,
-      };
+      } : (enableCancelledCheque && finalChequeUrl ? {
+        bankName: initialData.bankDetails?.bankName || "",
+        accountHolderName: initialData.bankDetails?.accountHolderName || "",
+        accountNumber: initialData.bankDetails?.accountNumber || "",
+        ifscCode: initialData.bankDetails?.ifscCode || "",
+        cancelledChequeUrl: finalChequeUrl,
+        cancelledChequeFileName: finalChequeFileName || undefined,
+        verified: initialData.bankDetails?.verified || false,
+      } : (initialData.bankDetails || undefined));
       
       const applicationStepData: Partial<ProviderApplication> = {
         workAreaCenter: {
@@ -536,44 +553,54 @@ export default function Step4LocationBank({
             </CardContent>
           </Card>
 
+          {(enableBankDetails || enableCancelledCheque) && (
           <Card className="p-4 border shadow-sm">
-            <CardHeader className="p-0 pb-3"><CardTitle className="text-lg flex items-center"><Banknote className="mr-2 h-5 w-5 text-primary"/>Bank Account Details</CardTitle></CardHeader>
+            <CardHeader className="p-0 pb-3">
+              <CardTitle className="text-lg flex items-center">
+                <Banknote className="mr-2 h-5 w-5 text-primary"/>
+                {enableBankDetails ? "Bank Account Details" : "Bank Verification Document"}
+              </CardTitle>
+            </CardHeader>
             <CardContent className="p-0 space-y-4">
-              <FormField control={form.control} name="accountHolderName" render={({ field }) => (<FormItem><FormLabel>Account Holder Name *</FormLabel><FormControl><Input placeholder="As per bank records" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
-              <FormField control={form.control} name="bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name *</FormLabel><FormControl><Input placeholder="e.g., State Bank of India" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField control={form.control} name="accountNumber" render={({ field }) => (<FormItem><FormLabel>Account Number *</FormLabel><FormControl><Input placeholder="Enter bank account number" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
-                <FormField control={form.control} name="confirmAccountNumber" render={({ field }) => (<FormItem><FormLabel>Confirm Account Number *</FormLabel><FormControl><Input placeholder="Re-enter account number" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
-              </div>
-              {customFields.map((field) => (
-                <FormField
-                  key={field.id}
-                  control={form.control}
-                  name={`customFields.${field.id}`}
-                  render={({ field: inputField }) => (
-                    <FormItem>
-                      <FormLabel>{field.name} {field.required ? '*' : ''}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder={field.placeholder || `Enter ${field.name}`}
-                          {...inputField}
-                          value={inputField.value ?? ""}
-                          onChange={(e) => {
-                            const rawVal = e.target.value;
-                            let formattedVal = rawVal;
-                            if (field.type === 'alphanumeric' || field.type === 'text') {
-                              formattedVal = rawVal.toUpperCase();
-                            }
-                            inputField.onChange(formattedVal);
-                          }}
-                          disabled={effectiveIsSaving}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
+              {enableBankDetails && (
+                <>
+                  <FormField control={form.control} name="accountHolderName" render={({ field }) => (<FormItem><FormLabel>Account Holder Name *</FormLabel><FormControl><Input placeholder="As per bank records" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name *</FormLabel><FormControl><Input placeholder="e.g., State Bank of India" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="accountNumber" render={({ field }) => (<FormItem><FormLabel>Account Number *</FormLabel><FormControl><Input placeholder="Enter bank account number" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={form.control} name="confirmAccountNumber" render={({ field }) => (<FormItem><FormLabel>Confirm Account Number *</FormLabel><FormControl><Input placeholder="Re-enter account number" {...field} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
+                  </div>
+                  {customFields.map((field) => (
+                    <FormField
+                      key={field.id}
+                      control={form.control}
+                      name={`customFields.${field.id}`}
+                      render={({ field: inputField }) => (
+                        <FormItem>
+                          <FormLabel>{field.name} {field.required ? '*' : ''}</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={field.placeholder || `Enter ${field.name}`}
+                              {...inputField}
+                              value={inputField.value ?? ""}
+                              onChange={(e) => {
+                                const rawVal = e.target.value;
+                                let formattedVal = rawVal;
+                                if (field.type === 'alphanumeric' || field.type === 'text') {
+                                  formattedVal = rawVal.toUpperCase();
+                                }
+                                inputField.onChange(formattedVal);
+                              }}
+                              disabled={effectiveIsSaving}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </>
+              )}
 
               {enableCancelledCheque && (
                 <FormItem className="space-y-2">
@@ -643,6 +670,7 @@ export default function Step4LocationBank({
               )}
             </CardContent>
           </Card>
+          )}
 
           {enableSignature && (
             <Card className="p-4 border shadow-sm">

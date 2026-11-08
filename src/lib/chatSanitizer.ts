@@ -21,11 +21,18 @@ export function escapeHtml(str: string): string {
  * - Supports markdown links ([title](https://...)) strictly requiring http/https protocols
  * - Supports auto-linking raw http/https URLs with rel="noopener noreferrer nofollow"
  */
-export function safeFormatChatMessage(text: string): string {
+export function safeFormatChatMessage(text: string, isOutgoing?: boolean): string {
   if (!text || typeof text !== 'string') return '';
 
   // 1. Mandatory First Step: Escape all HTML characters
   const escaped = escapeHtml(text);
+
+  // High contrast link styles:
+  // - Outgoing message (Fixbro teal background): white text with clear underline so it's fully visible and opposite of the background
+  // - Incoming message (white/gray card background): teal primary text with underline
+  const linkClasses = isOutgoing
+    ? "font-semibold underline underline-offset-2 text-white hover:text-white/80 decoration-white/80 break-all transition-colors"
+    : "font-semibold underline underline-offset-2 text-primary hover:text-primary/80 decoration-primary/60 break-all transition-colors";
 
   // 2. Markdown Links: [Title](https://...) strictly requiring http or https
   const mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s<>"')]+)\)/g;
@@ -36,7 +43,7 @@ export function safeFormatChatMessage(text: string): string {
         return `${title} (${rawUrl})`;
       }
       const safeHref = encodeURI(rawUrl);
-      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer nofollow" class="font-semibold underline text-primary hover:text-primary/80 transition-colors">${title}</a>`;
+      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer nofollow" class="${linkClasses}">${title}</a>`;
     } catch {
       return `${title} (${rawUrl})`;
     }
@@ -60,7 +67,7 @@ export function safeFormatChatMessage(text: string): string {
         return rawUrl;
       }
       const safeHref = encodeURI(rawUrl);
-      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer nofollow" class="font-medium underline text-primary hover:text-primary/80 transition-colors">${safeHref}</a>`;
+      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer nofollow" class="${linkClasses}">${safeHref}</a>`;
     } catch {
       return rawUrl;
     }

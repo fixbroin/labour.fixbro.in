@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, UserX, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck, AlertTriangle, Check, ChevronsUpDown } from "lucide-react"; 
+import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, UserX, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck, AlertTriangle, Check, ChevronsUpDown, Zap, Layers } from "lucide-react"; 
 import type { FirestoreBooking, BookingStatus, BookingServiceItem, AppSettings, ProviderApplication, FirestoreNotification, MarketingAutomationSettings, ReferralSettings, FirestoreUser, Referral, DayAvailability } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -85,6 +85,101 @@ const getCoverageBadge = (booking: FirestoreBooking) => {
         return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Manual Dispatch</Badge>;
     }
     return null;
+};
+
+const getQueueBadge = (pos?: number) => {
+  if (!pos) return null;
+  if (pos === 1) {
+    return (
+      <Badge className="bg-red-600 text-white hover:bg-red-700 font-extrabold text-[11px] px-2.5 py-0.5 shadow-sm border border-red-400 whitespace-nowrap">
+        🥇 #1 DUE FIRST
+      </Badge>
+    );
+  }
+  if (pos === 2) {
+    return (
+      <Badge className="bg-amber-600 text-white hover:bg-amber-700 font-extrabold text-[11px] px-2.5 py-0.5 shadow-sm border border-amber-400 whitespace-nowrap">
+        🥈 #2 DUE NEXT
+      </Badge>
+    );
+  }
+  if (pos === 3) {
+    return (
+      <Badge className="bg-yellow-600 text-white hover:bg-yellow-700 font-extrabold text-[11px] px-2.5 py-0.5 shadow-sm border border-yellow-400 whitespace-nowrap">
+        🥉 #3 DUE THIRD
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="font-bold text-[10px] px-2 py-0.5 bg-background border-muted-foreground/30 text-foreground whitespace-nowrap">
+      #{pos} DUE
+    </Badge>
+  );
+};
+
+const getDayCategory = (dateString: string | undefined): 'today' | 'tomorrow' | 'dayAfter' | 'later' => {
+  if (!dateString) return 'later';
+  try {
+    const now = new Date();
+    const todayStr = formatDateInTimezone(now, 'Asia/Kolkata', 'YYYY-MM-DD');
+    
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowStr = formatDateInTimezone(tomorrow, 'Asia/Kolkata', 'YYYY-MM-DD');
+
+    const dayAfter = new Date(now);
+    dayAfter.setDate(now.getDate() + 2);
+    const dayAfterStr = formatDateInTimezone(dayAfter, 'Asia/Kolkata', 'YYYY-MM-DD');
+
+    const cleanDateStr = dateString.split('T')[0];
+    if (cleanDateStr === todayStr) return 'today';
+    if (cleanDateStr === tomorrowStr) return 'tomorrow';
+    if (cleanDateStr === dayAfterStr) return 'dayAfter';
+    return 'later';
+  } catch (e) {
+    return 'later';
+  }
+};
+
+const getDayCategoryBadge = (dayCat: 'today' | 'tomorrow' | 'dayAfter' | 'later', isCompleted: boolean) => {
+  if (isCompleted) return null;
+  switch (dayCat) {
+    case 'today':
+      return <Badge className="bg-red-600 text-white font-black text-[10px] uppercase tracking-wider animate-pulse border-red-500 shadow-sm flex items-center gap-1 whitespace-nowrap">🚨 TODAY - URGENT</Badge>;
+    case 'tomorrow':
+      return <Badge className="bg-amber-600 text-white font-bold text-[10px] uppercase tracking-wider border-amber-500 shadow-sm flex items-center gap-1 whitespace-nowrap">⏰ TOMORROW</Badge>;
+    case 'dayAfter':
+      return <Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider border-emerald-500 shadow-sm flex items-center gap-1 whitespace-nowrap">📅 IN 2 DAYS</Badge>;
+    default:
+      return null;
+  }
+};
+
+const getDayBorderClass = (dayCat: 'today' | 'tomorrow' | 'dayAfter' | 'later', isCompleted: boolean) => {
+  if (isCompleted) return "border-l-4 border-l-gray-400";
+  switch (dayCat) {
+    case 'today':
+      return "border-l-4 border-l-red-600 border-red-200 dark:border-red-950 bg-red-500/5 shadow-red-100/50";
+    case 'tomorrow':
+      return "border-l-4 border-l-amber-500 border-amber-200 dark:border-amber-950 bg-amber-500/5 shadow-amber-100/50";
+    case 'dayAfter':
+      return "border-l-4 border-l-emerald-500 border-emerald-200 dark:border-emerald-950 bg-emerald-500/5 shadow-emerald-100/50";
+    default:
+      return "border-l-4 border-l-primary/60 border-border";
+  }
+};
+
+const getDayDateBoxClass = (dayCat: 'today' | 'tomorrow' | 'dayAfter' | 'later') => {
+  switch (dayCat) {
+    case 'today':
+      return "border-2 border-red-500/70 bg-red-500/10 text-red-800 dark:text-red-300";
+    case 'tomorrow':
+      return "border-2 border-amber-500/70 bg-amber-500/10 text-amber-900 dark:text-amber-300";
+    case 'dayAfter':
+      return "border-2 border-emerald-500/70 bg-emerald-500/10 text-emerald-900 dark:text-emerald-300";
+    default:
+      return "border-2 border-primary/40 bg-primary/5 text-primary";
+  }
 };
 
 const getPaymentBadgeClass = (method: string | undefined, status: string, booking?: any) => {
@@ -172,6 +267,14 @@ export default function AdminBookingsPage() {
   const [isInitializing, setIsInitializing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<BookingStatus | "All">("All");
+  const [filterCategory, setFilterCategory] = useState<string>("All");
+  const [isFilterCategoryPickerOpen, setIsFilterCategoryPickerOpen] = useState(false);
+
+  // Category and Provider metadata
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [serviceCategoryMap, setServiceCategoryMap] = useState<Record<string, string>>({});
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+  const [providerNames, setProviderNames] = useState<Record<string, string>>({});
 
   const searchParams = useSearchParams();
   const urlSearch = searchParams?.get('search') || '';
@@ -183,6 +286,61 @@ export default function AdminBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<FirestoreBooking | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+
+  // Load category hierarchy & provider names
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        const [catsSnap, subCatsSnap, servicesSnap, providersSnap] = await Promise.all([
+          getDocs(collection(db, "adminCategories")),
+          getDocs(collection(db, "adminSubCategories")),
+          getDocs(collection(db, "adminServices")),
+          getDocs(collection(db, "providerApplications")),
+        ]);
+
+        const cNameMap: Record<string, string> = {};
+        const catList: { id: string; name: string }[] = [];
+        catsSnap.docs.forEach(d => {
+          const data = d.data();
+          cNameMap[d.id] = data.name;
+          catList.push({ id: d.id, name: data.name });
+        });
+
+        const subToCatMap: Record<string, string> = {};
+        subCatsSnap.docs.forEach(d => {
+          const data = d.data();
+          if (data.parentId && cNameMap[data.parentId]) {
+            subToCatMap[d.id] = cNameMap[data.parentId];
+          }
+        });
+
+        const sToCatMap: Record<string, string> = {};
+        servicesSnap.docs.forEach(d => {
+          const data = d.data();
+          if (data.subCategoryId && subToCatMap[data.subCategoryId]) {
+            sToCatMap[d.id] = subToCatMap[data.subCategoryId];
+          } else if (data.parentCategoryId && cNameMap[data.parentCategoryId]) {
+            sToCatMap[d.id] = cNameMap[data.parentCategoryId];
+          }
+        });
+
+        const pMap: Record<string, string> = {};
+        providersSnap.docs.forEach(doc => {
+          const d = doc.data();
+          pMap[doc.id] = d.fullName || d.name || d.mobileNumber || 'Provider';
+        });
+
+        setCategories(catList);
+        setCategoryNameMap(cNameMap);
+        setServiceCategoryMap(sToCatMap);
+        setProviderNames(pMap);
+      } catch (err) {
+        console.error("Error loading booking metadata (categories/providers):", err);
+      }
+    };
+
+    fetchMetadata();
+  }, []);
 
   useEffect(() => {
     fetch('/api/bookings/cancel-pending-payment', {
@@ -206,7 +364,9 @@ export default function AdminBookingsPage() {
   }, [urlSearch, urlOpenBookingId]);
 
   useEffect(() => {
-    if (urlOpenBookingId && bookings.length > 0) {
+    if (!urlOpenBookingId) return;
+
+    if (bookings.length > 0) {
       const target = bookings.find(b => 
         b.bookingId === urlOpenBookingId || 
         b.id === urlOpenBookingId || 
@@ -221,9 +381,35 @@ export default function AdminBookingsPage() {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }, 300);
+        return;
       }
     }
-  }, [urlOpenBookingId, bookings]);
+
+    // Fallback: direct fetch if booking is not in current in-memory list
+    if (!isLoading) {
+      (async () => {
+        try {
+          const directDoc = await getDoc(doc(db, "bookings", urlOpenBookingId));
+          if (directDoc.exists()) {
+            const data = { ...directDoc.data(), id: directDoc.id } as FirestoreBooking;
+            setSelectedBooking(data);
+            setIsDetailsModalOpen(true);
+            return;
+          }
+
+          const q = query(collection(db, "bookings"), where("bookingId", "==", urlOpenBookingId), limit(1));
+          const qSnap = await getDocs(q);
+          if (!qSnap.empty) {
+            const data = { ...qSnap.docs[0].data(), id: qSnap.docs[0].id } as FirestoreBooking;
+            setSelectedBooking(data);
+            setIsDetailsModalOpen(true);
+          }
+        } catch (e) {
+          console.error("Error fetching single booking for modal:", e);
+        }
+      })();
+    }
+  }, [urlOpenBookingId, bookings, isLoading]);
   const symbol = appConfig?.currencySymbol || 'â‚¹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
@@ -406,6 +592,20 @@ export default function AdminBookingsPage() {
     }
   };
 
+  const getBookingCategory = useCallback((b: FirestoreBooking): string => {
+    if (b.workCategoryId && categoryNameMap[b.workCategoryId]) {
+      return categoryNameMap[b.workCategoryId];
+    }
+    if (b.services && b.services.length > 0) {
+      for (const s of b.services) {
+        if (s.serviceId && serviceCategoryMap[s.serviceId]) {
+          return serviceCategoryMap[s.serviceId];
+        }
+      }
+    }
+    return 'General Service';
+  }, [categoryNameMap, serviceCategoryMap]);
+
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
     
@@ -413,8 +613,13 @@ export default function AdminBookingsPage() {
     if (filterStatus !== "All") {
       filtered = filtered.filter(b => b.status === filterStatus);
     }
+
+    // 2. Category Filter
+    if (filterCategory !== "All") {
+      filtered = filtered.filter(b => getBookingCategory(b) === filterCategory);
+    }
     
-    // 2. Client-side Search Filter (for instant refinement)
+    // 3. Client-side Search Filter (for instant refinement)
     if (searchTerm.trim()) {
       const lowerSearch = searchTerm.toLowerCase().trim();
       const normalizedSearchPhone = lowerSearch.replace(/\D/g, '').replace(/^91/, '');
@@ -427,8 +632,9 @@ export default function AdminBookingsPage() {
         const phoneMatch = normalizedSearchPhone ? userPhone.includes(normalizedSearchPhone) : false;
 
         const numberMatch = b.bookingNumber?.toString() === lowerSearch;
+        const categoryMatch = getBookingCategory(b).toLowerCase().includes(lowerSearch);
         
-        return idMatch || nameMatch || phoneMatch || numberMatch;
+        return idMatch || nameMatch || phoneMatch || numberMatch || categoryMatch;
       });
     }
     
@@ -440,18 +646,64 @@ export default function AdminBookingsPage() {
       if (isACompleted && !isBCompleted) return 1;
 
       if (!isACompleted && !isBCompleted) {
+        // Active bookings: sort chronologically (earliest scheduled timestamp first)
         const timeA = getBookingScheduledTimestamp(a);
         const timeB = getBookingScheduledTimestamp(b);
         if (timeA !== timeB) return timeA - timeB;
-        return (Number(b.bookingNumber) || 0) - (Number(a.bookingNumber) || 0);
+        // Same time slot: tie-break by bookingNumber ascending (earliest created booking first)
+        const numA = Number(a.bookingNumber) || 0;
+        const numB = Number(b.bookingNumber) || 0;
+        if (numA !== numB) return numA - numB;
+        return getBookingTimestampMillis(a) - getBookingTimestampMillis(b);
       } else {
+        // Completed/Cancelled bookings: sort newest scheduled/completed first
         const timeA = getBookingScheduledTimestamp(a);
         const timeB = getBookingScheduledTimestamp(b);
         if (timeA !== timeB) return timeB - timeA;
         return (Number(b.bookingNumber) || 0) - (Number(a.bookingNumber) || 0);
       }
     });
-  }, [bookings, filterStatus, searchTerm]);
+  }, [bookings, filterStatus, filterCategory, searchTerm, getBookingCategory]);
+
+  // Active chronological queue map (#1, #2, #3...)
+  const activeQueueMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let activeIndex = 0;
+    filteredBookings.forEach(b => {
+      const isCompleted = b.status === 'Completed' || b.status === 'Cancelled' || b.status === 'ProviderRejected';
+      if (!isCompleted) {
+        activeIndex += 1;
+        map.set(b.id || b.bookingId, activeIndex);
+      }
+    });
+    return map;
+  }, [filteredBookings]);
+
+  // Concurrent bookings sharing identical scheduled date and time slot
+  const slotStatsMap = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    filteredBookings.forEach(b => {
+      const isCompleted = b.status === 'Completed' || b.status === 'Cancelled' || b.status === 'ProviderRejected';
+      if (!isCompleted && b.scheduledDate && b.scheduledTimeSlot) {
+        const cleanDate = b.scheduledDate.split('T')[0];
+        const cleanSlot = b.scheduledTimeSlot.trim().toLowerCase();
+        const key = `${cleanDate}_${cleanSlot}`;
+        const list = groups.get(key) || [];
+        list.push(b.id || b.bookingId);
+        groups.set(key, list);
+      }
+    });
+
+    const stats = new Map<string, { totalInSlot: number; slotIndex: number }>();
+    groups.forEach((ids) => {
+      if (ids.length > 1) {
+        ids.forEach((id, idx) => {
+          stats.set(id, { totalInSlot: ids.length, slotIndex: idx + 1 });
+        });
+      }
+    });
+    return stats;
+  }, [filteredBookings]);
 
   const handleStatusChange = async (booking: FirestoreBooking, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     if (!booking.id) return;
@@ -713,118 +965,193 @@ export default function AdminBookingsPage() {
     }
   };
 
-  const renderBookingCard = (booking: FirestoreBooking) => (
-    <Card key={booking.id} className="mb-4 border-l-4 shadow-md overflow-hidden" style={{ borderLeftColor: getStatusBadgeClass(booking.status).split(' ')[0].replace('bg-', 'var(--') }}>
-      <CardHeader className="p-4 bg-muted/20 pb-3">
-        <div className="flex flex-col gap-2">
+  const renderBookingCard = (booking: FirestoreBooking) => {
+    const isCompleted = booking.status === 'Completed' || booking.status === 'Cancelled' || booking.status === 'ProviderRejected';
+    const queuePos = !isCompleted ? activeQueueMap.get(booking.id || booking.bookingId) : undefined;
+    const dayCat = !isCompleted ? getDayCategory(booking.scheduledDate) : 'later';
+    const concurrentInfo = slotStatsMap.get(booking.id || booking.bookingId);
+    const categoryName = getBookingCategory(booking);
+    const providerName = booking.providerId ? (providerNames[booking.providerId] || 'Assigned Provider') : null;
+    const cardBorder = getDayBorderClass(dayCat, isCompleted);
+    const dateBoxStyle = getDayDateBoxClass(dayCat);
+
+    return (
+      <Card key={booking.id} className={cn("mb-4 border-l-4 shadow-md overflow-hidden transition-all", cardBorder)}>
+        <CardHeader className="p-4 bg-muted/20 pb-3 space-y-2">
+          {/* Priority, Urgency & Category Badges Row */}
+          {(queuePos || dayCat !== 'later' || concurrentInfo || categoryName) && (
+            <div className="flex flex-wrap items-center gap-1.5 pb-1">
+              {queuePos && getQueueBadge(queuePos)}
+              {getDayCategoryBadge(dayCat, isCompleted)}
+              {concurrentInfo && (
+                <Badge className="bg-purple-600 text-white font-extrabold text-[10px] px-2 py-0.5 shadow-sm border border-purple-400 animate-pulse flex items-center gap-1">
+                  <Zap className="h-3 w-3" />
+                  Concurrent: #{concurrentInfo.slotIndex} of {concurrentInfo.totalInSlot}
+                </Badge>
+              )}
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold flex items-center gap-1 ml-auto">
+                <Tag className="h-2.5 w-2.5" />
+                {categoryName}
+              </Badge>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
             {/* Row 1: Booking Number & ID */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded-lg shadow-sm">#{booking.bookingNumber || '...'}</span>
+              <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded-lg shadow-sm">
+                #{booking.bookingNumber || '...'}
+              </span>
               <CardTitle className="text-sm font-mono text-primary font-bold">{booking.bookingId}</CardTitle>
             </div>
             
             {/* Row 2: Dispatch/Coverage Badge & Status Badge side-by-side */}
             <div className="flex items-center gap-2 flex-wrap">
               {getCoverageBadge(booking)}
-              <Badge className={cn("capitalize px-3 py-0.5 font-bold shadow-sm", getStatusBadgeClass(booking.status))}>{booking.status}</Badge>
+              <Badge className={cn("capitalize px-3 py-0.5 font-bold shadow-sm", getStatusBadgeClass(booking.status))}>
+                {booking.status}
+              </Badge>
             </div>
 
             {/* Row 3: Customer Name */}
             <div className="text-sm font-bold text-foreground pt-0.5">{booking.customerName}</div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-4 space-y-3 text-sm">
-        <div className="space-y-2 bg-muted/10 p-2 rounded-lg border border-muted/50">
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 space-y-3 text-sm">
+          {/* Services Included */}
+          <div className="border-b pb-2 mb-2">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Services Included:</p>
+            <ul className="list-disc pl-4 text-xs space-y-0.5">
+              {booking.services.map((service, idx) => (
+                <li key={idx}>
+                  <span className="font-medium text-foreground">{service.name}</span> (x{service.quantity})
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Highlighted Date & Time Slot Box */}
+          <div className={cn("p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-2 transition-all", !isCompleted ? dateBoxStyle : "bg-muted/40 border border-muted")}>
+            <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+              <CalendarDays className="h-4 w-4 shrink-0" />
+              <span>Date: {formatDateForDisplay(booking.scheduledDate)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm bg-background/90 px-3 py-1.5 rounded-xl border shadow-2xs text-foreground">
+              <Clock className="h-4 w-4 text-primary shrink-0" />
+              <span>Slot: {booking.scheduledTimeSlot}</span>
+            </div>
+          </div>
+
+          {booking.estimatedEndTime && (
+            <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md w-fit">
+              <History className="h-3 w-3 mr-1.5" />Ends: {formatDateInTimezone(booking.estimatedEndTime, appConfig.timezone, { day: '2-digit', month: '2-digit' })} {formatTimeInTimezone(booking.estimatedEndTime, appConfig.timezone)}
+            </div>
+          )}
+
+          {/* Provider Assignment Status Banner */}
+          <div>
+            {booking.providerId ? (
+              <div className="flex items-center justify-between text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900">
+                <div className="flex items-center gap-1.5">
+                  <UserCheck2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Provider: <strong>{providerName}</strong></span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-300 dark:border-amber-900">
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>🚨 No Provider Assigned Yet</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Customer Contact & Amount Box */}
+          <div className="space-y-2 bg-muted/10 p-2.5 rounded-xl border border-muted/50">
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-medium">
-                    <Phone className="h-4 w-4 text-primary" /> 
-                    <a href={`tel:${booking.customerPhone}`} className="text-primary hover:underline">{booking.customerPhone}</a>
-                    {booking.customerPhone && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10" onClick={() => handleWhatsAppClick(booking)} title="Chat on WhatsApp">
-                            <AppImage src="/whatsapp.png" alt="WhatsApp" width={18} height={18} />
-                        </Button>
-                    )}
-                </div>
-                <div className="font-black text-base text-foreground flex items-center gap-1">
-                    <span>{symbol}</span>
-                    {booking.totalAmount.toLocaleString()}
-                </div>
+              <div className="flex items-center gap-2 font-medium">
+                <Phone className="h-4 w-4 text-primary" /> 
+                <a href={`tel:${booking.customerPhone}`} className="text-primary hover:underline">{booking.customerPhone}</a>
+                {booking.customerPhone && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10" onClick={() => handleWhatsAppClick(booking)} title="Chat on WhatsApp">
+                    <AppImage src="/whatsapp.png" alt="WhatsApp" width={18} height={18} />
+                  </Button>
+                )}
+              </div>
+              <div className="font-black text-base text-foreground flex items-center gap-1">
+                <span>{symbol}</span>
+                {booking.totalAmount.toLocaleString()}
+              </div>
             </div>
             <div className="flex justify-between items-center text-xs py-1 border-t border-muted/30 mt-1 pt-1">
-                <span className="text-muted-foreground">Payment:</span>
-                <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter", getPaymentBadgeClass(booking.paymentMethod, booking.status, booking))}>{getPaymentLabel(booking.paymentMethod, booking.status, booking)}</Badge>
+              <span className="text-muted-foreground">Payment:</span>
+              <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter", getPaymentBadgeClass(booking.paymentMethod, booking.status, booking))}>{getPaymentLabel(booking.paymentMethod, booking.status, booking)}</Badge>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground break-all mt-1">
-                <Mail className="h-3.5 w-3.5 text-primary" /> {booking.customerEmail}
+              <Mail className="h-3.5 w-3.5 text-primary" /> {booking.customerEmail}
             </div>
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-2 py-1 border-y border-muted/50">
-            <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> {formatDateForDisplay(booking.scheduledDate)}</div>
-            <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> {booking.scheduledTimeSlot}</div>
-        </div>
-        {booking.estimatedEndTime && (
-          <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md w-fit">
-            <History className="h-3 w-3 mr-1.5" />Ends: {formatDateInTimezone(booking.estimatedEndTime, appConfig.timezone, { day: '2-digit', month: '2-digit' })} {formatTimeInTimezone(booking.estimatedEndTime, appConfig.timezone)}
           </div>
-        )}
-        <div className="pt-1">
-          <PermissionGuard moduleId="bookings" action="write" fallback={
-            <div className="w-full h-10 flex items-center justify-center bg-muted/30 rounded-lg">
-              <Badge className={cn("capitalize px-4 py-0.5 font-bold", getStatusBadgeClass(booking.status))}>{booking.status}</Badge>
-            </div>
-          }>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-10 font-bold shadow-sm bg-background border-muted justify-between"
-              onClick={() => {
-                setBookingToChangeStatus(booking);
-                setIsStatusDialogOpen(true);
-              }}
-              disabled={isUpdatingStatus === booking.id}
-            >
-              <div className="flex-1 flex justify-center">
-                <Badge className={cn("capitalize px-4 py-0.5 font-bold", getStatusBadgeClass(booking.status))}>
-                  {isUpdatingStatus === booking.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : booking.status}
-                </Badge>
+
+          <div className="pt-1">
+            <PermissionGuard moduleId="bookings" action="write" fallback={
+              <div className="w-full h-10 flex items-center justify-center bg-muted/30 rounded-lg">
+                <Badge className={cn("capitalize px-4 py-0.5 font-bold", getStatusBadgeClass(booking.status))}>{booking.status}</Badge>
               </div>
-              <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
-            </Button>
-          </PermissionGuard>
-        </div>
-      </CardContent>
-      <CardFooter className="p-4 pt-0 gap-2 flex flex-wrap">
-        <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setSelectedBooking(booking); setIsDetailsModalOpen(true); }}>Details</Button>
-        <PermissionGuard moduleId="bookings" action="write">
-          <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToEditId(booking.id || null); setIsEditModalOpen(true); }}>Edit</Button>
-        </PermissionGuard>
-        <PermissionGuard moduleId="bookings" action="write">
-          <Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>
-            {booking.providerId ? "Reassign" : "Assign"}
-          </Button>
-        </PermissionGuard>
-        {booking.providerId && (
+            }>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-10 font-bold shadow-sm bg-background border-muted justify-between"
+                onClick={() => {
+                  setBookingToChangeStatus(booking);
+                  setIsStatusDialogOpen(true);
+                }}
+                disabled={isUpdatingStatus === booking.id}
+              >
+                <div className="flex-1 flex justify-center">
+                  <Badge className={cn("capitalize px-4 py-0.5 font-bold", getStatusBadgeClass(booking.status))}>
+                    {isUpdatingStatus === booking.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : booking.status}
+                  </Badge>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
+              </Button>
+            </PermissionGuard>
+          </div>
+        </CardContent>
+        <CardFooter className="p-4 pt-0 gap-2 flex flex-wrap">
+          <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setSelectedBooking(booking); setIsDetailsModalOpen(true); }}>Details</Button>
           <PermissionGuard moduleId="bookings" action="write">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1 font-bold h-9 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 shadow-sm" 
-              onClick={() => handleUnassignProvider(booking)}
-              disabled={isUpdatingStatus === booking.id || ["Completed", "Cancelled"].includes(booking.status)}
-            >
-              Unassign
+            <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToEditId(booking.id || null); setIsEditModalOpen(true); }}>Edit</Button>
+          </PermissionGuard>
+          <PermissionGuard moduleId="bookings" action="write">
+            <Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>
+              {booking.providerId ? "Reassign" : "Assign"}
             </Button>
           </PermissionGuard>
-        )}
-        <PermissionGuard moduleId="bookings" action="delete">
-          <AlertDialog>
-            <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === booking.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-            <AlertDialogContent className="w-[90vw] rounded-2xl"><AlertDialogHeader><AlertDialogTitle className="font-bold">Delete Booking?</AlertDialogTitle><AlertDialogDescription>Remove #{booking.bookingId} from system?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(booking)} className="bg-destructive hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-          </AlertDialog>
-        </PermissionGuard>
-      </CardFooter>
-    </Card>
-  );
+          {booking.providerId && (
+            <PermissionGuard moduleId="bookings" action="write">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1 font-bold h-9 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 shadow-sm" 
+                onClick={() => handleUnassignProvider(booking)}
+                disabled={isUpdatingStatus === booking.id || ["Completed", "Cancelled"].includes(booking.status)}
+              >
+                Unassign
+              </Button>
+            </PermissionGuard>
+          )}
+          <PermissionGuard moduleId="bookings" action="delete">
+            <AlertDialog>
+              <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === booking.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+              <AlertDialogContent className="w-[90vw] rounded-2xl"><AlertDialogHeader><AlertDialogTitle className="font-bold">Delete Booking?</AlertDialogTitle><AlertDialogDescription>Remove #{booking.bookingId} from system?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(booking)} className="bg-destructive hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+            </AlertDialog>
+          </PermissionGuard>
+        </CardFooter>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -921,6 +1248,65 @@ export default function AdminBookingsPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Category Filter Dialog */}
+          <Dialog open={isFilterCategoryPickerOpen} onOpenChange={setIsFilterCategoryPickerOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 sm:w-44 bg-background font-bold justify-between"
+                type="button"
+              >
+                <span className="truncate">{filterCategory === "All" ? "All Categories" : filterCategory}</span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[calc(100%-6px)] sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Filter by Category</DialogTitle>
+                <DialogDescription>
+                  Filter bookings by service category (e.g. Plumbing, Electrician).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <ScrollArea className="h-[300px] rounded-md border p-2">
+                  <div className="space-y-1">
+                    <Button
+                      variant={filterCategory === "All" ? "secondary" : "ghost"}
+                      className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                      onClick={() => {
+                        setFilterCategory("All");
+                        setIsFilterCategoryPickerOpen(false);
+                      }}
+                      type="button"
+                    >
+                      <span className="text-sm font-medium">All Categories</span>
+                      {filterCategory === "All" && (
+                        <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                      )}
+                    </Button>
+                    {categories.map((c) => (
+                      <Button
+                        key={c.id}
+                        variant={filterCategory === c.name ? "secondary" : "ghost"}
+                        className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                        onClick={() => {
+                          setFilterCategory(c.name);
+                          setIsFilterCategoryPickerOpen(false);
+                        }}
+                        type="button"
+                      >
+                        <span className="text-sm font-medium">{c.name}</span>
+                        {filterCategory === c.name && (
+                          <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -929,19 +1315,46 @@ export default function AdminBookingsPage() {
           ) : filteredBookings.length === 0 ? ( <div className="text-center py-20"><PackageSearch className="h-10 w-10 text-muted-foreground mx-auto mb-4" /><h3 className="text-lg font-semibold">No bookings found</h3></div>
           ) : (
             <><div className="hidden md:block">
-                <Table><TableHeader><TableRow><TableHead className="w-[50px]">No.</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount ({symbol})</TableHead></TableRow></TableHeader>
+                <Table><TableHeader><TableRow><TableHead className="w-[75px] text-center">Queue</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead className="min-w-[190px]">Date & Time Slot</TableHead><TableHead>Payment</TableHead><TableHead className="max-w-[220px]">Category & Services</TableHead><TableHead className="text-right">Amount ({symbol})</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {filteredBookings.slice(0, displayLimit).map((b, index) => {
+                  {filteredBookings.slice(0, displayLimit).map((b) => {
+                    const isCompleted = b.status === 'Completed' || b.status === 'Cancelled' || b.status === 'ProviderRejected';
+                    const queuePos = !isCompleted ? activeQueueMap.get(b.id || b.bookingId) : undefined;
+                    const dayCat = !isCompleted ? getDayCategory(b.scheduledDate) : 'later';
+                    const concurrentInfo = slotStatsMap.get(b.id || b.bookingId);
+                    const categoryName = getBookingCategory(b);
+                    const providerName = b.providerId ? (providerNames[b.providerId] || 'Assigned Provider') : null;
+                    const dateBoxStyle = getDayDateBoxClass(dayCat);
+
                     return (
                       <React.Fragment key={b.id}>
-                        <TableRow id={`booking-row-${b.id || b.bookingId}`} className="hover:bg-transparent border-b-0 transition-colors">
-                          <TableCell className="text-xs font-black text-primary bg-primary/5 rounded-lg text-center h-8 w-8 flex items-center justify-center mt-3 ml-2">{b.bookingNumber || '...'}</TableCell>
-                          <TableCell>
+                        <TableRow 
+                          id={`booking-row-${b.id || b.bookingId}`} 
+                          className={cn(
+                            "hover:bg-muted/30 transition-colors border-b-0",
+                            !isCompleted && dayCat === 'today' && "border-l-4 border-l-red-600 bg-red-500/[0.03]",
+                            !isCompleted && dayCat === 'tomorrow' && "border-l-4 border-l-amber-500 bg-amber-500/[0.03]",
+                            !isCompleted && dayCat === 'dayAfter' && "border-l-4 border-l-emerald-500 bg-emerald-500/[0.02]"
+                          )}
+                        >
+                          <TableCell className="text-center align-top pt-3">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-md text-center">
+                                #{b.bookingNumber || '...'}
+                              </span>
+                              {queuePos && (
+                                <div className="mt-0.5">
+                                  {getQueueBadge(queuePos)}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-top pt-3">
                             <div className="font-mono text-xs font-bold text-primary">{b.bookingId}</div>
                             <div className="mt-1">{getCoverageBadge(b)}</div>
                           </TableCell>
-                          <TableCell>
-                            <div className="font-bold">{b.customerName}</div>
+                          <TableCell className="align-top pt-3">
+                            <div className="font-bold text-sm">{b.customerName}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-xs text-muted-foreground">
                                 <a href={`tel:${b.customerPhone}`} className="hover:underline">{b.customerPhone}</a>
@@ -953,85 +1366,133 @@ export default function AdminBookingsPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <div className="text-sm font-bold">{formatDateForDisplay(b.scheduledDate)}</div>
-                            <div className="text-xs">{b.scheduledTimeSlot}</div>
-                            {b.estimatedEndTime && (
-  <div className="text-[10px] font-black flex items-center mt-1 text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit">
-    <History className="h-3 w-3 mr-1" />Ends: {formatDateInTimezone(b.estimatedEndTime, appConfig.timezone, { day: '2-digit', month: '2-digit' })} {formatTimeInTimezone(b.estimatedEndTime, appConfig.timezone)}
-  </div>
-)}
+                          <TableCell className="align-top pt-3">
+                            <div className="space-y-1.5">
+                              {/* Urgency & Concurrent badges */}
+                              <div className="flex flex-wrap items-center gap-1">
+                                {getDayCategoryBadge(dayCat, isCompleted)}
+                                {concurrentInfo && (
+                                  <Badge className="bg-purple-600 text-white font-extrabold text-[9px] px-1.5 py-0.5 shadow-sm border border-purple-400 animate-pulse flex items-center gap-0.5 whitespace-nowrap">
+                                    <Zap className="h-2.5 w-2.5" />
+                                    Slot #{concurrentInfo.slotIndex} of {concurrentInfo.totalInSlot}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className={cn("p-2 rounded-xl text-xs font-bold transition-all", !isCompleted ? dateBoxStyle : "bg-muted/40 border border-muted")}>
+                                <div className="flex items-center gap-1.5">
+                                  <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                                  <span>{formatDateForDisplay(b.scheduledDate)}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1 font-extrabold text-foreground">
+                                  <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                                  <span>{b.scheduledTimeSlot}</span>
+                                </div>
+                              </div>
+                              {b.estimatedEndTime && (
+                                <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit">
+                                  <History className="h-3 w-3 mr-1" />Ends: {formatDateInTimezone(b.estimatedEndTime, appConfig.timezone, { day: '2-digit', month: '2-digit' })} {formatTimeInTimezone(b.estimatedEndTime, appConfig.timezone)}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="align-top pt-3">
                             <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter shadow-sm", getPaymentBadgeClass(b.paymentMethod, b.status, b))}>
                               {getPaymentLabel(b.paymentMethod, b.status, b)}
                             </Badge>
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate text-xs font-medium">{b.services.map(s => s.name).join(', ')}</TableCell>
-                          <TableCell className="text-right pr-6 font-black text-lg">
+                          <TableCell className="align-top pt-3 max-w-[220px]">
+                            <div className="space-y-1.5">
+                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold flex items-center gap-1 w-fit">
+                                <Tag className="h-2.5 w-2.5" />
+                                {categoryName}
+                              </Badge>
+                              <div className="text-xs font-medium text-foreground line-clamp-2">
+                                {b.services.map(s => `${s.name} (x${s.quantity})`).join(', ')}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-top pt-3 text-right pr-6 font-black text-lg">
                             {formatCurrency(b.totalAmount, symbol, decimals, code)}
                           </TableCell>
                         </TableRow>
-                        <TableRow className="hover:bg-transparent border-t-0">
-                          <TableCell colSpan={7} className="py-3 px-4">
-                            <div className="flex flex-wrap items-center gap-3">
-                              <PermissionGuard moduleId="bookings" action="write" fallback={
-                                <div className="h-9 px-4 flex items-center bg-muted/30 rounded-md">
-                                  <Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge>
-                                </div>
-                              }>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-9 w-44 bg-background font-bold text-xs shadow-sm justify-between"
-                                  onClick={() => {
-                                    setBookingToChangeStatus(b);
-                                    setIsStatusDialogOpen(true);
-                                  }}
-                                  disabled={isUpdatingStatus === b.id}
-                                >
-                                  <Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge>
-                                  <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-50 ml-1" />
-                                </Button>
-                              </PermissionGuard>
-                              <PermissionGuard moduleId="bookings" action="write">
-                                <Button variant="default" size="sm" className="h-9 px-4 font-bold shadow-sm" onClick={() => { setBookingToAssign(b); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(b.status)}>
-                                  <Users className="mr-1.5 h-4 w-4" /> {b.providerId ? "Reassign" : "Assign Provider"}
-                                </Button>
-                              </PermissionGuard>
-                              {b.providerId && (
-                                <PermissionGuard moduleId="bookings" action="write">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-9 px-4 font-bold text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 shadow-sm" 
-                                    onClick={() => handleUnassignProvider(b)}
-                                    disabled={isUpdatingStatus === b.id || ["Completed", "Cancelled"].includes(b.status)}
+                        <TableRow className="hover:bg-transparent border-t-0 border-b border-border/50">
+                          <TableCell colSpan={7} className="py-2.5 px-4 bg-muted/10">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <PermissionGuard moduleId="bookings" action="write" fallback={
+                                  <div className="h-9 px-4 flex items-center bg-muted/30 rounded-md">
+                                    <Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge>
+                                  </div>
+                                }>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-9 w-44 bg-background font-bold text-xs shadow-sm justify-between"
+                                    onClick={() => {
+                                      setBookingToChangeStatus(b);
+                                      setIsStatusDialogOpen(true);
+                                    }}
+                                    disabled={isUpdatingStatus === b.id}
                                   >
-                                    <UserX className="mr-1.5 h-4 w-4" /> Unassign
+                                    <Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge>
+                                    <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-50 ml-1" />
                                   </Button>
                                 </PermissionGuard>
-                              )}
-                              <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button>
-                              <PermissionGuard moduleId="bookings" action="write">
-                                <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setBookingToEditId(b.id || null); setIsEditModalOpen(true); }}>Edit</Button>
-                              </PermissionGuard>
-                              <PermissionGuard moduleId="bookings" action="delete">
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === b.id}>
-                                      <Trash2 className="h-4 w-4" />
+
+                                {/* Provider Assignment Status Banner */}
+                                {b.providerId ? (
+                                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900 shadow-2xs">
+                                    <UserCheck2 className="h-3.5 w-3.5 text-emerald-600" />
+                                    <span>Provider: <strong>{providerName}</strong></span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-900 shadow-2xs">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                                    <span>🚨 Unassigned - Needs Provider</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <PermissionGuard moduleId="bookings" action="write">
+                                  <Button variant="default" size="sm" className="h-9 px-4 font-bold shadow-sm" onClick={() => { setBookingToAssign(b); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(b.status)}>
+                                    <Users className="mr-1.5 h-4 w-4" /> {b.providerId ? "Reassign" : "Assign Provider"}
+                                  </Button>
+                                </PermissionGuard>
+                                {b.providerId && (
+                                  <PermissionGuard moduleId="bookings" action="write">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="h-9 px-4 font-bold text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 shadow-sm" 
+                                      onClick={() => handleUnassignProvider(b)}
+                                      disabled={isUpdatingStatus === b.id || ["Completed", "Cancelled"].includes(b.status)}
+                                    >
+                                      <UserX className="mr-1.5 h-4 w-4" /> Unassign
                                     </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Delete?</AlertDialogTitle><AlertDialogDescription>Remove #{b.bookingId}?</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteBooking(b)} className="bg-destructive">Delete</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </PermissionGuard>
+                                  </PermissionGuard>
+                                )}
+                                <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button>
+                                <PermissionGuard moduleId="bookings" action="write">
+                                  <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setBookingToEditId(b.id || null); setIsEditModalOpen(true); }}>Edit</Button>
+                                </PermissionGuard>
+                                <PermissionGuard moduleId="bookings" action="delete">
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === b.id}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader><AlertDialogTitle>Delete?</AlertDialogTitle><AlertDialogDescription>Remove #{b.bookingId}?</AlertDialogDescription></AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteBooking(b)} className="bg-destructive">Delete</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </PermissionGuard>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>

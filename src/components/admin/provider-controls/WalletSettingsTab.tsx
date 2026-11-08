@@ -67,6 +67,7 @@ export default function WalletSettingsTab() {
       const result = await saveProviderWalletSettingsAction(data);
       if (result.success) {
         toast({ title: "Success", description: result.message });
+        await loadSettings();
       } else {
         toast({ title: "Error", description: result.message, variant: "destructive" });
       }

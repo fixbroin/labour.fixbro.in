@@ -3,6 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { UserPlus, CheckCircle2, ListChecks, UserCircle, FileText, MapPin, Banknote } from 'lucide-react';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface Step {
   id: number;
@@ -10,18 +11,20 @@ interface Step {
   icon: React.ElementType;
 }
 
-const steps: Step[] = [
-  { id: 1, name: 'Category & Skills', icon: ListChecks },
-  { id: 2, name: 'Personal Info', icon: UserCircle },
-  { id: 3, name: 'KYC Documents', icon: FileText },
-  { id: 4, name: 'Location & Bank', icon: MapPin },
-];
-
 interface ProviderRegistrationStepperProps {
   currentStep: number; // 1-based index
 }
 
 export default function ProviderRegistrationStepper({ currentStep }: ProviderRegistrationStepperProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const enableBankDetails = appConfig?.enableBankDetailsSection === true;
+
+  const steps: Step[] = [
+    { id: 1, name: 'Category & Skills', icon: ListChecks },
+    { id: 2, name: 'Personal Info', icon: UserCircle },
+    { id: 3, name: 'KYC Documents', icon: FileText },
+    { id: 4, name: enableBankDetails ? 'Location & Bank' : 'Location & Details', icon: MapPin },
+  ];
   return (
     <nav aria-label="Progress">
       <ol role="list" className="space-y-4 md:flex md:space-x-8 md:space-y-0">

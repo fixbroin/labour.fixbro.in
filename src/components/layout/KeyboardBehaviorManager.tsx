@@ -47,7 +47,16 @@ export default function KeyboardBehaviorManager() {
         document.documentElement.classList.add('keyboard-active');
 
         // 3. Smoothly scroll the focused element ONLY if it is covered by the keyboard (and not excluded)
-        const shouldScroll = !target.classList.contains('no-keyboard-scroll') && !target.closest('.no-keyboard-scroll');
+        const isMapOrFixedInput = 
+          target.classList.contains('no-keyboard-scroll') || 
+          target.closest('.no-keyboard-scroll') ||
+          target.closest('.map-dialog-content') ||
+          target.closest('[data-map-modal="true"]') ||
+          target.id === 'address-search-input' ||
+          target.id === 'marketplace-location-search' ||
+          target.classList.contains('pac-target-input');
+
+        const shouldScroll = !isMapOrFixedInput;
         if (shouldScroll) {
           setTimeout(() => {
             const rect = target.getBoundingClientRect();

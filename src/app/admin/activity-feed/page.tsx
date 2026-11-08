@@ -542,7 +542,7 @@ export default function AdminActivityFeedPage() {
         return (
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-teal-600">{formatCurrency(data.totalAmount || 0, symbol, decimals, code)}</span>
-            <Link href={`/admin/bookings/edit/${data.bookingDocId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline flex items-center">
+            <Link href={`/admin/bookings?openBookingId=${encodeURIComponent(data.bookingDocId || data.bookingId || '')}&search=${encodeURIComponent(data.bookingId || data.bookingDocId || '')}`} className="text-xs font-bold text-blue-600 hover:underline flex items-center">
               {data.bookingId} <ChevronRight className="h-3 w-3 ml-0.5" />
             </Link>
           </div>
@@ -585,7 +585,7 @@ export default function AdminActivityFeedPage() {
         return (
           <span className="text-xs font-medium">
             Accepted job{' '}
-            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+            <Link href={`/admin/bookings?openBookingId=${encodeURIComponent(data.bookingDocId || data.bookingId || '')}&search=${encodeURIComponent(data.bookingId || '')}`} className="text-xs font-bold text-blue-600 hover:underline">
               {data.bookingId}
             </Link>
           </span>
@@ -594,7 +594,7 @@ export default function AdminActivityFeedPage() {
         return (
           <span className="text-xs font-medium text-destructive">
             Rejected job{' '}
-            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+            <Link href={`/admin/bookings?openBookingId=${encodeURIComponent(data.bookingDocId || data.bookingId || '')}&search=${encodeURIComponent(data.bookingId || '')}`} className="text-xs font-bold text-blue-600 hover:underline">
               {data.bookingId}
             </Link>
           </span>
@@ -603,7 +603,7 @@ export default function AdminActivityFeedPage() {
         return (
           <span className="text-xs font-medium text-amber-600">
             Started work on{' '}
-            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+            <Link href={`/admin/bookings?openBookingId=${encodeURIComponent(data.bookingDocId || data.bookingId || '')}&search=${encodeURIComponent(data.bookingId || '')}`} className="text-xs font-bold text-blue-600 hover:underline">
               {data.bookingId}
             </Link>
           </span>
@@ -613,7 +613,7 @@ export default function AdminActivityFeedPage() {
           <div className="flex flex-col gap-0.5">
             <span className="text-xs font-bold text-green-600">
               Completed work on{' '}
-              <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              <Link href={`/admin/bookings?openBookingId=${encodeURIComponent(data.bookingDocId || data.bookingId || '')}&search=${encodeURIComponent(data.bookingId || '')}`} className="text-xs font-bold text-blue-600 hover:underline">
                 {data.bookingId}
               </Link>
             </span>

@@ -36,6 +36,7 @@ const processData = (firestoreData: Partial<AppSettings>): AppSettings => {
     isCancelledChequeCompulsory: typeof firestoreData.isCancelledChequeCompulsory === 'boolean' ? firestoreData.isCancelledChequeCompulsory : defaultAppSettings.isCancelledChequeCompulsory,
     enableCancelledChequeUpload: typeof firestoreData.enableCancelledChequeUpload === 'boolean' ? firestoreData.enableCancelledChequeUpload : defaultAppSettings.enableCancelledChequeUpload,
     enableSignatureUpload: typeof firestoreData.enableSignatureUpload === 'boolean' ? firestoreData.enableSignatureUpload : defaultAppSettings.enableSignatureUpload,
+    enableBankDetailsSection: typeof firestoreData.enableBankDetailsSection === 'boolean' ? firestoreData.enableBankDetailsSection : defaultAppSettings.enableBankDetailsSection,
     customBankFields: firestoreData.customBankFields || defaultAppSettings.customBankFields || [],
     enableEmailPasswordLogin: typeof firestoreData.enableEmailPasswordLogin === 'boolean' ? firestoreData.enableEmailPasswordLogin : defaultAppSettings.enableEmailPasswordLogin,
     enableOtpLogin: typeof firestoreData.enableOtpLogin === 'boolean' ? firestoreData.enableOtpLogin : defaultAppSettings.enableOtpLogin,
@@ -97,13 +98,22 @@ export function useApplicationConfig(initialData?: AppSettings | null): UseAppli
     const fetchConfig = async () => {
       try {
         const remoteVersions = await getRemoteCacheVersions();
-        const remoteVersion = remoteVersions['app-settings'] || remoteVersions.global || 0;
+        const remoteVersion = Math.max(
+          Number(remoteVersions['app-settings'] || 0),
+          Number(remoteVersions['global-cache'] || 0),
+          Number(remoteVersions.global || 0)
+        );
 
         const localVersion = parseInt(localStorage.getItem(`${CACHE_KEY}-version`) || "0");
         const cached = getCache<AppSettings>(CACHE_KEY, true);
-        const isCheckoutOrPolicy = pathname?.includes('/cart') || pathname?.includes('/checkout') || pathname?.includes('/cancellation-policy') || pathname?.includes('/my-bookings');
+        const isFreshRoute = pathname?.includes('/cart') || 
+          pathname?.includes('/checkout') || 
+          pathname?.includes('/cancellation-policy') || 
+          pathname?.includes('/my-bookings') || 
+          pathname?.includes('/provider-registration') ||
+          pathname?.includes('/provider');
 
-        if (cached && !isAdmin && !isCheckoutOrPolicy && remoteVersion <= localVersion) {
+        if (cached && !isAdmin && !isFreshRoute && remoteVersion <= localVersion) {
           setConfig(processData(cached));
           setIsLoading(false);
           return;

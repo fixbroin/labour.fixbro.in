@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Logo from '@/components/shared/Logo';
-import { LayoutDashboard, UserCog, Briefcase, DollarSign, Star, Bell, ReceiptText, Banknote, ChevronRight, Wallet, Loader2, CalendarOff } from 'lucide-react';
+import { LayoutDashboard, UserCog, Briefcase, DollarSign, Star, Bell, ReceiptText, Banknote, ChevronRight, Wallet, Loader2, CalendarOff, MapPin, Contact2 } from 'lucide-react';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +38,8 @@ const navItems = [
   { type: 'separator', label: 'Other' },
   { href: '/provider/reviews', label: 'My Reviews', icon: Star },
   { href: '/provider/notifications', label: 'Notifications', icon: Bell },
+  { href: '/provider/service-area', label: 'Serviceable Area', icon: MapPin },
+  { href: '/provider/id-card', label: 'Generate ID Card', icon: Contact2, idCardOnly: true },
 ];
 
 export default function ProviderSidebarContent() {
@@ -50,6 +52,7 @@ export default function ProviderSidebarContent() {
 
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isTogglingOnline, setIsTogglingOnline] = useState(false);
+  const [isIdCardEnabled, setIsIdCardEnabled] = useState<boolean>(true);
 
   useEffect(() => {
     if (!providerUser?.uid) return;
@@ -57,6 +60,16 @@ export default function ProviderSidebarContent() {
       if (docSnap.exists()) {
         const data = docSnap.data() as ProviderApplication;
         setIsOnline(data.isOnline !== false);
+      }
+    });
+    return () => unsub();
+  }, [providerUser?.uid]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "appConfiguration", "provider_id_card"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as any;
+        setIsIdCardEnabled(data.isIdCardEnabled !== false);
       }
     });
     return () => unsub();
@@ -145,7 +158,8 @@ export default function ProviderSidebarContent() {
         )}
 
         <SidebarMenu className="gap-1 px-2 pt-2 group-data-[collapsible=icon]:px-1">
-          {navItems.map((item, index) => {
+          {navItems.map((item: any, index) => {
+            if (item.idCardOnly && !isIdCardEnabled) return null;
             if (item.type === 'separator') {
               return (
                 <div key={`sep-${index}`} className="px-4 py-4 mt-4 mb-1 group-data-[collapsible=icon]:hidden">

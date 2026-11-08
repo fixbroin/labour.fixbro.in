@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -13,6 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Loader2, User, Mail, Phone, Gift } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from '@/lib/mysqlDb';
 
 interface CompleteProfileDialogProps {
   isOpen: boolean;
@@ -41,6 +42,32 @@ export default function CompleteProfileDialog({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { config, isLoading: isLoadingConfig } = useApplicationConfig();
+  const [isReferralSystemEnabled, setIsReferralSystemEnabled] = useState<boolean>(() => {
+    if (typeof config?.isReferralSystemEnabled === 'boolean') {
+      return config.isReferralSystemEnabled;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof config?.isReferralSystemEnabled === 'boolean') {
+      setIsReferralSystemEnabled(config.isReferralSystemEnabled);
+    }
+    const checkReferral = async () => {
+      try {
+        const snap = await getDoc(doc(db, "appConfiguration", "referral"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (typeof data?.isReferralSystemEnabled === 'boolean') {
+            setIsReferralSystemEnabled(data.isReferralSystemEnabled);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not check referral system config:", e);
+      }
+    };
+    checkReferral();
+  }, [config?.isReferralSystemEnabled]);
   
   const providerId = userCredential.user.providerData[0]?.providerId;
   const isGoogleSignIn = providerId === 'google.com';
@@ -86,6 +113,9 @@ export default function CompleteProfileDialog({
     return cleaned.replace(/\D/g, ''); // Only digits
   };
 
+  const hasAutoReferral = typeof window !== 'undefined' && !!localStorage.getItem('referralCode');
+  const shouldShowReferralField = isReferralSystemEnabled && !hasAutoReferral;
+
   const handleSubmit = async (data: ProfileFormData) => {
     let mobileNumberForSubmit = data.mobileNumber;
 
@@ -108,7 +138,7 @@ export default function CompleteProfileDialog({
         fullName: data.fullName,
         email: data.email || userCredential.user.email || undefined,
         mobileNumber: mobileNumberForSubmit || userCredential.user.phoneNumber || undefined,
-        referralCode: data.referralCode,
+        referralCode: shouldShowReferralField ? data.referralCode : undefined,
       });
     } catch (error: any) {
       const errorMessage = error.message || "Could not save profile. Please try again.";
@@ -117,8 +147,6 @@ export default function CompleteProfileDialog({
       setIsSubmitting(false);
     }
   };
-
-  const hasAutoReferral = typeof window !== 'undefined' && !!localStorage.getItem('referralCode');
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -200,7 +228,7 @@ export default function CompleteProfileDialog({
               />
             )}
 
-            {!hasAutoReferral && (
+            {shouldShowReferralField && (
               <FormField
                 control={form.control}
                 name="referralCode"

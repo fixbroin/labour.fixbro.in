@@ -134,17 +134,14 @@ export default function AdminChatMessageArea({ selectedUser, onViewUserDetails }
         }
         if (messagesMarkedRead) {
           await batch.commit();
-        }
-
-        if (selectedUser && supportAdminProfile.uid) {
-            await setDoc(sessionDocRef, {
-                userId: selectedUser.id,
-                adminId: supportAdminProfile.uid,
-                adminUnreadCount: 0,
-                updatedAt: serverTimestamp(),
-                createdAt: serverTimestamp(),
-                participants: [selectedUser.id, supportAdminProfile.uid].filter(Boolean),
-            }, { merge: true });
+          try {
+            // Only clear unread count for admin; never touch updatedAt or lastMessageTimestamp on view
+            await updateDoc(sessionDocRef, {
+              adminUnreadCount: 0
+            });
+          } catch (e) {
+            // Session doc might not exist yet if no messages were ever sent
+          }
         }
       }, (error) => {
         console.error("Error fetching messages:", error);
@@ -166,11 +163,10 @@ export default function AdminChatMessageArea({ selectedUser, onViewUserDetails }
     if (!currentChatSessionId) return;
     try {
       const sessionDocRef = doc(db, 'chats', currentChatSessionId);
-      setDoc(sessionDocRef, {
+      updateDoc(sessionDocRef, {
         isAdminTyping: isTyping,
         adminTypingAt: isTyping ? Date.now() : null,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+      }).catch(() => {});
     } catch (e) {
       console.error("AdminChatMessageArea: Error reporting admin typing:", e);
     }
@@ -583,15 +579,15 @@ export default function AdminChatMessageArea({ selectedUser, onViewUserDetails }
                       <div className={cn(
                         "p-3.5 px-4 shadow-sm relative",
                         isMe 
-                          ? "bg-primary text-primary-foreground rounded-2xl rounded-br-none" 
+                          ? "bg-primary text-primary-foreground rounded-2xl rounded-br-none [&_a]:text-white [&_a]:decoration-white/80 hover:[&_a]:text-white/80" 
                           : isAi 
-                            ? "bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-2xl rounded-bl-none border border-zinc-200 dark:border-zinc-700"
-                            : "bg-card text-foreground rounded-2xl rounded-bl-none border"
+                            ? "bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-2xl rounded-bl-none border border-zinc-200 dark:border-zinc-700 [&_a]:text-primary [&_a]:decoration-primary/60 hover:[&_a]:text-primary/80"
+                            : "bg-card text-foreground rounded-2xl rounded-bl-none border [&_a]:text-primary [&_a]:decoration-primary/60 hover:[&_a]:text-primary/80"
                       )}>
                         {msg.text && (
                           <div 
-                            className="text-sm leading-relaxed whitespace-pre-wrap" 
-                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text) }}
+                            className="text-sm leading-relaxed whitespace-pre-wrap break-words" 
+                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text, isMe) }}
                           />
                         )}
                         <span className={cn(

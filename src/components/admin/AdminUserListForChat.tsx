@@ -29,9 +29,12 @@ export default function AdminUserListForChat({
   scrollAreaHeightClass = "h-full"
 }: AdminUserListForChatProps) {
   const [recentUsers, setRecentUsers] = useState<FirestoreUser[]>([]);
+  const [allUsers, setAllUsers] = useState<FirestoreUser[]>([]);
+  const [activeTab, setActiveTab] = useState<'recent' | 'all'>('recent');
   const [searchResults, setSearchUsers] = useState<FirestoreUser[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [chatSessions, setChatSessions] = useState<Record<string, ChatSession>>({});
   const [supportAdminUid, setSupportAdminUid] = useState<string | null>(null);
@@ -93,27 +96,27 @@ export default function AdminUserListForChat({
         }
 
         if (customerUid && !adminUids.has(customerUid)) {
+          // A conversation is ONLY recent if an actual message was exchanged
+          const hasRealMessage = Boolean(session.lastMessageTimestamp && session.lastMessageText);
+
           const existingSession = sessions[customerUid];
           if (!existingSession) {
             sessions[customerUid] = session;
-            if (!userIdsToFetch.includes(customerUid)) {
+            if (hasRealMessage && !userIdsToFetch.includes(customerUid)) {
               userIdsToFetch.push(customerUid);
             }
           } else {
-            // Keep the session with unread messages or newest activity!
+            // Keep the session with unread messages or newest real message!
             const currentUnread = Number(existingSession.adminUnreadCount) || 0;
             const newUnread = Number(session.adminUnreadCount) || 0;
-            const currentTime = Math.max(
-              getTimestampMillis(existingSession.lastMessageTimestamp),
-              getTimestampMillis(existingSession.updatedAt)
-            );
-            const newTime = Math.max(
-              getTimestampMillis(session.lastMessageTimestamp),
-              getTimestampMillis(session.updatedAt)
-            );
+            const currentTime = getTimestampMillis(existingSession.lastMessageTimestamp) || 0;
+            const newTime = getTimestampMillis(session.lastMessageTimestamp) || 0;
 
             if (newUnread > currentUnread || (newUnread === currentUnread && newTime > currentTime)) {
               sessions[customerUid] = session;
+            }
+            if (hasRealMessage && !userIdsToFetch.includes(customerUid)) {
+              userIdsToFetch.push(customerUid);
             }
           }
 
@@ -163,7 +166,35 @@ export default function AdminUserListForChat({
     return () => unsubscribeChats();
   }, [adminUser?.uid, supportAdminUid]);
 
-  // 2. Search Logic (Mirroring /admin/users)
+  // 2. Fetch All Registered Users Directory (Live Listener)
+  useEffect(() => {
+    if (!adminUser?.uid) return;
+    setIsLoadingAllUsers(true);
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, orderBy("createdAt", "desc"), limit(150));
+
+    const unsubscribeUsers = onSnapshot(q, (snap) => {
+      const usersList: FirestoreUser[] = [];
+      const adminUids = new Set(
+        [adminUser?.uid, supportAdminUid, 'fallback_admin_uid', 'admin_master_id', CANONICAL_SUPPORT_ADMIN_UID].filter(Boolean)
+      );
+
+      snap.forEach(d => {
+        if (d.id !== adminUser?.uid && !adminUids.has(d.id)) {
+          usersList.push({ ...d.data(), id: d.id } as FirestoreUser);
+        }
+      });
+      setAllUsers(usersList);
+      setIsLoadingAllUsers(false);
+    }, (err) => {
+      console.error("Error fetching all users for chat:", err);
+      setIsLoadingAllUsers(false);
+    });
+
+    return () => unsubscribeUsers();
+  }, [adminUser?.uid, supportAdminUid]);
+
+  // 3. Search Logic (Mirroring /admin/users)
   useEffect(() => {
     if (searchTerm.trim().length === 0) {
       setSearchUsers([]);
@@ -237,13 +268,13 @@ export default function AdminUserListForChat({
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, adminUser, chatSessions]);
 
-  const combinedUsers = useMemo(() => {
-    if (searchTerm.trim().length > 0) return searchResults;
-    return recentUsers;
-  }, [searchTerm, searchResults, recentUsers]);
-
   const sortedUsersForDisplay = useMemo(() => {
-    return [...combinedUsers].sort((a, b) => {
+    const isSearchingActive = searchTerm.trim().length > 0;
+    const baseList = isSearchingActive 
+      ? searchResults 
+      : (activeTab === 'all' ? allUsers : recentUsers);
+
+    return [...baseList].sort((a, b) => {
       const sessionA = chatSessions[a.id];
       const sessionB = chatSessions[b.id];
 
@@ -268,27 +299,22 @@ export default function AdminUserListForChat({
       if (unreadB > 0 && unreadA === 0) return 1;
       if (unreadA !== unreadB && unreadA > 0 && unreadB > 0) return unreadB - unreadA;
 
-      // 3. Most recent activity (lastMessageTimestamp, updatedAt, or userTypingAt)
-      const timeA = Math.max(
-        getTimestampMillis(sessionA?.lastMessageTimestamp),
-        getTimestampMillis(sessionA?.updatedAt),
-        getTimestampMillis(sessionA?.userTypingAt)
-      ) || 0;
+      // 3. Most recent REAL chat message (lastMessageTimestamp ONLY)
+      const timeA = getTimestampMillis(sessionA?.lastMessageTimestamp) || 0;
+      const timeB = getTimestampMillis(sessionB?.lastMessageTimestamp) || 0;
 
-      const timeB = Math.max(
-        getTimestampMillis(sessionB?.lastMessageTimestamp),
-        getTimestampMillis(sessionB?.updatedAt),
-        getTimestampMillis(sessionB?.userTypingAt)
-      ) || 0;
+      if (timeA > 0 || timeB > 0) {
+        if (timeA !== timeB) return timeB - timeA;
+      }
 
-      if (timeA !== timeB) return timeB - timeA;
-
-      // 4. Fallback to creation date (mostly for search results without sessions)
+      // 4. Fallback for users without chats: newest user first
       const createdAtA = getTimestampMillis(a.createdAt) || 0;
       const createdAtB = getTimestampMillis(b.createdAt) || 0;
-      return createdAtB - createdAtA;
+      if (createdAtA !== createdAtB) return createdAtB - createdAtA;
+
+      return (a.displayName || a.email || '').localeCompare(b.displayName || b.email || '');
     });
-  }, [combinedUsers, chatSessions]);
+  }, [searchTerm, searchResults, recentUsers, allUsers, activeTab, chatSessions]);
 
   const formatLastActive = (timestamp?: any): string => {
     const millis = getTimestampMillis(timestamp);
@@ -298,16 +324,48 @@ export default function AdminUserListForChat({
 
   return (
     <Card className="h-full flex flex-col shadow-none border-0 rounded-none bg-transparent">
-        <CardHeader className="p-4 border-b space-y-4">
-            <CardTitle className="text-lg font-bold flex items-center justify-between">
-              <span className="flex items-center">
-                <Users className="mr-2 h-5 w-5 text-primary"/> 
-                {searchTerm ? 'Search Results' : 'Recent Chats'}
+        <CardHeader className="p-3 md:p-4 border-b space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center font-bold text-base md:text-lg">
+                <Users className="mr-2 h-5 w-5 text-primary shrink-0"/> 
+                {searchTerm ? 'Search Results' : 'Chats'}
               </span>
               {!searchTerm && (
-                <Badge variant="secondary" className="font-mono text-[10px]">{sortedUsersForDisplay.length}</Badge>
+                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('recent')}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                      activeTab === 'recent'
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Recent
+                    <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-mono leading-none">
+                      {recentUsers.length}
+                    </Badge>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('all')}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                      activeTab === 'all'
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    All Users
+                    <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-mono leading-none">
+                      {allUsers.length}
+                    </Badge>
+                  </button>
+                </div>
               )}
-            </CardTitle>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -316,7 +374,7 @@ export default function AdminUserListForChat({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {(isSearching || isLoading) && (
+              {(isSearching || isLoading || isLoadingAllUsers) && (
                 <div className="absolute right-3 top-3">
                   <Loader2 className="h-4 w-4 animate-spin text-primary/40" />
                 </div>
@@ -326,16 +384,24 @@ export default function AdminUserListForChat({
         <CardContent className="p-0 flex-grow overflow-hidden">
             <ScrollArea className={cn("h-full", scrollAreaHeightClass)}>
             <div className="p-2 space-y-1">
-                {sortedUsersForDisplay.length === 0 && !isLoading && !isSearching ? (
+                {sortedUsersForDisplay.length === 0 && !isLoading && !isSearching && !isLoadingAllUsers ? (
                   <div className="py-12 text-center px-4">
                     <div className="bg-muted/30 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       {searchTerm ? <Search className="h-6 w-6 text-muted-foreground/50" /> : <MessageSquare className="h-6 w-6 text-muted-foreground/50" />}
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">
-                        {searchTerm ? `No users found for "${searchTerm}"` : 'No recent conversations'}
+                        {searchTerm 
+                          ? `No users found for "${searchTerm}"` 
+                          : activeTab === 'recent' 
+                            ? 'No recent conversations yet' 
+                            : 'No users found'}
                     </p>
                     <p className="text-xs text-muted-foreground/60 mt-1">
-                        {searchTerm ? 'Try a different keyword or mobile number.' : 'Start a chat by searching for a user above.'}
+                        {searchTerm 
+                          ? 'Try a different keyword or mobile number.' 
+                          : activeTab === 'recent' 
+                            ? 'Switch to "All Users" to pick a user and start chatting.' 
+                            : 'Registered users will appear here.'}
                     </p>
                   </div>
                 ) : sortedUsersForDisplay.map((user, index) => {
@@ -343,6 +409,7 @@ export default function AdminUserListForChat({
                   const adminUnreadCount = Number(session?.adminUnreadCount) || 0;
                   const isSelected = selectedUserId === user.id;
                   const lastMsg = session?.lastMessageText;
+                  const hasRealMessage = Boolean(session?.lastMessageTimestamp && lastMsg);
                   const isTyping = Boolean(
                     session?.isUserTyping &&
                     (Date.now() - (getTimestampMillis(session?.userTypingAt) || 0) < 6000)
@@ -364,7 +431,7 @@ export default function AdminUserListForChat({
                         )}
                     >
                         {/* Number Indicator (Top Left Ranking) */}
-                        {!searchTerm && !isSelected && (
+                        {!searchTerm && !isSelected && activeTab === 'recent' && (
                             <span className="absolute left-1 top-1 text-[8px] font-black opacity-20 group-hover:opacity-40">
                                 #{index + 1}
                             </span>
@@ -396,13 +463,13 @@ export default function AdminUserListForChat({
                         <div className="flex-grow min-w-0">
                             <div className="flex items-center justify-between">
                                 <p className={cn("text-sm font-black truncate", isSelected ? "text-primary-foreground" : "text-foreground")}>
-                                  {user.displayName || user.email?.split('@')[0] || "Customer"}
+                                  {user.displayName || user.email?.split('@')[0] || user.mobileNumber || "Customer"}
                                 </p>
                                 <span className={cn("text-[9px] font-medium whitespace-nowrap ml-2", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
                                   {isTyping ? (
                                     <span className="text-primary font-bold animate-pulse">active</span>
-                                  ) : session?.lastMessageTimestamp || session?.updatedAt ? (
-                                    formatLastActive(session?.lastMessageTimestamp || session?.updatedAt)
+                                  ) : session?.lastMessageTimestamp ? (
+                                    formatLastActive(session.lastMessageTimestamp)
                                   ) : ''}
                                 </span>
                             </div>
@@ -414,7 +481,9 @@ export default function AdminUserListForChat({
                                 </p>
                               ) : (
                                 <p className={cn("text-[11px] truncate max-w-[150px]", isSelected ? "text-primary-foreground/80" : "text-muted-foreground")}>
-                                  {lastMsg || user.mobileNumber || user.email || "No message yet"}
+                                  {hasRealMessage 
+                                    ? lastMsg 
+                                    : (user.mobileNumber || user.email || "No messages yet")}
                                 </p>
                               )}
                               {adminUnreadCount > 0 && !isSelected && (

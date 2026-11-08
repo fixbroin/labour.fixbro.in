@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import type { ProviderApplication, ProviderControlOptions, LanguageOption, QualificationOption } from '@/types/firestore';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Loader2, User, Mail, Phone, MapPin, BookOpen, Languages, Camera, Image as ImageIcon, Trash2, AlertCircle, ArrowLeft, ChevronRight, Check } from "lucide-react";
+import { Loader2, User, Mail, Phone, MapPin, BookOpen, Languages, Camera, Image as ImageIcon, Trash2, AlertCircle, ArrowLeft, ChevronRight, Check, Calendar } from "lucide-react";
 import NextImage from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import { storage } from '@/lib/firebase';
@@ -35,12 +35,67 @@ const isValidImageSrc = (url: string | null | undefined): url is string => {
 };
 
 
+export function calculateAgeFromDob(dobString: string): { age: number | null; error?: string } {
+  if (!dobString || dobString.trim().length < 10) {
+    return { age: null, error: "Please enter complete date of birth (DD/MM/YYYY)" };
+  }
+  const parts = dobString.split('/');
+  if (parts.length !== 3) {
+    return { age: null, error: "Invalid date format. Use DD/MM/YYYY" };
+  }
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+
+  if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    return { age: null, error: "Invalid numbers in date of birth" };
+  }
+  if (month < 1 || month > 12) {
+    return { age: null, error: "Month must be between 01 and 12" };
+  }
+  if (day < 1 || day > 31) {
+    return { age: null, error: "Day must be between 01 and 31" };
+  }
+  if (year < 1920 || year > new Date().getFullYear()) {
+    return { age: null, error: "Invalid year of birth" };
+  }
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  if (day > daysInMonth) {
+    return { age: null, error: `Invalid date: ${month}/${year} has only ${daysInMonth} days` };
+  }
+
+  const birthDate = new Date(year, month - 1, day);
+  const today = new Date();
+
+  if (birthDate > today) {
+    return { age: null, error: "Date of birth cannot be in the future" };
+  }
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  if (age < 18) {
+    return { age, error: "Applicant must be at least 18 years old" };
+  }
+  if (age > 99) {
+    return { age, error: "Age seems incorrect" };
+  }
+
+  return { age };
+}
+
 const step2PersonalInfoSchema = z.object({
   fullName: z.string().min(2, "Full name is required.").max(100),
   email: z.string().email("Invalid email.").optional().or(z.literal('')),
   mobileNumber: z.string().min(10, "Valid mobile number required.").max(15).regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format."),
   address: z.string().min(5, "Address is required.").max(250),
-  age: z.coerce.number().min(18, "Must be at least 18.").max(99, "Age seems incorrect."),
+  dob: z.string().min(10, "Date of birth is required (DD/MM/YYYY).").regex(/^\d{2}\/\d{2}\/\d{4}$/, "Please enter date as DD/MM/YYYY."),
+  age: z.coerce.number().min(18, "Must be at least 18 years old to register.").max(99, "Age seems incorrect."),
+  gender: z.enum(["Male", "Female", "Other"]).default("Male"),
   qualificationId: z.string({ required_error: "Please select your qualification." }),
   alternateMobile: z.string().max(15).regex(/^\+?[1-9]\d{1,14}$/, "Invalid alternate phone format.").optional().or(z.literal('')),
   languagesSpokenIds: z.array(z.string()).min(1, "Select at least one language spoken.").max(5, "Select up to 5 languages."),
@@ -86,7 +141,9 @@ export default function Step2PersonalInfo({
       email: initialData?.email || firestoreUser?.email || user?.email || "",
       mobileNumber: initialData?.mobileNumber || firestoreUser?.mobileNumber || user?.phoneNumber || "",
       address: initialData?.address || "",
+      dob: initialData?.dob || "",
       age: initialData?.age ?? undefined, 
+      gender: (initialData?.gender as any) || "Male",
       qualificationId: initialData?.qualificationId || undefined,
       alternateMobile: initialData?.alternateMobile || "",
       languagesSpokenIds: initialData?.languagesSpokenIds || [],
@@ -140,7 +197,9 @@ export default function Step2PersonalInfo({
             email: initialData.email || firestoreUser?.email || user?.email || "",
             mobileNumber: initialData.mobileNumber || firestoreUser?.mobileNumber || user?.phoneNumber || "",
             address: initialData.address || "",
+            dob: initialData.dob || "",
             age: initialData.age ?? undefined, 
+            gender: (initialData.gender as any) || "Male",
             qualificationId: initialData.qualificationId || undefined,
             alternateMobile: initialData.alternateMobile || "",
             languagesSpokenIds: initialData.languagesSpokenIds || [],
@@ -282,30 +341,130 @@ export default function Step2PersonalInfo({
               <FormMessage />
             </FormItem>
           )}/>
+          {/* Date of Birth & Auto Calculated Age */}
           <FormField 
             control={form.control} 
-            name="age" 
+            name="dob" 
             render={({ field }) => {
-              const inputValue = field.value === undefined || field.value === null ? '' : String(field.value);
+              const currentAge = form.watch('age');
+              const handleDobInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+                let raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+                let formatted = raw;
+                if (raw.length > 4) {
+                  formatted = `${raw.slice(0, 2)}/${raw.slice(2, 4)}/${raw.slice(4)}`;
+                } else if (raw.length > 2) {
+                  formatted = `${raw.slice(0, 2)}/${raw.slice(2)}`;
+                }
+
+                field.onChange(formatted);
+
+                if (formatted.length === 10) {
+                  const check = calculateAgeFromDob(formatted);
+                  if (check.age !== null) {
+                    form.setValue('age', check.age, { shouldValidate: true });
+                    form.clearErrors('dob');
+                  } else {
+                    form.setValue('age', undefined as any);
+                    form.setError('dob', { type: 'manual', message: check.error || 'Invalid date of birth' });
+                  }
+                } else {
+                  form.setValue('age', undefined as any);
+                }
+              };
+
+              const handleNativeDatePicker = (e: React.ChangeEvent<HTMLInputElement>) => {
+                const yyyyMmDd = e.target.value;
+                if (!yyyyMmDd) return;
+                const [y, m, d] = yyyyMmDd.split('-');
+                const formatted = `${d}/${m}/${y}`;
+                field.onChange(formatted);
+                const check = calculateAgeFromDob(formatted);
+                if (check.age !== null) {
+                  form.setValue('age', check.age, { shouldValidate: true });
+                  form.clearErrors('dob');
+                } else {
+                  form.setValue('age', undefined as any);
+                  form.setError('dob', { type: 'manual', message: check.error || 'Invalid date of birth' });
+                }
+              };
+
               return (
                 <FormItem>
-                  <FormLabel>Age <span className="text-destructive ml-1">*</span></FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="e.g., 25" 
-                      {...field} 
-                      value={inputValue}
-                      onChange={(e) => {
-                        field.onChange(e.target.value === '' ? null : e.target.value); 
-                      }}
-                      disabled={effectiveIsSaving}
-                    />
-                  </FormControl>
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4 text-muted-foreground"/>Date of Birth <span className="text-destructive ml-1">*</span>
+                    </FormLabel>
+                    {typeof currentAge === 'number' && currentAge >= 18 && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Age: {currentAge} years old
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative flex items-center">
+                    <FormControl>
+                      <Input 
+                        type="text" 
+                        inputMode="numeric"
+                        placeholder="DD/MM/YYYY (e.g., 15/08/1995)" 
+                        value={field.value || ''}
+                        onChange={handleDobInput}
+                        maxLength={10}
+                        disabled={effectiveIsSaving}
+                        className="pr-10 font-mono text-base tracking-wider sm:text-sm"
+                      />
+                    </FormControl>
+                    <label 
+                      className="absolute right-2.5 cursor-pointer text-muted-foreground hover:text-primary transition-colors p-1"
+                      title="Open calendar picker"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      <input 
+                        type="date" 
+                        className="sr-only"
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={handleNativeDatePicker}
+                        disabled={effectiveIsSaving}
+                      />
+                    </label>
+                  </div>
+                  <FormDescription className="text-xs text-muted-foreground">
+                    Type numbers directly (slashes added automatically) or click the calendar icon. Age is calculated automatically.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               );
             }}
+          />
+
+          <FormField
+            control={form.control}
+            name="gender"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel className="flex items-center">
+                  <User className="mr-2 h-4 w-4 text-muted-foreground"/>Gender<span className="text-destructive ml-1">*</span>
+                </FormLabel>
+                <FormControl>
+                  <div className="flex items-center gap-6 pt-1">
+                    {["Male", "Female", "Other"].map((g) => (
+                      <label key={g} className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                        <input
+                          type="radio"
+                          name="gender"
+                          value={g}
+                          checked={field.value === g}
+                          onChange={() => field.onChange(g)}
+                          disabled={effectiveIsSaving}
+                          className="h-4 w-4 text-primary focus:ring-primary border-slate-300"
+                        />
+                        <span>{g === "Male" ? "Male" : g === "Female" ? "Female" : "Other"}</span>
+                      </label>
+                    ))}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
 
           <FormField
@@ -320,17 +479,17 @@ export default function Step2PersonalInfo({
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-between h-11 text-left font-normal",
+                          "w-full justify-between h-auto min-h-[44px] py-2 px-3 text-left font-normal",
                           !field.value && "text-muted-foreground"
                         )}
                         disabled={effectiveIsSaving}
                       >
-                        <span className="truncate">
+                        <span className="truncate flex-1 mr-2">
                           {field.value
                             ? controlOptions.qualificationOptions.find((opt) => opt.id === field.value)?.label
                             : "Select your qualification"}
                         </span>
-                        <ChevronRight className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </FormControl>
                   </DialogTrigger>
@@ -344,14 +503,14 @@ export default function Step2PersonalInfo({
                           <Button
                             key={opt.id}
                             variant="ghost"
-                            className="w-full justify-between font-normal h-11 px-3"
+                            className="w-full min-w-0 justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
                             onClick={() => {
                               field.onChange(opt.id);
                               setIsQualificationDialogOpen(false);
                             }}
                           >
-                            <span>{opt.label}</span>
-                            {field.value === opt.id && <Check className="h-4 w-4 text-primary" />}
+                            <span className="text-sm leading-snug break-words whitespace-normal text-left flex-1 min-w-0 mr-2">{opt.label}</span>
+                            {field.value === opt.id && <Check className="h-4 w-4 text-primary shrink-0" />}
                           </Button>
                         ))}
                       </div>

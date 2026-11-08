@@ -48,7 +48,7 @@ const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }: { title: s
         <Icon className="h-4 w-4" />
       </div>
     </CardHeader>
-    <CardContent className="p-3 pt-0">
+    <CardContent className="p-2 pt-0">
       <div className="text-3xl font-black tracking-tight">{value}</div>
       {subtitle && <p className="text-[10px] font-bold text-muted-foreground uppercase mt-2">{subtitle}</p>}
     </CardContent>
@@ -275,7 +275,7 @@ export default function AdminDashboardPage() {
               <div className="relative space-y-8">
                 <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-muted/50" />
                 {recentActivities.map((activity: any) => (
-                  <Link key={activity.id} href={activity.href || '#'} className="relative flex items-center group">
+                  <Link key={activity.id} href={activity.href?.startsWith('/admin/bookings/edit/') ? `/admin/bookings?openBookingId=${encodeURIComponent(activity.href.replace('/admin/bookings/edit/', ''))}&search=${encodeURIComponent(activity.href.replace('/admin/bookings/edit/', ''))}` : (activity.href || '#')} className="relative flex items-center group">
                     <div className="z-10 flex h-12 w-12 items-center justify-center rounded-2xl bg-card border-2 border-muted shadow-sm group-hover:border-primary/50 group-hover:scale-110 transition-all duration-300">
                       {activity.type === 'new_booking' ? <TagIcon className="h-4 w-4 text-primary" /> : <UserPlus className="h-4 w-4 text-emerald-500" />}
                     </div>

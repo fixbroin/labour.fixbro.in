@@ -19,16 +19,93 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Image as ImageIcon, Search, Upload, RefreshCw, Loader2, Sparkles, FolderTree, Layers, Wrench, Tv, Settings2, Eye, CheckCircle2, ChevronRight, FileText, Megaphone, Bell, Copy, Check, Trash2, ExternalLink, Share2, Plus } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Search,
+  Upload,
+  RefreshCw,
+  Loader2,
+  Sparkles,
+  FolderTree,
+  Layers,
+  Wrench,
+  Tv,
+  Settings2,
+  Eye,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Megaphone,
+  Bell,
+  Copy,
+  Check,
+  Trash2,
+  ExternalLink,
+  Share2,
+  Plus,
+  Users,
+  UserCheck,
+  ShieldCheck,
+  FileCheck,
+  FileSignature,
+  Landmark,
+  HardDrive,
+  Filter,
+  X,
+  FileImage,
+  FolderOpen,
+  Mail,
+  Phone,
+} from "lucide-react";
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { cn } from "@/lib/utils";
 import { db, auth } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, deleteDoc, query, orderBy, Timestamp } from '@/lib/mysqlDb';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { compressImage } from '@/lib/imageCompressor';
 import { deleteObject } from '@/lib/mysqlStorage';
 import type { HomepageAd } from '@/types/firestore';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  listAllServerImagesAction,
+  deleteServerImageAction,
+  updateProviderImageFieldAction,
+  type ServerImageFile,
+} from "@/app/actions/serverMediaActions";
+
+export interface ProviderGalleryImageItem {
+  key: string;
+  providerId: string;
+  providerName: string;
+  providerEmail?: string;
+  providerMobile?: string;
+  providerStatus?: string;
+  imageType: 'profile' | 'aadhaar_front' | 'aadhaar_back' | 'pan_front' | 'pan_back' | 'additional_doc' | 'signature' | 'cancelled_cheque';
+  title: string;
+  fieldPath: string;
+  imageUrl: string;
+  uploadFolder: string;
+}
+
+export interface ProviderGalleryGroup {
+  providerId: string;
+  providerName: string;
+  providerEmail?: string;
+  providerMobile?: string;
+  primaryCategory?: string;
+  status: string;
+  avatarUrl?: string;
+  images: ProviderGalleryImageItem[];
+}
 
 export interface CustomGalleryImage {
   id: string;
@@ -132,6 +209,31 @@ export default function AdminImageGalleryPage() {
   const [copiedUrlId, setCopiedUrlId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<CustomGalleryImage | null>(null);
   const [isDeletingCustom, setIsDeletingCustom] = useState(false);
+
+  // Provider Images State
+  const [providerGroups, setProviderGroups] = useState<ProviderGalleryGroup[]>([]);
+  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+  const [providerFilterStatus, setProviderFilterStatus] = useState<string>('all');
+  const [replaceProviderModalItem, setReplaceProviderModalItem] = useState<ProviderGalleryImageItem | null>(null);
+  const [providerPreviewFile, setProviderPreviewFile] = useState<File | null>(null);
+  const [providerPreviewUrl, setProviderPreviewUrl] = useState<string | null>(null);
+  const [isReplacingProviderImage, setIsReplacingProviderImage] = useState(false);
+  const [providerReplaceProgress, setProviderReplaceProgress] = useState(0);
+  const [deleteProviderCandidate, setDeleteProviderCandidate] = useState<ProviderGalleryImageItem | null>(null);
+  const [isDeletingProviderImage, setIsDeletingProviderImage] = useState(false);
+
+  // Other Server Files State
+  const [serverImages, setServerImages] = useState<ServerImageFile[]>([]);
+  const [serverFolders, setServerFolders] = useState<string[]>([]);
+  const [isLoadingServerImages, setIsLoadingServerImages] = useState(false);
+  const [serverFolderFilter, setServerFolderFilter] = useState<string>('all');
+  const [serverTotalSize, setServerTotalSize] = useState(0);
+  const [deleteServerImageCandidate, setDeleteServerImageCandidate] = useState<ServerImageFile | null>(null);
+  const [isDeletingServerImage, setIsDeletingServerImage] = useState(false);
+  const [isUploadServerModalOpen, setIsUploadServerModalOpen] = useState(false);
+  const [isUploadingOther, setIsUploadingOther] = useState(false);
+  const [otherUploadProgress, setOtherUploadProgress] = useState(0);
+  const [otherUploadFolder, setOtherUploadFolder] = useState<string>('general');
 
   // Modal State for Full Screen Image Preview
   const [viewingImage, setViewingImage] = useState<{
@@ -508,9 +610,221 @@ export default function AdminImageGalleryPage() {
     }
   };
 
+  const fetchProviderImages = async () => {
+    setIsLoadingProviders(true);
+    try {
+      const snap = await getDocs(query(collection(db, "providerApplications"), orderBy("createdAt", "desc")));
+      const groups: ProviderGalleryGroup[] = [];
+
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        const providerId = docSnap.id;
+        const providerName = data.fullName || data.personalInfo?.fullName || data.displayName || 'Unnamed Provider';
+        const providerEmail = data.email || data.personalInfo?.email || '';
+        const providerMobile = data.mobileNumber || data.personalInfo?.mobileNumber || '';
+        const primaryCategory = data.primaryCategory || data.categoryName || '';
+        const status = data.status || 'pending_review';
+        const avatarUrl = data.profilePhotoUrl || data.photoURL || '';
+
+        const images: ProviderGalleryImageItem[] = [];
+
+        // 1. Profile Photo
+        if (data.profilePhotoUrl || data.photoURL) {
+          images.push({
+            key: `${providerId}-profilePhotoUrl`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'profile',
+            title: 'Profile Photo',
+            fieldPath: 'profilePhotoUrl',
+            imageUrl: data.profilePhotoUrl || data.photoURL,
+            uploadFolder: 'providers/profile',
+          });
+        }
+
+        // 2. Aadhaar Front & Back
+        if (data.aadhaar?.frontImageUrl) {
+          images.push({
+            key: `${providerId}-aadhaar-front`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'aadhaar_front',
+            title: `Aadhaar Front ${data.aadhaar?.aadhaarNumber ? `(..${String(data.aadhaar.aadhaarNumber).slice(-4)})` : ''}`,
+            fieldPath: 'aadhaar.frontImageUrl',
+            imageUrl: data.aadhaar.frontImageUrl,
+            uploadFolder: 'providers/documents',
+          });
+        }
+        if (data.aadhaar?.backImageUrl) {
+          images.push({
+            key: `${providerId}-aadhaar-back`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'aadhaar_back',
+            title: 'Aadhaar Back',
+            fieldPath: 'aadhaar.backImageUrl',
+            imageUrl: data.aadhaar.backImageUrl,
+            uploadFolder: 'providers/documents',
+          });
+        }
+
+        // 3. PAN Front & Back
+        if (data.pan?.frontImageUrl) {
+          images.push({
+            key: `${providerId}-pan-front`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'pan_front',
+            title: `PAN Front ${data.pan?.panNumber ? `(${data.pan.panNumber})` : ''}`,
+            fieldPath: 'pan.frontImageUrl',
+            imageUrl: data.pan.frontImageUrl,
+            uploadFolder: 'providers/documents',
+          });
+        }
+        if (data.pan?.backImageUrl) {
+          images.push({
+            key: `${providerId}-pan-back`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'pan_back',
+            title: 'PAN Back',
+            fieldPath: 'pan.backImageUrl',
+            imageUrl: data.pan.backImageUrl,
+            uploadFolder: 'providers/documents',
+          });
+        }
+
+        // 4. Additional Documents (Array)
+        if (Array.isArray(data.additionalDocuments)) {
+          data.additionalDocuments.forEach((docItem: any, idx: number) => {
+            const docLabel = docItem.docLabel || docItem.docType || `Additional Doc #${idx + 1}`;
+            if (docItem.frontImageUrl) {
+              images.push({
+                key: `${providerId}-addDoc-${idx}-front`,
+                providerId,
+                providerName,
+                providerEmail,
+                providerMobile,
+                providerStatus: status,
+                imageType: 'additional_doc',
+                title: `${docLabel} (Front)`,
+                fieldPath: `additionalDocuments.${idx}.frontImageUrl`,
+                imageUrl: docItem.frontImageUrl,
+                uploadFolder: 'providers/documents',
+              });
+            }
+            if (docItem.backImageUrl) {
+              images.push({
+                key: `${providerId}-addDoc-${idx}-back`,
+                providerId,
+                providerName,
+                providerEmail,
+                providerMobile,
+                providerStatus: status,
+                imageType: 'additional_doc',
+                title: `${docLabel} (Back)`,
+                fieldPath: `additionalDocuments.${idx}.backImageUrl`,
+                imageUrl: docItem.backImageUrl,
+                uploadFolder: 'providers/documents',
+              });
+            }
+          });
+        }
+
+        // 5. Signature
+        if (data.signatureUrl) {
+          images.push({
+            key: `${providerId}-signatureUrl`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'signature',
+            title: 'Digital Signature',
+            fieldPath: 'signatureUrl',
+            imageUrl: data.signatureUrl,
+            uploadFolder: 'providers/signatures',
+          });
+        }
+
+        // 6. Cancelled Cheque / Chequebook
+        if (data.bankDetails?.cancelledChequeUrl) {
+          images.push({
+            key: `${providerId}-bankDetails-cancelledChequeUrl`,
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            providerStatus: status,
+            imageType: 'cancelled_cheque',
+            title: `Bank Cancelled Cheque ${data.bankDetails?.bankName ? `(${data.bankDetails.bankName})` : ''}`,
+            fieldPath: 'bankDetails.cancelledChequeUrl',
+            imageUrl: data.bankDetails.cancelledChequeUrl,
+            uploadFolder: 'providers/cheques',
+          });
+        }
+
+        if (images.length > 0) {
+          groups.push({
+            providerId,
+            providerName,
+            providerEmail,
+            providerMobile,
+            primaryCategory,
+            status,
+            avatarUrl,
+            images,
+          });
+        }
+      });
+
+      setProviderGroups(groups);
+    } catch (err) {
+      console.warn("Error fetching provider images:", err);
+    } finally {
+      setIsLoadingProviders(false);
+    }
+  };
+
+  const fetchServerImages = async () => {
+    setIsLoadingServerImages(true);
+    try {
+      const res = await listAllServerImagesAction();
+      if (res.success) {
+        setServerImages(res.images);
+        setServerFolders(res.folders);
+        setServerTotalSize(res.totalSize);
+      } else {
+        toast({ title: "Failed to list server images", description: res.message, variant: "destructive" });
+      }
+    } catch (err: any) {
+      console.warn("Error listing server images:", err);
+    } finally {
+      setIsLoadingServerImages(false);
+    }
+  };
+
   useEffect(() => {
     fetchAllWebsiteImages();
     fetchCustomImages();
+    fetchProviderImages();
+    fetchServerImages();
   }, []);
 
   const handleCustomUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -675,6 +989,299 @@ export default function AdminImageGalleryPage() {
       img.imageUrl.toLowerCase().includes(lower)
     );
   }, [customImages, searchTerm]);
+
+  const handleExecuteReplaceProviderImage = async () => {
+    if (!replaceProviderModalItem || !providerPreviewFile) return;
+
+    setIsReplacingProviderImage(true);
+    setProviderReplaceProgress(15);
+
+    try {
+      // 1. Compress image
+      let uploadPayload: Blob = providerPreviewFile;
+      try {
+        uploadPayload = await compressImage(providerPreviewFile);
+      } catch (cErr) {
+        uploadPayload = providerPreviewFile;
+      }
+      setProviderReplaceProgress(40);
+
+      // 2. Upload file via /api/upload
+      const formData = new FormData();
+      formData.append('file', uploadPayload, providerPreviewFile.name);
+      formData.append('uploadPath', replaceProviderModalItem.uploadFolder || 'providers');
+
+      const token = await auth.currentUser?.getIdToken();
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      const uploadData = await uploadRes.json();
+
+      if (!uploadRes.ok || !uploadData.success) {
+        throw new Error(uploadData.error || 'Failed to upload replacement image.');
+      }
+
+      setProviderReplaceProgress(75);
+      const newImageUrl = uploadData.url;
+
+      // 3. Update database & delete old file via server action
+      const updateRes = await updateProviderImageFieldAction({
+        providerId: replaceProviderModalItem.providerId,
+        fieldPath: replaceProviderModalItem.fieldPath,
+        newUrl: newImageUrl,
+        oldUrl: replaceProviderModalItem.imageUrl,
+      });
+
+      if (!updateRes.success) {
+        throw new Error(updateRes.message);
+      }
+
+      setProviderReplaceProgress(100);
+
+      // 4. Update local state
+      setProviderGroups((prev) =>
+        prev.map((group) => {
+          if (group.providerId !== replaceProviderModalItem.providerId) return group;
+          return {
+            ...group,
+            images: group.images.map((img) =>
+              img.key === replaceProviderModalItem.key
+                ? { ...img, imageUrl: newImageUrl }
+                : img
+            ),
+            avatarUrl:
+              replaceProviderModalItem.fieldPath === 'profilePhotoUrl'
+                ? newImageUrl
+                : group.avatarUrl,
+          };
+        })
+      );
+
+      toast({
+        title: "Image Replaced Successfully! ✅",
+        description: `${replaceProviderModalItem.title} for ${replaceProviderModalItem.providerName} updated.`,
+      });
+
+      setReplaceProviderModalItem(null);
+      setProviderPreviewFile(null);
+      setProviderPreviewUrl(null);
+    } catch (error: any) {
+      console.error('Error replacing provider image:', error);
+      toast({
+        title: "Replacement Failed",
+        description: error.message || "Could not replace provider image.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReplacingProviderImage(false);
+      setProviderReplaceProgress(0);
+    }
+  };
+
+  const handleExecuteDeleteProviderImage = async () => {
+    if (!deleteProviderCandidate) return;
+
+    setIsDeletingProviderImage(true);
+    try {
+      const res = await updateProviderImageFieldAction({
+        providerId: deleteProviderCandidate.providerId,
+        fieldPath: deleteProviderCandidate.fieldPath,
+        newUrl: null,
+        oldUrl: deleteProviderCandidate.imageUrl,
+      });
+
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      // Update local state
+      setProviderGroups((prev) =>
+        prev
+          .map((group) => {
+            if (group.providerId !== deleteProviderCandidate.providerId) return group;
+            const nextImages = group.images.filter((img) => img.key !== deleteProviderCandidate.key);
+            return {
+              ...group,
+              images: nextImages,
+              avatarUrl:
+                deleteProviderCandidate.fieldPath === 'profilePhotoUrl'
+                  ? undefined
+                  : group.avatarUrl,
+            };
+          })
+          .filter((group) => group.images.length > 0)
+      );
+
+      toast({
+        title: "Image Deleted Successfully! 🗑️",
+        description: `${deleteProviderCandidate.title} removed from ${deleteProviderCandidate.providerName}'s profile.`,
+      });
+
+      setDeleteProviderCandidate(null);
+    } catch (error: any) {
+      console.error('Error deleting provider image:', error);
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Could not delete provider image.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingProviderImage(false);
+    }
+  };
+
+  const handleExecuteDeleteServerImage = async () => {
+    if (!deleteServerImageCandidate) return;
+
+    setIsDeletingServerImage(true);
+    try {
+      const res = await deleteServerImageAction(deleteServerImageCandidate.url);
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      setServerImages((prev) => prev.filter((img) => img.url !== deleteServerImageCandidate.url));
+      setServerTotalSize((prev) => Math.max(0, prev - deleteServerImageCandidate.fileSize));
+
+      toast({
+        title: "Image Deleted Permanently! 🗑️",
+        description: `${deleteServerImageCandidate.fileName} was removed from the server.`,
+      });
+
+      setDeleteServerImageCandidate(null);
+    } catch (error: any) {
+      console.error('Error deleting server image:', error);
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Could not delete image from server.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingServerImage(false);
+    }
+  };
+
+  const handleOtherUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingOther(true);
+    setOtherUploadProgress(10);
+
+    try {
+      const totalFiles = files.length;
+      let completed = 0;
+
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        let uploadPayload: Blob = file;
+        if (file.type.startsWith('image/') && !file.type.includes('svg')) {
+          try {
+            uploadPayload = await compressImage(file);
+          } catch {
+            uploadPayload = file;
+          }
+        }
+
+        const formData = new FormData();
+        formData.append('file', uploadPayload, file.name);
+        formData.append('uploadPath', otherUploadFolder || 'general');
+
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData,
+        });
+
+        const resData = await res.json();
+        if (!res.ok || !resData.success) {
+          throw new Error(resData.error || `Failed to upload ${file.name}`);
+        }
+
+        completed++;
+        setOtherUploadProgress(Math.round((completed / totalFiles) * 100));
+      }
+
+      toast({
+        title: "Upload Successful! 🎉",
+        description: `${totalFiles} image(s) uploaded to folder "${otherUploadFolder}".`,
+      });
+
+      setIsUploadServerModalOpen(false);
+      await fetchServerImages();
+    } catch (error: any) {
+      console.error('Error uploading to server:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload file(s).",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingOther(false);
+      setOtherUploadProgress(0);
+      e.target.value = '';
+    }
+  };
+
+  const totalProviderImages = useMemo(() => {
+    return providerGroups.reduce((acc, g) => acc + g.images.length, 0);
+  }, [providerGroups]);
+
+  const filteredProviderGroups = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return providerGroups
+      .map((group) => {
+        if (providerFilterStatus !== 'all' && group.status !== providerFilterStatus) {
+          return null;
+        }
+        if (!term) return group;
+
+        const matchesGroupInfo =
+          group.providerName.toLowerCase().includes(term) ||
+          (group.providerEmail && group.providerEmail.toLowerCase().includes(term)) ||
+          (group.providerMobile && group.providerMobile.includes(term)) ||
+          (group.primaryCategory && group.primaryCategory.toLowerCase().includes(term));
+
+        if (matchesGroupInfo) return group;
+
+        const matchingImages = group.images.filter((img) =>
+          img.title.toLowerCase().includes(term)
+        );
+        if (matchingImages.length > 0) {
+          return {
+            ...group,
+            images: matchingImages,
+          };
+        }
+
+        return null;
+      })
+      .filter((g): g is ProviderGalleryGroup => g !== null);
+  }, [providerGroups, searchTerm, providerFilterStatus]);
+
+  const filteredServerImages = useMemo(() => {
+    let list = serverImages;
+    if (serverFolderFilter !== 'all') {
+      list = list.filter((img) => img.folder === serverFolderFilter);
+    }
+    const term = searchTerm.toLowerCase().trim();
+    if (term) {
+      list = list.filter(
+        (img) =>
+          img.fileName.toLowerCase().includes(term) ||
+          img.folder.toLowerCase().includes(term) ||
+          img.url.toLowerCase().includes(term)
+      );
+    }
+    return list;
+  }, [serverImages, serverFolderFilter, searchTerm]);
 
   const formatFileSize = (bytes?: number): string => {
     if (!bytes || isNaN(bytes)) return '';
@@ -1114,6 +1721,209 @@ export default function AdminImageGalleryPage() {
     );
   };
 
+  const renderProviderImageCard = (img: ProviderGalleryImageItem) => {
+    const isCopied = copiedUrlId === img.key;
+
+    return (
+      <Card key={img.key} className="overflow-hidden group hover:shadow-lg transition-all duration-300 border border-border/60 flex flex-col justify-between bg-card">
+        <div>
+          <div className="relative aspect-video w-full bg-slate-900/5 dark:bg-slate-800/50 overflow-hidden flex items-center justify-center border-b">
+            <img 
+              src={img.imageUrl} 
+              alt={img.title} 
+              className="object-contain max-h-full max-w-full p-2 group-hover:scale-105 transition-transform duration-300"
+            />
+
+            <div className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[90%]">
+              <Badge className={cn(
+                "text-[10px] shadow-sm backdrop-blur-md border-none font-semibold truncate",
+                img.imageType === 'profile' ? "bg-blue-600 text-white" :
+                img.imageType.startsWith('aadhaar') ? "bg-amber-600 text-white" :
+                img.imageType.startsWith('pan') ? "bg-indigo-600 text-white" :
+                img.imageType === 'signature' ? "bg-purple-600 text-white" :
+                img.imageType === 'cancelled_cheque' ? "bg-emerald-600 text-white" :
+                "bg-slate-700 text-white"
+              )}>
+                {img.title}
+              </Badge>
+            </div>
+
+            {/* Quick Hover Overlay */}
+            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-1.5 p-2 backdrop-blur-[2px]">
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                onClick={() => setViewingImage({ id: img.key, title: `${img.title} - ${img.providerName}`, imageUrl: img.imageUrl, categoryType: 'provider', uploadFolder: img.uploadFolder })} 
+                className="bg-white/95 text-slate-900 hover:bg-white text-xs h-8 px-2.5 font-medium"
+              >
+                <Eye className="h-3.5 w-3.5 mr-1" /> View Full
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  setReplaceProviderModalItem(img);
+                  setProviderPreviewFile(null);
+                  setProviderPreviewUrl(null);
+                }} 
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 px-2.5 font-medium shadow-md"
+              >
+                <Upload className="h-3.5 w-3.5 mr-1" /> Replace
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-3">
+            <div className="flex items-center justify-between gap-1">
+              <h5 className="font-bold text-xs text-foreground line-clamp-1" title={img.title}>
+                {img.title}
+              </h5>
+              <span className="text-[10px] text-muted-foreground uppercase font-mono shrink-0">
+                {img.imageUrl.split('.').pop()?.toUpperCase() || 'IMG'}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground font-mono truncate mt-1" title={img.imageUrl}>
+              {img.imageUrl}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 pt-0 flex items-center gap-1.5">
+          <Button 
+            type="button"
+            onClick={() => {
+              const fullUrl = img.imageUrl.startsWith('http') ? img.imageUrl : `${window.location.origin}${img.imageUrl.startsWith('/') ? '' : '/'}${img.imageUrl}`;
+              navigator.clipboard.writeText(fullUrl);
+              setCopiedUrlId(img.key);
+              setTimeout(() => setCopiedUrlId(null), 2500);
+              toast({ title: "URL Copied! 📋", description: fullUrl });
+            }} 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 text-[11px] h-8 px-2 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-950/40"
+          >
+            {isCopied ? <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 mr-1 text-muted-foreground" />}
+            {isCopied ? 'Copied' : 'Copy URL'}
+          </Button>
+          <Button 
+            type="button"
+            onClick={() => {
+              setReplaceProviderModalItem(img);
+              setProviderPreviewFile(null);
+              setProviderPreviewUrl(null);
+            }} 
+            variant="outline" 
+            size="sm" 
+            className="text-[11px] h-8 px-2 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-950/40 text-blue-600"
+            title="Replace Image"
+          >
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+          <Button 
+            type="button"
+            onClick={() => setDeleteProviderCandidate(img)} 
+            variant="outline" 
+            size="sm" 
+            className="text-[11px] h-8 px-2 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:hover:bg-red-950/40 text-destructive"
+            title="Delete Image"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderServerImageCard = (file: ServerImageFile) => {
+    const isCopied = copiedUrlId === file.url;
+    const formattedSize = formatFileSize(file.fileSize);
+    const formattedDate = new Date(file.modifiedAt).toLocaleDateString();
+
+    return (
+      <Card key={file.url} className="overflow-hidden group hover:shadow-lg transition-all duration-300 border border-border/60 flex flex-col justify-between bg-card">
+        <div>
+          <div className="relative aspect-video w-full bg-slate-900/5 dark:bg-slate-800/50 overflow-hidden flex items-center justify-center border-b">
+            <img 
+              src={file.url} 
+              alt={file.fileName} 
+              className="object-contain max-h-full max-w-full p-2 group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+
+            <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+              <Badge className="text-[10px] shadow-sm bg-amber-600 text-white backdrop-blur-md border-none font-semibold">
+                {file.folder}
+              </Badge>
+              {formattedSize && (
+                <Badge variant="outline" className="text-[10px] shadow-sm bg-background/90 text-foreground border-border/50 backdrop-blur-md">
+                  {formattedSize}
+                </Badge>
+              )}
+            </div>
+
+            {/* Quick Hover Overlay */}
+            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-1.5 p-2 backdrop-blur-[2px]">
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                onClick={() => setViewingImage({ id: file.url, title: file.fileName, imageUrl: file.url, categoryType: 'server', uploadFolder: file.folder })} 
+                className="bg-white/95 text-slate-900 hover:bg-white text-xs h-8 px-2.5 font-medium"
+              >
+                <Eye className="h-3.5 w-3.5 mr-1" /> View Full
+              </Button>
+              <Button 
+                size="sm" 
+                variant="secondary"
+                onClick={() => window.open(file.url, '_blank')} 
+                className="bg-slate-800 text-white hover:bg-slate-700 text-xs h-8 px-2.5 font-medium"
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-3">
+            <h5 className="font-bold text-xs text-foreground line-clamp-1" title={file.fileName}>
+              {file.fileName}
+            </h5>
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
+              <span className="font-mono truncate max-w-[130px]">{file.url}</span>
+              <span>{formattedDate}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3 pt-0 flex items-center gap-1.5">
+          <Button 
+            type="button"
+            onClick={() => {
+              const fullUrl = file.url.startsWith('http') ? file.url : `${window.location.origin}${file.url.startsWith('/') ? '' : '/'}${file.url}`;
+              navigator.clipboard.writeText(fullUrl);
+              setCopiedUrlId(file.url);
+              setTimeout(() => setCopiedUrlId(null), 2500);
+              toast({ title: "URL Copied! 📋", description: fullUrl });
+            }} 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 text-[11px] h-8 px-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 dark:hover:bg-amber-950/40"
+          >
+            {isCopied ? <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 mr-1 text-muted-foreground" />}
+            {isCopied ? 'Copied' : 'Copy URL'}
+          </Button>
+          <Button 
+            type="button"
+            onClick={() => setDeleteServerImageCandidate(file)} 
+            variant="outline" 
+            size="sm" 
+            className="text-[11px] h-8 px-2 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:hover:bg-red-950/40 text-destructive"
+            title="Delete Permanently"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </Card>
+    );
+  };
+
   return (
     <PermissionGuard moduleId="image_gallery" action="read">
       <div className="space-y-6">
@@ -1134,11 +1944,11 @@ export default function AdminImageGalleryPage() {
                 </CardDescription>
               </div>
               <Button 
-                onClick={() => { fetchAllWebsiteImages(); fetchCustomImages(); }} 
-                disabled={isLoading || isLoadingCustom}
+                onClick={() => { fetchAllWebsiteImages(); fetchCustomImages(); fetchProviderImages(); fetchServerImages(); }} 
+                disabled={isLoading || isLoadingCustom || isLoadingProviders || isLoadingServerImages}
                 className="bg-white text-emerald-800 hover:bg-emerald-50 font-bold shadow-lg shrink-0 rounded-xl"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading || isLoadingCustom ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading || isLoadingCustom || isLoadingProviders || isLoadingServerImages ? 'animate-spin' : ''}`} />
                 Refresh Gallery
               </Button>
             </div>
@@ -1146,59 +1956,81 @@ export default function AdminImageGalleryPage() {
         </Card>
 
         {/* Stats Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card className="p-4 shadow-sm border border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                <ImageIcon className="h-6 w-6" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <Card className="p-3.5 shadow-sm border border-border/50">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                <ImageIcon className="h-5 w-5" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Total Website Images</p>
-                <p className="text-2xl font-black">{items.length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 shadow-sm border border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-500/10 text-blue-600 rounded-xl">
-                <FolderTree className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Categories & Sub-Cats</p>
-                <p className="text-2xl font-black">{items.filter(i => i.categoryType === 'category' || i.categoryType === 'subcategory').length}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Total Website</p>
+                <p className="text-xl font-black">{items.length}</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 shadow-sm border border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-500/10 text-indigo-600 rounded-xl">
-                <Wrench className="h-6 w-6" />
+          <Card className="p-3.5 shadow-sm border border-border/50">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-blue-500/10 text-blue-600 rounded-xl">
+                <FolderTree className="h-5 w-5" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Service Images</p>
-                <p className="text-2xl font-black">{items.filter(i => i.categoryType === 'service').length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 shadow-sm border border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl">
-                <Tv className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Banners & Blogs</p>
-                <p className="text-2xl font-black">{items.filter(i => i.categoryType === 'slideshow' || i.categoryType === 'ad' || i.categoryType === 'popup' || i.categoryType === 'blog' || i.categoryType === 'branding').length}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Categories</p>
+                <p className="text-xl font-black">{items.filter(i => i.categoryType === 'category' || i.categoryType === 'subcategory').length}</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 shadow-sm border border-border/50 bg-purple-50/40 dark:bg-purple-950/20">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-500/10 text-purple-600 rounded-xl">
-                <Share2 className="h-6 w-6" />
+          <Card className="p-3.5 shadow-sm border border-border/50">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-indigo-500/10 text-indigo-600 rounded-xl">
+                <Wrench className="h-5 w-5" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Custom Marketing</p>
-                <p className="text-2xl font-black text-purple-700 dark:text-purple-300">{customImages.length}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Services</p>
+                <p className="text-xl font-black">{items.filter(i => i.categoryType === 'service').length}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3.5 shadow-sm border border-border/50">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-rose-500/10 text-rose-600 rounded-xl">
+                <Tv className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Banners/Ads</p>
+                <p className="text-xl font-black">{items.filter(i => i.categoryType === 'slideshow' || i.categoryType === 'ad' || i.categoryType === 'popup' || i.categoryType === 'blog' || i.categoryType === 'branding').length}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3.5 shadow-sm border border-border/50 bg-purple-50/40 dark:bg-purple-950/20">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-purple-500/10 text-purple-600 rounded-xl">
+                <Share2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Marketing</p>
+                <p className="text-xl font-black text-purple-700 dark:text-purple-300">{customImages.length}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3.5 shadow-sm border border-border/50 bg-sky-50/40 dark:bg-sky-950/20">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-blue-500/10 text-blue-600 rounded-xl">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Providers</p>
+                <p className="text-xl font-black text-blue-700 dark:text-blue-300">{totalProviderImages}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3.5 shadow-sm border border-border/50 bg-amber-50/40 dark:bg-amber-950/20">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-xl">
+                <HardDrive className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium truncate">Server Files</p>
+                <p className="text-xl font-black text-amber-700 dark:text-amber-300">{serverImages.length}</p>
               </div>
             </div>
           </Card>
@@ -1210,7 +2042,12 @@ export default function AdminImageGalleryPage() {
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={activeTab === 'custom' ? "Search custom images by name..." : "Search images by title or category..."}
+                placeholder={
+                  activeTab === 'custom' ? "Search custom images by name..." :
+                  activeTab === 'providers' ? "Search provider name, phone, email, document..." :
+                  activeTab === 'other' ? "Search file name, folder, or URL..." :
+                  "Search images by title or category..."
+                }
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -1225,11 +2062,19 @@ export default function AdminImageGalleryPage() {
                 <TabsTrigger value="service" className="text-xs py-1.5 px-3">Services ({items.filter(i => i.categoryType === 'service').length})</TabsTrigger>
                 <TabsTrigger value="slideshow" className="text-xs py-1.5 px-3">Slideshows ({items.filter(i => i.categoryType === 'slideshow').length})</TabsTrigger>
                 <TabsTrigger value="ad" className="text-xs py-1.5 px-3">Ad Banners ({items.filter(i => i.categoryType === 'ad').length})</TabsTrigger>
-                <TabsTrigger value="popup" className="text-xs py-1.5 px-3">Newsletter Popups ({items.filter(i => i.categoryType === 'popup').length})</TabsTrigger>
+                <TabsTrigger value="popup" className="text-xs py-1.5 px-3">Popups ({items.filter(i => i.categoryType === 'popup').length})</TabsTrigger>
                 <TabsTrigger value="blog" className="text-xs py-1.5 px-3">Blogs ({items.filter(i => i.categoryType === 'blog').length})</TabsTrigger>
                 <TabsTrigger value="branding" className="text-xs py-1.5 px-3">Branding</TabsTrigger>
                 <TabsTrigger value="custom" className="text-xs py-1.5 px-3 bg-purple-500/15 text-purple-800 dark:text-purple-300 data-[state=active]:bg-purple-600 data-[state=active]:text-white font-bold">
-                  Custom Images ({customImages.length})
+                  Custom ({customImages.length})
+                </TabsTrigger>
+                <TabsTrigger value="providers" className="text-xs py-1.5 px-3 bg-blue-500/15 text-blue-800 dark:text-blue-300 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold">
+                  <Users className="h-3.5 w-3.5 mr-1 inline-block" />
+                  Provider Images ({totalProviderImages})
+                </TabsTrigger>
+                <TabsTrigger value="other" className="text-xs py-1.5 px-3 bg-amber-500/15 text-amber-800 dark:text-amber-300 data-[state=active]:bg-amber-600 data-[state=active]:text-white font-bold">
+                  <HardDrive className="h-3.5 w-3.5 mr-1 inline-block" />
+                  Other Server Images ({serverImages.length})
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -1340,6 +2185,248 @@ export default function AdminImageGalleryPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                 {filteredCustomImages.map(item => renderCustomImageCard(item))}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'providers' ? (
+          <div className="space-y-6">
+            {/* Guidance Banner */}
+            <Card className="border-blue-500/30 bg-gradient-to-r from-blue-500/10 via-sky-500/10 to-indigo-500/10 p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-xl mt-0.5 sm:mt-0">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
+                      Provider Documents & Profile Images
+                      <Badge className="bg-blue-600 text-white border-none text-[10px]">KYC & Verification</Badge>
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-3xl leading-relaxed">
+                      Provider-wise gallery displaying profile photos, Aadhaar (Front/Back), PAN (Front/Back), Additional Documents, Digital Signatures, and Bank Cancelled Cheques. You can view full size, copy image URLs, replace any image directly with a new upload, or delete individual files permanently.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                  <Select value={providerFilterStatus} onValueChange={setProviderFilterStatus}>
+                    <SelectTrigger className="h-9 text-xs w-full sm:w-40 bg-background/80">
+                      <SelectValue placeholder="Status Filter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="pending_review">Pending Review</SelectItem>
+                      <SelectItem value="needs_update">Needs Update</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={fetchProviderImages}
+                    disabled={isLoadingProviders}
+                    className="h-9 px-3 text-xs bg-background/80"
+                    title="Refresh Provider Images"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoadingProviders ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Provider List */}
+            {isLoadingProviders ? (
+              <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="text-xs text-muted-foreground font-medium">Loading provider documents and images...</p>
+              </div>
+            ) : filteredProviderGroups.length === 0 ? (
+              <Card className="p-12 text-center shadow-sm">
+                <Users className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
+                <h3 className="text-lg font-bold">No Provider Images Found</h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
+                  {searchTerm.trim() 
+                    ? `No provider documents match "${searchTerm}".`
+                    : "No provider profiles with uploaded images found."}
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                {filteredProviderGroups.map((group) => (
+                  <Card key={group.providerId} className="overflow-hidden border border-border/70 shadow-sm bg-card">
+                    {/* Provider Header Bar */}
+                    <div className="p-4 sm:px-6 bg-muted/40 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar className="h-10 w-10 border border-primary/20 shrink-0">
+                          {group.avatarUrl ? (
+                            <AvatarImage src={group.avatarUrl} alt={group.providerName} />
+                          ) : null}
+                          <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs uppercase">
+                            {group.providerName.slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-sm text-foreground truncate">{group.providerName}</h4>
+                            <Badge variant={
+                              group.status === 'approved' ? 'default' :
+                              group.status === 'rejected' ? 'destructive' :
+                              group.status === 'needs_update' ? 'outline' : 'secondary'
+                            } className="text-[10px] capitalize py-0 h-4">
+                              {group.status.replace(/_/g, ' ')}
+                            </Badge>
+                            {group.primaryCategory && (
+                              <Badge variant="outline" className="text-[10px] py-0 h-4 bg-muted/60 text-muted-foreground">
+                                {group.primaryCategory}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 truncate">
+                            {group.providerMobile && (
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" /> {group.providerMobile}
+                              </span>
+                            )}
+                            {group.providerEmail && (
+                              <span className="flex items-center gap-1 truncate">
+                                <Mail className="h-3 w-3" /> {group.providerEmail}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge className="bg-blue-600/15 text-blue-700 dark:text-blue-300 border border-blue-500/20 text-xs px-2.5 py-0.5 font-bold">
+                          {group.images.length} {group.images.length === 1 ? 'image' : 'images'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Images Grid */}
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {group.images.map((img) => renderProviderImageCard(img))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'other' ? (
+          <div className="space-y-6">
+            {/* Other Images Guidance & Header */}
+            <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-yellow-500/10 p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl mt-0.5 sm:mt-0">
+                    <HardDrive className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
+                      All Server Media & Files (public/uploads)
+                      <Badge className="bg-amber-600 text-white border-none text-[10px]">Disk Storage</Badge>
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-3xl leading-relaxed">
+                      Complete filesystem view of all image files stored on the server. You can view full size, copy direct public links, upload new files to specific upload folders, or permanently delete unused files to free up server disk space.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={() => setIsUploadServerModalOpen(true)}
+                    className="h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl"
+                  >
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />
+                    Upload Image
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={fetchServerImages}
+                    disabled={isLoadingServerImages}
+                    className="h-9 px-3 text-xs bg-background/80"
+                    title="Rescan Server Directory"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoadingServerImages ? 'animate-spin' : ''}`} />
+                    Rescan
+                  </Button>
+                </div>
+              </div>
+
+              {/* Folder Filter & Summary Bar */}
+              <div className="mt-4 pt-4 border-t border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-muted-foreground flex items-center gap-1">
+                    <FolderOpen className="h-3.5 w-3.5" /> Folder:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setServerFolderFilter('all')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
+                      serverFolderFilter === 'all'
+                        ? "bg-amber-600 text-white shadow-xs font-bold"
+                        : "bg-background/80 text-muted-foreground hover:text-foreground border"
+                    )}
+                  >
+                    All ({serverImages.length})
+                  </button>
+                  {serverFolders.map((f) => {
+                    const count = serverImages.filter((img) => img.folder === f).length;
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setServerFolderFilter(f)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-medium transition-all capitalize",
+                          serverFolderFilter === f
+                            ? "bg-amber-600 text-white shadow-xs font-bold"
+                            : "bg-background/80 text-muted-foreground hover:text-foreground border"
+                        )}
+                      >
+                        {f} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2 text-muted-foreground font-mono text-[11px] shrink-0">
+                  <Badge variant="outline" className="bg-background/80 font-mono">
+                    {filteredServerImages.length} files • {formatFileSize(serverTotalSize)} Total
+                  </Badge>
+                </div>
+              </div>
+            </Card>
+
+            {/* Grid of Server Files */}
+            {isLoadingServerImages ? (
+              <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
+                <Loader2 className="h-10 w-10 animate-spin text-amber-600" />
+                <p className="text-xs text-muted-foreground font-medium">Scanning server storage directory...</p>
+              </div>
+            ) : filteredServerImages.length === 0 ? (
+              <Card className="p-12 text-center shadow-sm">
+                <HardDrive className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
+                <h3 className="text-lg font-bold">No Server Images Found</h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
+                  {searchTerm.trim()
+                    ? `No server files match "${searchTerm}".`
+                    : serverFolderFilter !== 'all'
+                    ? `No files found in folder "${serverFolderFilter}".`
+                    : "No image files found on server."}
+                </p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredServerImages.map((file) => renderServerImageCard(file))}
               </div>
             )}
           </div>
@@ -1621,6 +2708,206 @@ export default function AdminImageGalleryPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Replace Provider Image Dialog */}
+        <Dialog open={!!replaceProviderModalItem} onOpenChange={(open) => !open && setReplaceProviderModalItem(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-blue-600" />
+                Replace Provider Image
+              </DialogTitle>
+              <DialogDescription>
+                Upload a new image file to replace <span className="font-bold text-foreground">"{replaceProviderModalItem?.title}"</span> for provider <span className="font-bold text-foreground">{replaceProviderModalItem?.providerName}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5 text-center">
+                  <Label className="text-xs text-muted-foreground">Current Image</Label>
+                  <div className="h-28 rounded-lg border bg-muted/40 p-2 flex items-center justify-center overflow-hidden">
+                    {replaceProviderModalItem?.imageUrl && (
+                      <img src={replaceProviderModalItem.imageUrl} alt="Current" className="max-h-full max-w-full object-contain" />
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5 text-center">
+                  <Label className="text-xs text-muted-foreground">New Replacement</Label>
+                  <div className="h-28 rounded-lg border-2 border-dashed border-blue-500/50 bg-blue-50/20 dark:bg-blue-950/20 p-2 flex items-center justify-center overflow-hidden">
+                    {providerPreviewUrl ? (
+                      <img src={providerPreviewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No file chosen</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="provider-replace-file" className="text-xs font-semibold">Choose New Image File</Label>
+                <Input
+                  id="provider-replace-file"
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  disabled={isReplacingProviderImage}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setProviderPreviewFile(file);
+                      setProviderPreviewUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                  className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                />
+              </div>
+
+              {isReplacingProviderImage && (
+                <div className="space-y-1">
+                  <Progress value={providerReplaceProgress} className="h-2" />
+                  <p className="text-xs text-center text-muted-foreground">Replacing and updating provider record... {providerReplaceProgress}%</p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="ghost" onClick={() => setReplaceProviderModalItem(null)} disabled={isReplacingProviderImage}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleExecuteReplaceProviderImage}
+                disabled={!providerPreviewFile || isReplacingProviderImage}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+              >
+                {isReplacingProviderImage ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                Replace Image Now
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Provider Image Alert Dialog */}
+        <AlertDialog open={!!deleteProviderCandidate} onOpenChange={(open) => !open && setDeleteProviderCandidate(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Delete Provider Image
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <span>Are you sure you want to delete <strong className="text-foreground">"{deleteProviderCandidate?.title}"</strong> for provider <strong className="text-foreground">{deleteProviderCandidate?.providerName}</strong>?</span>
+                <span className="block text-xs text-muted-foreground">This will remove the file from storage and clear this document from their application profile.</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingProviderImage}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleExecuteDeleteProviderImage();
+                }}
+                disabled={isDeletingProviderImage}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold"
+              >
+                {isDeletingProviderImage ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Delete Image
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Server Image Alert Dialog */}
+        <AlertDialog open={!!deleteServerImageCandidate} onOpenChange={(open) => !open && setDeleteServerImageCandidate(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Delete Image File From Server
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <span>Are you sure you want to permanently delete <strong className="text-foreground">"{deleteServerImageCandidate?.fileName}"</strong> from folder <strong className="text-foreground">uploads/{deleteServerImageCandidate?.folder}</strong>?</span>
+                <span className="block text-xs text-destructive/80 font-semibold">⚠️ WARNING: This file will be unlinked from disk permanently. If any webpage or service still uses this URL, it will become broken.</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingServerImage}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleExecuteDeleteServerImage();
+                }}
+                disabled={isDeletingServerImage}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold"
+              >
+                {isDeletingServerImage ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Permanently Delete File
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Upload Directly to Server Modal */}
+        <Dialog open={isUploadServerModalOpen} onOpenChange={setIsUploadServerModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-amber-600" />
+                Upload Image to Server
+              </DialogTitle>
+              <DialogDescription>
+                Choose target upload folder and select one or more images to save on the server.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Target Server Folder (public/uploads/...)</Label>
+                <Select value={otherUploadFolder} onValueChange={setOtherUploadFolder}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Select folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">general (Default)</SelectItem>
+                    <SelectItem value="ads">ads</SelectItem>
+                    <SelectItem value="blog">blog</SelectItem>
+                    <SelectItem value="categories">categories</SelectItem>
+                    <SelectItem value="services">services</SelectItem>
+                    <SelectItem value="slideshows">slideshows</SelectItem>
+                    <SelectItem value="subcategories">subcategories</SelectItem>
+                    <SelectItem value="branding">branding</SelectItem>
+                    <SelectItem value="custom">custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="server-file-input" className="text-xs font-semibold">Select Image Files</Label>
+                <Input
+                  id="server-file-input"
+                  type="file"
+                  multiple
+                  accept="image/png, image/jpeg, image/webp, image/svg+xml, image/gif"
+                  disabled={isUploadingOther}
+                  onChange={handleOtherUpload}
+                  className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700"
+                />
+              </div>
+
+              {isUploadingOther && (
+                <div className="space-y-1">
+                  <Progress value={otherUploadProgress} className="h-2" />
+                  <p className="text-xs text-center text-muted-foreground">Uploading files to server... {otherUploadProgress}%</p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setIsUploadServerModalOpen(false)} disabled={isUploadingOther}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PermissionGuard>
   );
