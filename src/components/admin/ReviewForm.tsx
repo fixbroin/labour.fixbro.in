@@ -1,20 +1,20 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { FirestoreReview, FirestoreService } from '@/types/firestore';
+import { Loader2, Star, Search, Check, ChevronsUpDown, UserCheck } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { FirestoreReview, FirestoreService, ReviewStatus } from "@/types/firestore";
-import { useEffect, useState } from "react";
-import { Loader2, Star, Check, ChevronsUpDown, Search, UserCheck, Briefcase } from "lucide-react";
 
 export interface ReviewTargetProvider {
   id: string;
@@ -27,7 +27,7 @@ export interface ReviewTargetProvider {
 const reviewStatusOptions: [string, ...string[]] = ["Pending", "Approved", "Rejected", "Flagged"];
 
 const reviewFormSchema = z.object({
-  serviceId: z.string({ required_error: "Please select a provider or service." }),
+  serviceId: z.string({ required_error: "Please select a daily labour provider." }),
   userName: z.string().min(2, "Reviewer name must be at least 2 characters.").default("Admin"),
   rating: z.coerce.number().min(1, "Rating must be at least 1.").max(5, "Rating cannot exceed 5."),
   comment: z.string().min(10, "Comment must be at least 10 characters.").max(1000, "Comment too long."),
@@ -49,11 +49,9 @@ export default function ReviewForm({
   onSubmit: onSubmitProp,
   initialData,
   providers = [],
-  services = [],
   onCancel,
   isSubmitting = false
 }: ReviewFormProps) {
-  const [targetType, setTargetType] = useState<'provider' | 'service'>('provider');
   const [selectedTargetName, setSelectedTargetName] = useState<string>("");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,10 +59,6 @@ export default function ReviewForm({
   const filteredProviders = providers.filter((p) =>
     p.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.workCategoryName && p.workCategoryName.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  const filteredServices = services.filter((s) =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   useEffect(() => {
@@ -76,7 +70,7 @@ export default function ReviewForm({
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewFormSchema),
     defaultValues: {
-      serviceId: initialData?.serviceId || undefined,
+      serviceId: initialData?.providerId || initialData?.serviceId || undefined,
       userName: initialData?.userName || "Admin",
       rating: initialData?.rating || 5,
       comment: initialData?.comment || "",
@@ -89,7 +83,7 @@ export default function ReviewForm({
   useEffect(() => {
     if (initialData) {
       form.reset({
-        serviceId: initialData.serviceId,
+        serviceId: initialData.providerId || initialData.serviceId,
         userName: initialData.userName,
         rating: initialData.rating,
         comment: initialData.comment,
@@ -97,11 +91,9 @@ export default function ReviewForm({
       });
       const prov = providers.find(p => p.id === initialData.providerId || p.id === initialData.serviceId);
       if (prov) {
-        setTargetType('provider');
         setSelectedTargetName(prov.fullName);
       } else {
-        const srv = services.find(s => s.id === initialData.serviceId);
-        setSelectedTargetName(srv?.name || initialData.serviceName || "Selected Item");
+        setSelectedTargetName(initialData.providerName || initialData.serviceName || "Selected Provider");
       }
     } else {
       form.reset({
@@ -113,7 +105,7 @@ export default function ReviewForm({
       });
       setSelectedTargetName("");
     }
-  }, [initialData, form, providers, services]);
+  }, [initialData, form, providers]);
 
   useEffect(() => {
     if (watchedServiceId) {
@@ -122,20 +114,17 @@ export default function ReviewForm({
         setSelectedTargetName(prov.fullName);
         return;
       }
-      const service = services.find(s => s.id === watchedServiceId);
-      setSelectedTargetName(service?.name || "Selected Item");
     } else {
       setSelectedTargetName("");
     }
-  }, [watchedServiceId, providers, services]);
+  }, [watchedServiceId, providers]);
 
   const handleSubmit = async (formData: ReviewFormData) => {
     const matchedProvider = providers.find(p => p.id === formData.serviceId);
-    const matchedService = services.find(s => s.id === formData.serviceId);
     
-    const finalServiceName = matchedProvider ? matchedProvider.fullName : (matchedService?.name || selectedTargetName || "Daily Labour");
-    const finalProviderId = matchedProvider ? matchedProvider.id : undefined;
-    const finalProviderName = matchedProvider ? matchedProvider.fullName : undefined;
+    const finalServiceName = matchedProvider ? matchedProvider.fullName : (selectedTargetName || "Daily Labour");
+    const finalProviderId = matchedProvider ? matchedProvider.id : formData.serviceId;
+    const finalProviderName = matchedProvider ? matchedProvider.fullName : selectedTargetName;
 
     await onSubmitProp({ 
       ...formData, 
@@ -152,51 +141,15 @@ export default function ReviewForm({
       <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col h-full"> 
         <div className="p-3 space-y-5 flex-grow">
           
-          {/* Target Type Switcher: Provider (Daily Labour) vs Service */}
-          <div className="space-y-2">
-            <FormLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Review Target</FormLabel>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={targetType === 'provider' ? 'default' : 'outline'}
-                className="flex-1 rounded-xl text-xs font-bold"
-                onClick={() => {
-                  setTargetType('provider');
-                  form.setValue('serviceId', '');
-                  setSelectedTargetName('');
-                }}
-                disabled={isSubmitting || !!initialData}
-              >
-                <UserCheck className="mr-1.5 h-3.5 w-3.5" />
-                Daily Labour Provider ({providers.length})
-              </Button>
-              {services.length > 0 && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={targetType === 'service' ? 'default' : 'outline'}
-                  className="flex-1 rounded-xl text-xs font-bold"
-                  onClick={() => {
-                    setTargetType('service');
-                    form.setValue('serviceId', '');
-                    setSelectedTargetName('');
-                  }}
-                  disabled={isSubmitting || !!initialData}
-                >
-                  <Briefcase className="mr-1.5 h-3.5 w-3.5" />
-                  Service Category ({services.length})
-                </Button>
-              )}
-            </div>
-          </div>
-
           <FormField
             control={form.control}
             name="serviceId"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>{targetType === 'provider' ? 'Select Provider' : 'Select Service'}</FormLabel>
+                <FormLabel className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <UserCheck className="h-4 w-4 text-primary" />
+                  Select Daily Labour Provider ({providers.length})
+                </FormLabel>
                 <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -209,21 +162,21 @@ export default function ReviewForm({
                       disabled={isSubmitting || !!initialData}
                       type="button"
                     >
-                      {selectedTargetName ? selectedTargetName : targetType === 'provider' ? "Choose a daily labour worker..." : "Choose a service..."}
+                      {selectedTargetName ? selectedTargetName : "Choose a daily labour worker..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="w-[calc(100%-6px)] sm:max-w-[440px] rounded-2xl">
                     <DialogHeader>
-                      <DialogTitle>{targetType === 'provider' ? 'Select Daily Labour Provider' : 'Select Service'}</DialogTitle>
+                      <DialogTitle>Select Daily Labour Provider</DialogTitle>
                       <DialogDescription>
-                        {targetType === 'provider' ? 'Search by provider name or category trade.' : 'Search by service name.'}
+                        Search by provider name or category trade.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="relative my-2">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder={targetType === 'provider' ? "Search providers (e.g. Srikanth, Carpenter)..." : "Search services..."}
+                        placeholder="Search providers (e.g. Srikanth, Carpenter)..."
                         className="pl-9 h-10 rounded-xl"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -232,70 +185,45 @@ export default function ReviewForm({
                     <div className="py-2">
                       <ScrollArea className="h-[260px] rounded-xl border p-2">
                         <div className="space-y-1">
-                          {targetType === 'provider' ? (
-                            filteredProviders.length === 0 ? (
-                              <p className="text-sm text-muted-foreground text-center py-6">No providers found.</p>
-                            ) : (
-                              filteredProviders.map((provider) => (
-                                <Button
-                                  key={provider.id}
-                                  variant={field.value === provider.id ? "secondary" : "ghost"}
-                                  className="w-full justify-start text-left h-auto py-2 px-2.5 rounded-xl relative"
-                                  onClick={() => {
-                                    field.onChange(provider.id);
-                                    setSelectedTargetName(provider.fullName);
-                                    setIsPickerOpen(false);
-                                  }}
-                                  type="button"
-                                >
-                                  <div className="flex items-center gap-2.5 w-full pr-6">
-                                    <Avatar className="h-8 w-8 border">
-                                      <AvatarImage src={provider.profilePhotoUrl} alt={provider.fullName} />
-                                      <AvatarFallback className="font-bold text-xs">{provider.fullName[0] || 'P'}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="text-xs font-bold truncate">{provider.fullName}</span>
-                                      <span className="text-[11px] text-muted-foreground truncate">
-                                        {provider.workCategoryName || 'Daily Labour'} {provider.seniorityLevel && `• ${provider.seniorityLevel}`}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {field.value === provider.id && (
-                                    <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600" />
-                                  )}
-                                </Button>
-                              ))
-                            )
+                          {filteredProviders.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-6">No providers found.</p>
                           ) : (
-                            filteredServices.length === 0 ? (
-                              <p className="text-sm text-muted-foreground text-center py-6">No services found.</p>
-                            ) : (
-                              filteredServices.map((service) => (
-                                <Button
-                                  key={service.id}
-                                  variant={field.value === service.id ? "secondary" : "ghost"}
-                                  className="w-full justify-start text-left h-auto py-2.5 px-3 relative rounded-xl"
-                                  onClick={() => {
-                                    field.onChange(service.id);
-                                    setSelectedTargetName(service.name);
-                                    setIsPickerOpen(false);
-                                  }}
-                                  type="button"
-                                >
-                                  <span className="text-xs font-medium">{service.name}</span>
-                                  {field.value === service.id && (
-                                    <Check className="absolute right-3 top-3 h-4 w-4 text-emerald-600" />
-                                  )}
-                                </Button>
-                              ))
-                            )
+                            filteredProviders.map((provider) => (
+                              <Button
+                                key={provider.id}
+                                variant={field.value === provider.id ? "secondary" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-2 px-2.5 rounded-xl relative"
+                                onClick={() => {
+                                  field.onChange(provider.id);
+                                  setSelectedTargetName(provider.fullName);
+                                  setIsPickerOpen(false);
+                                }}
+                                type="button"
+                              >
+                                <div className="flex items-center gap-2.5 w-full pr-6">
+                                  <Avatar className="h-8 w-8 border">
+                                    <AvatarImage src={provider.profilePhotoUrl} alt={provider.fullName} />
+                                    <AvatarFallback className="font-bold text-xs">{provider.fullName[0] || 'P'}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-xs font-bold truncate">{provider.fullName}</span>
+                                    <span className="text-[11px] text-muted-foreground truncate">
+                                      {provider.workCategoryName || 'Daily Labour'} {provider.seniorityLevel && `• ${provider.seniorityLevel}`}
+                                    </span>
+                                  </div>
+                                </div>
+                                {field.value === provider.id && (
+                                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600" />
+                                )}
+                              </Button>
+                            ))
                           )}
                         </div>
                       </ScrollArea>
                     </div>
                   </DialogContent>
                 </Dialog>
-                {initialData && <FormDescription>Target cannot be changed for an existing review.</FormDescription>}
+                {initialData && <FormDescription>Target provider cannot be changed for an existing review.</FormDescription>}
                 <FormMessage />
               </FormItem>
             )}
@@ -349,8 +277,8 @@ export default function ReviewForm({
                 <FormLabel>Review Comment</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="e.g., Arrived punctually at 09:30 AM, brought his own carpentry tools and worked diligently throughout the day. Very neat finish!"
-                    className="min-h-[100px] rounded-xl text-xs"
+                    placeholder="Enter customer feedback about work quality, trade skill, punctuality, and conduct..."
+                    className="min-h-[100px] resize-y rounded-xl"
                     {...field}
                     disabled={isSubmitting}
                   />
@@ -365,37 +293,34 @@ export default function ReviewForm({
             name="status"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Review Status</FormLabel>
-                <div className="flex gap-2">
-                  {reviewStatusOptions.map((status) => (
-                    <Button
-                      key={status}
-                      type="button"
-                      size="sm"
-                      variant={field.value === status ? (status === 'Approved' ? 'default' : 'secondary') : 'outline'}
-                      className={cn(
-                        "rounded-xl text-xs font-bold",
-                        field.value === status && status === 'Approved' && "bg-emerald-600 text-white hover:bg-emerald-700"
-                      )}
-                      onClick={() => field.onChange(status)}
-                    >
-                      {status}
-                    </Button>
-                  ))}
-                </div>
+                <FormLabel>Status</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                  <FormControl>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent className="rounded-xl">
+                    {reviewStatusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
+
         </div>
-        
-        <div className="p-4 border-t flex justify-end gap-2 bg-muted/20">
+        <div className="p-3 border-t bg-background flex justify-end gap-2 sticky bottom-0 z-10">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="rounded-xl">
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="rounded-xl font-bold bg-primary text-primary-foreground">
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {initialData ? "Update Review" : "Save Review"}
+          <Button type="submit" disabled={isSubmitting} className="rounded-xl">
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {initialData ? 'Save Changes' : 'Add Review'}
           </Button>
         </div>
       </form>

@@ -226,13 +226,17 @@ function getApiUrl(path: string): string {
 export async function getDoc(docRef: DocumentReference): Promise<DocumentSnapshot> {
   let result = { exists: false, data: null };
   try {
-    const res = await fetch(getApiUrl('/api/db/getDoc'), {
-      method: 'POST',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({ path: docRef.path })
-    });
-    if (res.ok) {
-      result = await res.json();
+    if (typeof window === 'undefined') {
+      result = await executeDbGetDoc(docRef.path);
+    } else {
+      const res = await fetch(getApiUrl('/api/db/getDoc'), {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ path: docRef.path })
+      });
+      if (res.ok) {
+        result = await res.json();
+      }
     }
   } catch (e) {
     console.error("getDoc API fetch error:", e);
@@ -252,14 +256,19 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
   
   let rawDocs: any[] = [];
   try {
-    const res = await fetch(getApiUrl('/api/db/getDocs'), {
-      method: 'POST',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({ path: queryRef.path, constraints: cleanConstraints })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      rawDocs = Array.isArray(data) ? data : (data.docs || []);
+    if (typeof window === 'undefined') {
+      const result: any = await executeDbGetDocs(queryRef.path, cleanConstraints);
+      rawDocs = Array.isArray(result) ? result : (result?.docs || []);
+    } else {
+      const res = await fetch(getApiUrl('/api/db/getDocs'), {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ path: queryRef.path, constraints: cleanConstraints })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        rawDocs = Array.isArray(data) ? data : (data.docs || []);
+      }
     }
   } catch (e) {
     console.error("getDocs API fetch error:", e);
@@ -299,6 +308,13 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
 
 export async function addDoc(collectionRef: CollectionReference, data: any) {
   const cleanData = serializeClientData(data);
+  if (typeof window === 'undefined') {
+    const result = await executeDbAddDoc(collectionRef.path, cleanData);
+    return {
+      id: result.id,
+      path: `${collectionRef.path}/${result.id}`
+    };
+  }
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: await getAuthHeaders(),
@@ -320,6 +336,10 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
+  if (typeof window === 'undefined') {
+    await executeDbSetDoc(collectionPath, docId, cleanData, options);
+    return { success: true };
+  }
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: await getAuthHeaders(),
@@ -337,6 +357,10 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
+  if (typeof window === 'undefined') {
+    await executeDbUpdateDoc(collectionPath, docId, cleanData);
+    return { success: true };
+  }
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: await getAuthHeaders(),
@@ -350,6 +374,10 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
 }
 
 export async function deleteDoc(docRef: DocumentReference) {
+  if (typeof window === 'undefined') {
+    await executeDbDeleteDoc(docRef.path);
+    return { success: true };
+  }
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: await getAuthHeaders(),
@@ -386,6 +414,10 @@ export function writeBatch(dbInstance: any) {
       operations.push({ action: 'deleteDoc', collection: collectionPath, id: docId });
     },
     commit: async () => {
+      if (typeof window === 'undefined') {
+        await executeDbBatch(operations);
+        return;
+      }
       const res = await fetch(getApiUrl('/api/db/batch'), {
         method: 'POST',
         headers: await getAuthHeaders(),

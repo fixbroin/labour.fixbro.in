@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { PlusCircle, Edit, Trash2, Loader2, Star, MessageSquare, Filter, Wand2, Check, ChevronsUpDown, UserCheck } from "lucide-react"; 
+import { PlusCircle, Edit, Trash2, Loader2, Star, MessageSquare, Filter, Wand2, Sparkles, Check, ChevronsUpDown, UserCheck } from "lucide-react"; 
 import type { FirestoreReview, ReviewStatus, FirestoreService, FirestoreSubCategory, FirestoreCategory } from '@/types/firestore';
 import ReviewForm, { type ReviewFormData, type ReviewTargetProvider } from '@/components/admin/ReviewForm';
 import BulkReviewGeneratorDialog from '@/components/admin/BulkReviewGeneratorDialog';
@@ -235,7 +235,7 @@ export default function AdminReviewsPage() {
               Manage Reviews
             </CardTitle>
             <CardDescription>
-              Create, edit, delete, and AI-generate verified customer reviews for Daily Labour providers.
+              Create, edit, delete, and bulk-generate authentic customer reviews for Daily Labour providers.
             </CardDescription>
           </div>
           <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
@@ -304,7 +304,7 @@ export default function AdminReviewsPage() {
             </div>
             <PermissionGuard moduleId="reviews" action="write">
               <Button onClick={handleOpenBulkGenerate} variant="outline" className="w-full sm:w-auto h-9" disabled={isPrerequisitesLoading}>
-                  {isPrerequisitesLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} AI Bulk Generate
+                  {isPrerequisitesLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-primary" />} Bulk Generate Reviews
               </Button>
             </PermissionGuard>
             <PermissionGuard moduleId="reviews" action="create">
@@ -324,7 +324,7 @@ export default function AdminReviewsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Provider / Service</TableHead>
+                  <TableHead>Daily Labour Provider</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead className="text-center">Rating</TableHead>
                   <TableHead>Comment</TableHead>
@@ -460,10 +460,10 @@ export default function AdminReviewsPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary"/>
                   <span className="ml-2">Loading data...</span>
               </div>
-            ) : providers.length === 0 && services.length === 0 && !editingReview ? (
+            ) : providers.length === 0 && !editingReview ? (
               <div className="p-3 py-8 text-center">
-                  <p className="text-destructive">Cannot add new reviews because no providers or services exist.</p>
-                  <p className="text-muted-foreground text-sm mt-2">Please add at least one provider or service first.</p>
+                  <p className="text-destructive">Cannot add new reviews because no daily labour providers exist.</p>
+                  <p className="text-muted-foreground text-sm mt-2">Please add or approve at least one provider first.</p>
               </div>
             ) : (
               <ReviewForm
