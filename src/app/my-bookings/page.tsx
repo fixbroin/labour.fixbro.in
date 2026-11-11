@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock, KeyRound, ShieldCheck } from "lucide-react"; // Added Phone
+import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock, KeyRound, ShieldCheck, CalendarDays, Users } from "lucide-react"; // Added Phone, CalendarDays, Users
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
@@ -29,9 +29,25 @@ import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatC
 import BookingRulesView from "@/components/shared/BookingRulesView";
 
 
+export interface EnrichedProviderItem {
+  serviceId: string;
+  name: string;
+  imageUrl: string;
+  days: number;
+  pricePerDay: number;
+  totalPrice: number;
+  categoryName?: string;
+  skillLevel?: string;
+  experience?: string;
+  mobileNumber?: string;
+  languages?: string[];
+  providerDetails?: ProviderApplication;
+}
+
 // Enriched booking type to include provider details
 interface EnrichedBooking extends FirestoreBooking {
     providerDetails?: ProviderApplication;
+    enrichedProviders?: EnrichedProviderItem[];
 }
 
 const formatBookingTimestamp = (timestamp?: any): string => {
@@ -195,7 +211,7 @@ export default function MyBookingsPage() {
       const enrichedPromises = fetchedBookings.map(async (booking): Promise<EnrichedBooking> => {
         const enrichedBooking: EnrichedBooking = { ...booking };
 
-        // 1. Fetch Provider Details
+        // 1. Fetch Primary Provider Details
         if (booking.providerId) {
           try {
             const providerDocRef = doc(db, "providerApplications", booking.providerId);
@@ -208,22 +224,66 @@ export default function MyBookingsPage() {
           }
         }
 
-        // 2. Fetch missing service images
-        if (booking.services && booking.services.length > 0 && !booking.services[0].imageUrl) {
-            try {
-                const serviceDocRef = doc(db, "adminServices", booking.services[0].serviceId);
-                const serviceDocSnap = await getDoc(serviceDocRef);
-                if (serviceDocSnap.exists()) {
-                    const sData = serviceDocSnap.data();
-                    if (sData?.imageUrl) {
-                        enrichedBooking.services[0].imageUrl = sData.imageUrl;
-                    }
+        // 2. Enrich all services/providers in booking.services
+        const servicesList = booking.services || [];
+        const enrichedProviders: EnrichedProviderItem[] = [];
+
+        for (const service of servicesList) {
+          const days = Math.max(1, service.quantity || 1);
+          const pricePerDay = service.pricePerUnit || service.discountedPricePerUnit || 0;
+          const totalPrice = pricePerDay * days;
+          
+          let pData: ProviderApplication | undefined;
+          const targetId = (service as any).providerId || (service as any).providerUserId || service.serviceId;
+          
+          if (targetId) {
+            if (enrichedBooking.providerDetails && (booking.providerId === targetId || (service as any).providerId === booking.providerId)) {
+              pData = enrichedBooking.providerDetails;
+            } else {
+              try {
+                const pSnap = await getDoc(doc(db, "providerApplications", targetId));
+                if (pSnap.exists()) {
+                  pData = pSnap.data() as ProviderApplication;
                 }
-            } catch (err) {
-                console.error("Failed to fetch service image for enrichment", err);
+              } catch (e) {
+                // Ignore fallback to service data
+              }
             }
+          }
+
+          if (!enrichedBooking.providerDetails && pData) {
+            enrichedBooking.providerDetails = pData;
+          }
+
+          // Fallback image from adminServices if needed
+          let finalImageUrl = pData?.profilePhotoUrl || service.imageUrl;
+          if (!finalImageUrl && service.serviceId) {
+            try {
+              const serviceDocRef = doc(db, "adminServices", service.serviceId);
+              const serviceDocSnap = await getDoc(serviceDocRef);
+              if (serviceDocSnap.exists()) {
+                finalImageUrl = serviceDocSnap.data()?.imageUrl;
+              }
+            } catch (err) {}
+          }
+
+          enrichedProviders.push({
+            serviceId: service.serviceId,
+            name: pData?.fullName || service.name || 'Daily Labour Provider',
+            imageUrl: finalImageUrl || '/default-image.png',
+            days,
+            pricePerDay,
+            totalPrice,
+            categoryName: pData?.workCategoryName || (service as any).categoryName || '',
+            skillLevel: pData?.skillLevelLabel || (pData as any)?.seniorityLevel || (service as any).skillLevel || '',
+            experience: pData?.experienceLevelLabel || (pData as any)?.experienceYearsLabel || (service as any).experience || '',
+            mobileNumber: pData?.mobileNumber || (service as any).mobileNumber || '',
+            languages: pData?.languagesSpokenLabels || (service as any).languages || [],
+            providerDetails: pData,
+          });
         }
 
+        enrichedBooking.enrichedProviders = enrichedProviders;
         return enrichedBooking;
       });
       
@@ -621,62 +681,143 @@ export default function MyBookingsPage() {
         ) : (
           <div className="space-y-6">
             {myBookings.map((booking, index) => {
-              const hasMultipleServices = booking.services && booking.services.length > 1;
+              const providers: EnrichedProviderItem[] = (booking.enrichedProviders && booking.enrichedProviders.length > 0)
+                ? booking.enrichedProviders
+                : (booking.services || []).map((s) => ({
+                    serviceId: s.serviceId,
+                    name: s.name,
+                    imageUrl: s.imageUrl || '/default-image.png',
+                    days: Math.max(1, s.quantity || 1),
+                    pricePerDay: s.pricePerUnit || s.discountedPricePerUnit || 0,
+                    totalPrice: (s.pricePerUnit || s.discountedPricePerUnit || 0) * Math.max(1, s.quantity || 1),
+                    categoryName: (s as any).categoryName || booking.providerDetails?.workCategoryName || '',
+                    skillLevel: (s as any).skillLevel || booking.providerDetails?.skillLevelLabel || (booking.providerDetails as any)?.seniorityLevel || '',
+                    experience: (s as any).experience || booking.providerDetails?.experienceLevelLabel || '',
+                    mobileNumber: (s as any).mobileNumber || booking.providerDetails?.mobileNumber || '',
+                    languages: (s as any).languages || booking.providerDetails?.languagesSpokenLabels || [],
+                    providerDetails: booking.providerDetails,
+                  }));
+
+              const hasMultipleProviders = providers.length > 1;
+              const totalDays = providers.reduce((sum, p) => sum + p.days, 0);
+
               return (
                 <Card key={booking.id} className="shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                   <div className="flex flex-col md:flex-row">
-                    {/* Service Image Section / Services List */}
-                    {hasMultipleServices ? (
-                      <div className="w-full md:w-96 p-3 bg-muted/10 border-b md:border-b-0 md:border-r border-border/40 flex flex-col justify-start gap-4 shrink-0">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Booked Services ({booking.services.length})</span>
+                    {/* Service Image Section / Booked Providers List */}
+                    {hasMultipleProviders ? (
+                      <div className="w-full md:w-96 lg:w-[420px] p-3.5 bg-muted/10 border-b md:border-b-0 md:border-r border-border/40 flex flex-col justify-start gap-3 shrink-0">
+                        <div className="flex justify-between items-center pb-2 border-b border-border/40">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary" />
+                            <span className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
+                              Booked Providers ({providers.length})
+                            </span>
+                          </div>
+                          <Badge variant="secondary" className="text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+                            {totalDays} {totalDays === 1 ? 'Day Total' : 'Days Total'}
+                          </Badge>
                         </div>
-                        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                          {booking.services.map((service) => (
-                            <div key={service.serviceId} className="flex items-center justify-between p-3 border rounded-xl bg-background shadow-xs gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
-                                  <AppImage 
-                                    src={service.imageUrl || "/default-image.png"} 
-                                    alt={service.name}
-                                    fill
-                                    className="object-cover"
-                                  />
+                        <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                          {providers.map((p, pIdx) => (
+                            <div key={p.serviceId || pIdx} className="p-3 border rounded-xl bg-background shadow-2xs hover:border-primary/30 transition-colors flex flex-col gap-2">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0 border">
+                                    <AppImage 
+                                      src={p.imageUrl || "/default-image.png"} 
+                                      alt={p.name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-xs sm:text-sm truncate text-foreground" title={p.name}>{p.name}</p>
+                                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                      {p.categoryName && (
+                                        <span className="text-[10px] text-muted-foreground font-medium">{p.categoryName}</span>
+                                      )}
+                                      {p.skillLevel && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">
+                                          {p.skillLevel}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="min-w-0">
-                                  <p className="font-bold text-xs truncate text-foreground" title={service.name}>{service.name}</p>
-                                  <p className="text-[10px] text-muted-foreground">{formatCurrency(service.pricePerUnit, symbol, decimals, code)} per unit</p>
+                                <div className="text-right shrink-0">
+                                  <p className="font-bold text-xs text-foreground">{formatCurrency(p.totalPrice, symbol, decimals, code)}</p>
+                                  <p className="text-[10px] text-muted-foreground">({formatCurrency(p.pricePerDay, symbol, decimals, code)} / day)</p>
                                 </div>
                               </div>
-                              <div className="text-right shrink-0">
-                                <p className="text-[10px] font-black text-primary">Qty: {service.quantity}</p>
-                                <p className="font-black text-xs text-foreground">{formatCurrency(service.pricePerUnit * service.quantity, symbol, decimals, code)}</p>
+                              
+                              <div className="flex items-center justify-between pt-1 border-t border-border/30 text-xs">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
+                                  <CalendarDays className="h-3 w-3 text-primary" />
+                                  Booked for {p.days} {p.days === 1 ? 'Day' : 'Days'}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground font-medium">
+                                  1 Person • {p.days} {p.days === 1 ? 'Day' : 'Days'}
+                                </span>
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     ) : (
-                      <div className="relative w-full aspect-square md:w-80 md:h-81 bg-muted shrink-0">
+                      <div className="relative w-full aspect-square md:w-80 md:h-auto bg-muted shrink-0 overflow-hidden group">
                         <AppImage 
-                          src={booking.services[0]?.imageUrl || "/default-image.png"} 
-                          alt={booking.services[0]?.name || "Service Image"}
+                          src={providers[0]?.imageUrl || "/default-image.png"} 
+                          alt={providers[0]?.name || "Provider Image"}
                           fill
                           priority={index === 0}
                           className="object-cover"
                         />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
+                        <div className="absolute top-3 left-3">
+                          <Badge className="bg-primary/95 text-white font-bold text-xs shadow-md border-0 flex items-center gap-1.5 px-2.5 py-1">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            Booked for {providers[0]?.days || 1} {(providers[0]?.days || 1) === 1 ? 'Day' : 'Days'}
+                          </Badge>
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between text-white">
+                          <div>
+                            <p className="text-xs opacity-90 font-medium">Daily Wage Rate</p>
+                            <p className="text-lg font-bold">
+                              {formatCurrency(providers[0]?.pricePerDay || booking.totalAmount, symbol, decimals, code)}
+                              <span className="text-xs font-normal opacity-85"> / day</span>
+                            </p>
+                          </div>
+                          {providers[0]?.skillLevel && (
+                            <Badge variant="outline" className="bg-black/40 text-white border-white/40 text-[10px]">
+                              {providers[0].skillLevel}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     )}
 
                     <div className="flex-1 flex flex-col">
                       <CardHeader>
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                          <CardTitle className="text-xl font-headline">
-                            {hasMultipleServices 
-                              ? booking.services.map(s => s.name).join(', ') 
-                              : (booking.services[0]?.name || "Service Image")
-                            }
-                          </CardTitle>
+                          <div>
+                            <CardTitle className="text-xl font-headline flex items-center gap-2 flex-wrap">
+                              {hasMultipleProviders 
+                                ? `Daily Labour Booking (${providers.length} Providers)` 
+                                : (providers[0]?.name || "Daily Labour Booking")
+                              }
+                              {hasMultipleProviders && (
+                                <Badge variant="secondary" className="text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                                  {totalDays} Total Days
+                                </Badge>
+                              )}
+                            </CardTitle>
+                            {hasMultipleProviders && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {providers.map(p => `${p.name} (${p.days}d)`).join(' • ')}
+                              </p>
+                            )}
+                          </div>
                           <Badge variant={getStatusBadgeVariant(booking.status)} className={`capitalize text-xs w-fit ${getStatusBadgeClass(booking.status)}`}>
                               {booking.status}
                           </Badge>
@@ -696,6 +837,26 @@ export default function MyBookingsPage() {
                     <p className="text-muted-foreground text-emerald-600 font-semibold">End Time</p>
                     <p className="font-bold text-emerald-700">
                       {formatEndTimeDisplay(booking.estimatedEndTime, booking.scheduledTimeSlot)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Total Duration</p>
+                    <p className="font-semibold text-foreground flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                      {hasMultipleProviders 
+                        ? `${totalDays} Total Days (${providers.length} Persons)`
+                        : `${providers[0]?.days || 1} ${(providers[0]?.days || 1) === 1 ? 'Day' : 'Days'} (1 Person)`
+                      }
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Total Amount</p>
+                    <p className="font-bold text-foreground text-base">{formatCurrency(booking.totalAmount, symbol, decimals, code)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Payment Method</p>
+                    <p className="font-medium">
+                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Service'}
                     </p>
                   </div>
                   {booking.dailyTimeline && booking.dailyTimeline.length > 1 && (
@@ -734,16 +895,6 @@ export default function MyBookingsPage() {
                       </div>
                     </div>
                   )}
-                  <div>
-                    <p className="text-muted-foreground">Total Amount</p>
-                    <p className="font-medium">{formatCurrency(booking.totalAmount, symbol, decimals, code)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Payment Method</p>
-                    <p className="font-medium">
-                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Service'}
-                    </p>
-                  </div>
                   <div className="sm:col-span-2 md:col-span-3">
                     <p className="text-muted-foreground">Booked On</p>
                     <p className="font-medium">{formatBookingTimestamp(booking.createdAt)}</p>
@@ -808,119 +959,262 @@ export default function MyBookingsPage() {
                     </div>
                   )}
 
-                  {booking.providerDetails && shouldShowProviderDetails(booking.status) && (
-                    <div className="sm:col-span-2 md:col-span-3 pt-4 border-t">
-                      <h4 className="text-md font-semibold mb-2.5 text-foreground">Your Provider</h4>
-                      
-                      {/* Mobile View Layout (Line 1: Name + Badges, Line 2: Languages, Line 3: Call Button) */}
-                      <div className="sm:hidden space-y-2.5">
-                        {/* Line 1: Avatar + Name (Full Width) & Badges */}
-                        <div className="flex items-start gap-3">
-                          <Avatar className="h-12 w-12 shrink-0 border shadow-2xs">
-                            <AvatarImage src={booking.providerDetails.profilePhotoUrl || undefined} alt={booking.providerDetails.fullName} />
-                            <AvatarFallback><UserCircle className="h-6 w-6" /></AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-base text-foreground leading-tight">{booking.providerDetails.fullName}</p>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                              {booking.providerDetails.workCategoryName && (
-                                <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
-                                  {booking.providerDetails.workCategoryName}
-                                </Badge>
-                              )}
-                              {(booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel) && (
-                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  {booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel}
-                                </Badge>
-                              )}
-                              {(booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience) && (
-                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
-                                  {booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+                  {shouldShowProviderDetails(booking.status) && (
+                    hasMultipleProviders ? (
+                      <div className="sm:col-span-2 md:col-span-3 pt-4 border-t space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-md font-semibold text-foreground flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary" /> Your Assigned Providers ({providers.length})
+                          </h4>
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {totalDays} {totalDays === 1 ? 'Working Day Total' : 'Working Days Total'}
+                          </span>
                         </div>
 
-                        {/* Line 2: Languages */}
-                        {booking.providerDetails.languagesSpokenLabels && booking.providerDetails.languagesSpokenLabels.length > 0 && (
-                          <div className="pt-0.5">
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                              <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
-                              <span>{booking.providerDetails.languagesSpokenLabels.join(', ')}</span>
-                            </p>
-                          </div>
-                        )}
+                        <div className="grid grid-cols-1 gap-3">
+                          {providers.map((p, idx) => (
+                            <div key={p.serviceId || idx} className="p-3.5 rounded-xl border bg-muted/20 hover:bg-muted/30 transition-colors">
+                              {/* Mobile View */}
+                              <div className="sm:hidden space-y-2.5">
+                                {/* Line 1: Avatar + Name + Badges + Days */}
+                                <div className="flex items-start gap-3">
+                                  <Avatar className="h-12 w-12 shrink-0 border shadow-2xs">
+                                    <AvatarImage src={p.imageUrl || undefined} alt={p.name} />
+                                    <AvatarFallback><UserCircle className="h-6 w-6" /></AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <p className="font-bold text-base text-foreground leading-tight truncate">{p.name}</p>
+                                      <Badge variant="secondary" className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 shrink-0">
+                                        {p.days} {p.days === 1 ? 'Day' : 'Days'}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                      {p.categoryName && (
+                                        <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                          {p.categoryName}
+                                        </Badge>
+                                      )}
+                                      {p.skillLevel && (
+                                        <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          {p.skillLevel}
+                                        </Badge>
+                                      )}
+                                      {p.experience && (
+                                        <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                          {p.experience}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
 
-                        {/* Line 3: Call Button (Full Width on mobile) */}
-                        {booking.providerDetails.mobileNumber && (
-                          <div className="pt-1">
-                            {booking.status === 'AssignedToProvider' ? (
-                              <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2" disabled title="Awaiting provider acceptance">
-                                <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
-                              </Button>
-                            ) : (
-                              <a href={`tel:${booking.providerDetails.mobileNumber}`} className="block w-full">
-                                <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2">
-                                  <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call Provider
-                                </Button>
-                              </a>
+                                {/* Line 2: Languages */}
+                                {p.languages && p.languages.length > 0 && (
+                                  <div className="pt-0.5">
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                      <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
+                                      <span>{p.languages.join(', ')}</span>
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Line 3: Call Button */}
+                                {p.mobileNumber && (
+                                  <div className="pt-1">
+                                    {booking.status === 'AssignedToProvider' ? (
+                                      <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2" disabled title="Awaiting provider acceptance">
+                                        <Phone className="mr-2 h-4 w-4" /> Call {p.name.split(' ')[0]} (Awaiting Accept)
+                                      </Button>
+                                    ) : (
+                                      <a href={`tel:${p.mobileNumber}`} className="block w-full">
+                                        <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2">
+                                          <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call {p.name.split(' ')[0]}
+                                        </Button>
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Desktop View */}
+                              <div className="hidden sm:flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3.5">
+                                  <Avatar className="h-14 w-14 shrink-0 border shadow-2xs">
+                                    <AvatarImage src={p.imageUrl || undefined} alt={p.name} />
+                                    <AvatarFallback><UserCircle className="h-7 w-7" /></AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="font-bold text-base text-foreground">{p.name}</p>
+                                      <Badge variant="secondary" className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                                        {p.days} {p.days === 1 ? 'Day Booked' : 'Days Booked'}
+                                      </Badge>
+                                      {p.categoryName && (
+                                        <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                          {p.categoryName}
+                                        </Badge>
+                                      )}
+                                      {p.skillLevel && (
+                                        <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          {p.skillLevel}
+                                        </Badge>
+                                      )}
+                                      {p.experience && (
+                                        <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                          {p.experience}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {p.languages && p.languages.length > 0 && (
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                                        <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
+                                        <span>{p.languages.join(', ')}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                {p.mobileNumber && (
+                                  <div className="shrink-0">
+                                    {booking.status === 'AssignedToProvider' ? (
+                                      <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
+                                        <Phone className="mr-2 h-4 w-4" /> Call {p.name.split(' ')[0]} (Awaiting)
+                                      </Button>
+                                    ) : (
+                                      <a href={`tel:${p.mobileNumber}`}>
+                                        <Button variant="outline" size="sm">
+                                          <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call {p.name.split(' ')[0]}
+                                        </Button>
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      (booking.providerDetails || providers[0]) && (
+                        <div className="sm:col-span-2 md:col-span-3 pt-4 border-t">
+                          <div className="flex items-center justify-between mb-2.5">
+                            <h4 className="text-md font-semibold text-foreground">Your Provider</h4>
+                            <Badge variant="secondary" className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                              {providers[0]?.days || 1} {(providers[0]?.days || 1) === 1 ? 'Day Booked' : 'Days Booked'}
+                            </Badge>
+                          </div>
+                          
+                          {/* Mobile View Layout (Line 1: Name + Badges, Line 2: Languages, Line 3: Call Button) */}
+                          <div className="sm:hidden space-y-2.5">
+                            {/* Line 1: Avatar + Name (Full Width) & Badges */}
+                            <div className="flex items-start gap-3">
+                              <Avatar className="h-12 w-12 shrink-0 border shadow-2xs">
+                                <AvatarImage src={booking.providerDetails?.profilePhotoUrl || providers[0]?.imageUrl || undefined} alt={booking.providerDetails?.fullName || providers[0]?.name} />
+                                <AvatarFallback><UserCircle className="h-6 w-6" /></AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-base text-foreground leading-tight">{booking.providerDetails?.fullName || providers[0]?.name}</p>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                  {(booking.providerDetails?.workCategoryName || providers[0]?.categoryName) && (
+                                    <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                      {booking.providerDetails?.workCategoryName || providers[0]?.categoryName}
+                                    </Badge>
+                                  )}
+                                  {(booking.providerDetails?.skillLevelLabel || (booking.providerDetails as any)?.seniorityLevel || providers[0]?.skillLevel) && (
+                                    <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      {booking.providerDetails?.skillLevelLabel || (booking.providerDetails as any)?.seniorityLevel || providers[0]?.skillLevel}
+                                    </Badge>
+                                  )}
+                                  {(booking.providerDetails?.experienceLevelLabel || (booking.providerDetails as any)?.experienceYearsLabel || (booking.providerDetails as any)?.experience || providers[0]?.experience) && (
+                                    <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                      {booking.providerDetails?.experienceLevelLabel || (booking.providerDetails as any)?.experienceYearsLabel || (booking.providerDetails as any)?.experience || providers[0]?.experience}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Line 2: Languages */}
+                            {((booking.providerDetails?.languagesSpokenLabels && booking.providerDetails.languagesSpokenLabels.length > 0) || (providers[0]?.languages && providers[0].languages.length > 0)) && (
+                              <div className="pt-0.5">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                  <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
+                                  <span>{(booking.providerDetails?.languagesSpokenLabels || providers[0]?.languages || []).join(', ')}</span>
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Line 3: Call Button (Full Width on mobile) */}
+                            {(booking.providerDetails?.mobileNumber || providers[0]?.mobileNumber) && (
+                              <div className="pt-1">
+                                {booking.status === 'AssignedToProvider' ? (
+                                  <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2" disabled title="Awaiting provider acceptance">
+                                    <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
+                                  </Button>
+                                ) : (
+                                  <a href={`tel:${booking.providerDetails?.mobileNumber || providers[0]?.mobileNumber}`} className="block w-full">
+                                    <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2">
+                                      <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call Provider
+                                    </Button>
+                                  </a>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
 
-                      {/* Desktop View Layout */}
-                      <div className="hidden sm:flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                          <Avatar className="h-14 w-14 shrink-0 border shadow-2xs">
-                            <AvatarImage src={booking.providerDetails.profilePhotoUrl || undefined} alt={booking.providerDetails.fullName} />
-                            <AvatarFallback><UserCircle className="h-7 w-7" /></AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-bold text-base text-foreground">{booking.providerDetails.fullName}</p>
-                              {booking.providerDetails.workCategoryName && (
-                                <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
-                                  {booking.providerDetails.workCategoryName}
-                                </Badge>
-                              )}
-                              {(booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel) && (
-                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  {booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel}
-                                </Badge>
-                              )}
-                              {(booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience) && (
-                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
-                                  {booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience}
-                                </Badge>
-                              )}
+                          {/* Desktop View Layout */}
+                          <div className="hidden sm:flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                              <Avatar className="h-14 w-14 shrink-0 border shadow-2xs">
+                                <AvatarImage src={booking.providerDetails?.profilePhotoUrl || providers[0]?.imageUrl || undefined} alt={booking.providerDetails?.fullName || providers[0]?.name} />
+                                <AvatarFallback><UserCircle className="h-7 w-7" /></AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-bold text-base text-foreground">{booking.providerDetails?.fullName || providers[0]?.name}</p>
+                                  {(booking.providerDetails?.workCategoryName || providers[0]?.categoryName) && (
+                                    <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                      {booking.providerDetails?.workCategoryName || providers[0]?.categoryName}
+                                    </Badge>
+                                  )}
+                                  {(booking.providerDetails?.skillLevelLabel || (booking.providerDetails as any)?.seniorityLevel || providers[0]?.skillLevel) && (
+                                    <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      {booking.providerDetails?.skillLevelLabel || (booking.providerDetails as any)?.seniorityLevel || providers[0]?.skillLevel}
+                                    </Badge>
+                                  )}
+                                  {(booking.providerDetails?.experienceLevelLabel || (booking.providerDetails as any)?.experienceYearsLabel || (booking.providerDetails as any)?.experience || providers[0]?.experience) && (
+                                    <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                      {booking.providerDetails?.experienceLevelLabel || (booking.providerDetails as any)?.experienceYearsLabel || (booking.providerDetails as any)?.experience || providers[0]?.experience}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {((booking.providerDetails?.languagesSpokenLabels && booking.providerDetails.languagesSpokenLabels.length > 0) || (providers[0]?.languages && providers[0].languages.length > 0)) && (
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                                    <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
+                                    <span>{(booking.providerDetails?.languagesSpokenLabels || providers[0]?.languages || []).join(', ')}</span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            {booking.providerDetails.languagesSpokenLabels && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-                                <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
-                                <span>{booking.providerDetails.languagesSpokenLabels.join(', ')}</span>
-                              </p>
+                            {(booking.providerDetails?.mobileNumber || providers[0]?.mobileNumber) && (
+                              <div className="shrink-0">
+                                {booking.status === 'AssignedToProvider' ? (
+                                  <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
+                                    <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
+                                  </Button>
+                                ) : (
+                                  <a href={`tel:${booking.providerDetails?.mobileNumber || providers[0]?.mobileNumber}`}>
+                                    <Button variant="outline" size="sm">
+                                      <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call
+                                    </Button>
+                                  </a>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
-                        {booking.providerDetails.mobileNumber && (
-                          <div className="shrink-0">
-                            {booking.status === 'AssignedToProvider' ? (
-                              <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
-                                <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
-                              </Button>
-                            ) : (
-                              <a href={`tel:${booking.providerDetails.mobileNumber}`}>
-                                <Button variant="outline" size="sm">
-                                  <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call
-                                </Button>
-                              </a>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      )
+                    )
                   )}
                   </CardContent>
                   <CardFooter className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-2 pb-6">
