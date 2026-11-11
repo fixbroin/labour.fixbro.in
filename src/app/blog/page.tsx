@@ -17,8 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
   
-  const title = `Expert Home Maintenance Tips & Guides | Blog${seoSettings.defaultMetaTitleSuffix || ' | Fixbro'}`;
-  const description = "Discover professional tips, DIY guides, and home maintenance advice from Fixbro experts. Learn how to keep your home in top shape.";
+  const title = `Daily Labour Guides & Daily Wage Hiring Tips | Blog${seoSettings.defaultMetaTitleSuffix || ' | Fixbro Daily Labour'}`;
+  const description = "Discover professional guides, daily wage benchmarks, and hiring tips for carpenters, electricians, painters, and skilled daily wage workers in Bangalore.";
 
   const rawOgImage = seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       url: `${appBaseUrl}/blog`,
-      siteName: seoSettings.siteName || 'Fixbro',
+      siteName: seoSettings.siteName || 'Fixbro Daily Labour',
       type: 'website',
       images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
     },
@@ -55,12 +55,12 @@ export default async function BlogListPage() {
   const blogListingSchema = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    "name": "Fixbro Blog",
-    "description": "Expert home maintenance tips, guides, and updates from Fixbro.",
+    "name": "Fixbro Daily Labour Blog",
+    "description": "Expert daily labour hiring guides, daily wage benchmarks, trade insights, and updates from Fixbro Daily Labour.",
     "url": `${appBaseUrl}/blog`,
     "publisher": {
       "@type": "Organization",
-      "name": "Fixbro",
+      "name": "Fixbro Daily Labour",
       "logo": {
         "@type": "ImageObject",
         "url": `${appBaseUrl}/android-chrome-512x512.png`
@@ -77,7 +77,7 @@ export default async function BlogListPage() {
         "image": absImage,
         "author": {
           "@type": "Person",
-          "name": post.authorName || "Fixbro Expert"
+          "name": post.authorName || "Fixbro Daily Labour Expert"
         }
       };
     })
@@ -92,10 +92,10 @@ export default async function BlogListPage() {
           <Breadcrumbs items={breadcrumbItems} />
           <div className="mt-8 text-center max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-6xl font-headline font-bold text-foreground mb-6">
-              Our <span className="text-primary">Blog</span>
+              Our <span className="text-primary">Daily Labour Blog</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-              Expert tips, home maintenance guides, and the latest updates from the Fixbro team.
+              Expert hiring guides, daily wage benchmarks, trade tips, and worker insights from the Fixbro Daily Labour team.
             </p>
           </div>
         </div>

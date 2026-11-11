@@ -349,11 +349,11 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
   return (
     <Form {...form} key={initialData ? `edit-${initialData.id}` : 'new-post'}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-grow space-y-6 p-3 overflow-y-auto">
-        <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>Title</FormLabel><FormControl><Input placeholder="Your blog post title" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+        <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>Title</FormLabel><FormControl><Input placeholder="e.g., Complete Guide to Hiring Carpenter Daily Labour in Bangalore" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField control={form.control} name="readingTime" render={({ field }) => (<FormItem><FormLabel>Reading Time</FormLabel><FormControl><Input placeholder="e.g., 5 min" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
-          <FormField control={form.control} name="tags" render={({ field }) => (<FormItem><FormLabel>Tags</FormLabel><FormControl><Input placeholder="e.g., home, tips, plumbing (comma-separated)" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+          <FormField control={form.control} name="readingTime" render={({ field }) => (<FormItem><FormLabel>Reading Time</FormLabel><FormControl><Input placeholder="e.g., 6 min" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+          <FormField control={form.control} name="tags" render={({ field }) => (<FormItem><FormLabel>Tags</FormLabel><FormControl><Input placeholder="e.g., carpenter daily labour, daily wage workers, bangalore (comma-separated)" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
         </div>
 
         <FormField
@@ -524,7 +524,7 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
 
         <Button type="button" variant="outline" size="sm" onClick={handleGenerateContent} disabled={effectiveIsSubmitting || !watchedTitle.trim()}>
           {isGeneratingAiContent ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4" />}
-          Generate AI Content & SEO
+          Generate AI Daily Labour Blog & SEO
         </Button>
         <FormField
           control={form.control}

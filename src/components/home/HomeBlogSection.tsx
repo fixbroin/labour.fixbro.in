@@ -68,7 +68,7 @@ export default function HomeBlogSection() {
       <section className="py-8 md:py-10 bg-secondary/30">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-headline font-semibold text-center mb-8 md:mb-12 text-foreground flex items-center justify-center">
-            <FileText className="mr-2 h-6 w-6 text-primary" /> Our Blog
+            <FileText className="mr-2 h-6 w-6 text-primary" /> Daily Labour Guides & Blog
           </h2>
            <div className="flex w-full space-x-4 p-1 pb-3 overflow-hidden">
                 {[...Array(4)].map((_, i) => (
@@ -96,7 +96,7 @@ export default function HomeBlogSection() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-8 md:mb-12">
           <h2 className="text-2xl md:text-3xl font-headline font-semibold text-foreground flex items-center">
-            <FileText className="mr-2 h-6 w-6 text-primary" /> Our Blog
+            <FileText className="mr-2 h-6 w-6 text-primary" /> Daily Labour Guides & Blog
           </h2>
           <Link href="/blog" passHref>
             <Button variant="outline" onClick={handleNav}>

@@ -168,7 +168,7 @@ export default function AdminBlogPage() {
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div>
             <CardTitle className="text-2xl flex items-center"><FileText className="mr-2 h-6 w-6 text-primary" />Manage Blog Posts</CardTitle>
-            <CardDescription>Create, edit, and publish articles for your website's blog.</CardDescription>
+            <CardDescription>Create, edit, publish, and AI-generate verified daily labour articles and hiring guides for your website.</CardDescription>
           </div>
           <PermissionGuard moduleId="blog" action="create">
             <Button onClick={handleAddPost} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
