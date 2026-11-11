@@ -133,7 +133,7 @@ export default function ExploreByLocation({ initialData, categories = [] }: Expl
     return (
       <section className="py-8 md:py-10">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-headline font-semibold text-center mb-8 text-foreground">Explore Services Near You</h2>
+          <h2 className="text-2xl md:text-3xl font-headline font-semibold text-center mb-8 text-foreground">Explore Daily Labour Near You</h2>
           <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
         </div>
       </section>
@@ -150,9 +150,9 @@ export default function ExploreByLocation({ initialData, categories = [] }: Expl
         {/* Section Header */}
         <div className="max-w-4xl mx-auto text-center mb-8">
             <h2 className="text-2xl md:text-3xl font-headline font-semibold text-foreground mb-3">
-                Explore Services Near You
+                Explore Daily Labour Near You
             </h2>
-            <p className="text-muted-foreground text-sm md:text-base">Find verified professionals for every home need in your locality.</p>
+            <p className="text-muted-foreground text-sm md:text-base">Find verified daily wage trade workers and skilled labour across your locality.</p>
         </div>
 
         {/* Quick Search Filter (shown when there are more than 8 cities) */}
@@ -235,10 +235,10 @@ export default function ExploreByLocation({ initialData, categories = [] }: Expl
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-bold text-foreground">
-                      Services in {activeCity.name}
+                      Daily Labour in {activeCity.name}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Find verified professionals and home services across {activeCity.name}
+                      Find verified daily wage workers and trade labour across {activeCity.name}
                     </p>
                   </div>
                 </div>
@@ -269,7 +269,7 @@ export default function ExploreByLocation({ initialData, categories = [] }: Expl
               {/* Popular Categories in the Selected City */}
               <div className="pt-5 pb-2">
                 <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5 text-primary" /> Popular Services in {activeCity.name}
+                  <Tag className="h-3.5 w-3.5 text-primary" /> Popular Trades in {activeCity.name}
                 </h4>
                 <div className="flex flex-wrap gap-2 md:gap-2.5">
                   {allCategories.map(cat => (

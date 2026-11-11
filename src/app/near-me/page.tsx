@@ -110,7 +110,7 @@ export default async function NearMeHubPage() {
           <div className="mb-20">
             <h2 className="text-2xl md:text-3xl font-headline font-semibold mb-8 flex items-center gap-2">
               <MapPin className="text-primary h-6 w-6" />
-              Book Local Services Near You
+              Hire Daily Labour Providers Near You
             </h2>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
