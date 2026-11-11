@@ -1,8 +1,9 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { getHaversineDistance } from '@/lib/locationUtils';
 import { Button } from '@/components/ui/button';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
@@ -203,14 +204,15 @@ const getPriceDisplayInfo = (service: FirestoreService, quantity: number, symbol
 const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service }) => {
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
-  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 0;
   const code = appConfig?.currencyCode || 'INR';
-  const router = useRouter();
-  const { showLoading } = useLoading();
-  const { user, triggerAuthRedirect } = useAuth();
-  const [quantity, setQuantity] = useState(0);
+
+  const [quantity, setQuantity] = useState<number>(0);
   const { toast } = useToast();
+  const { user, triggerAuthRedirect } = useAuth();
+  const router = useRouter();
   const currentPathname = usePathname();
+  const { showLoading } = useLoading();
 
   useEffect(() => {
     const syncQuantity = () => {
@@ -221,22 +223,17 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
 
     syncQuantity();
 
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'fixbroUserCart' || event.key === null) {
-        syncQuantity();
-      }
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'fixbroUserCart' || e.key === null) syncQuantity();
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [service.id]);
 
   const updateCart = (newQuantity: number) => {
     const cartEntries = getCartEntries();
     const existingEntryIndex = cartEntries.findIndex(entry => entry.serviceId === service.id);
-    const oldQuantity = existingEntryIndex > -1 ? cartEntries[existingEntryIndex].quantity : 0;
-    
-    const quantityChange = Math.abs(newQuantity - oldQuantity);
-    
     if (newQuantity > 0) {
       if (existingEntryIndex > -1) {
         cartEntries[existingEntryIndex].quantity = newQuantity;
@@ -249,9 +246,12 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
       }
     }
     saveCartEntries(cartEntries);
-    if(user?.uid) syncCartToFirestore(user.uid, cartEntries);
-
-    window.dispatchEvent(new StorageEvent('storage', { key: 'fixbroUserCart' }));
+    if (user?.uid) {
+      syncCartToFirestore(user.uid, cartEntries);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'fixbroUserCart' }));
+    }
   };
 
   const handleQuantityChange = (newQuantity: number) => {
@@ -264,10 +264,10 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
     updateCart(newQuantity);
     
     if (newQuantity > oldQuantity) {
-      toast({ title: "Cart Updated", description: `${service.name} quantity updated.` });
+      toast({ title: "Cart Updated", description: `${service.name} added to booking.` });
       logUserActivity('addToCart', { serviceId: service.id, serviceName: service.name, quantity: newQuantity - oldQuantity, price: service.price }, user?.uid, !user ? getGuestId() : null);
     } else if (newQuantity < oldQuantity) {
-      if (newQuantity === 0) toast({ title: "Item Removed", description: `${service.name} removed from cart.` });
+      if (newQuantity === 0) toast({ title: "Item Removed", description: `${service.name} removed from booking.` });
       logUserActivity('removeFromCart', { serviceId: service.id, serviceName: service.name, quantity: oldQuantity - newQuantity }, user?.uid, !user ? getGuestId() : null);
     }
   };
@@ -289,15 +289,15 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
   };
   const taskTimeDisplay = formatTaskTime(service.taskTimeValue, service.taskTimeUnit);
 
-  const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity, symbol, decimals, code);
-
+  const { mainPrice, priceSuffix } = getPriceDisplayInfo(service, quantity, symbol, decimals, code);
   const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
+  const detailHref = service.isProvider ? `/provider/${service.slug}` : `/service/${service.slug}`;
   
   return (
     <Link 
-      href={`/service/${service.slug}`}
+      href={detailHref}
       onClick={(e: React.MouseEvent) => {
-        if (currentPathname === `/service/${service.slug}`) {
+        if (currentPathname === detailHref) {
           e.preventDefault();
         } else {
           showLoading();
@@ -305,46 +305,68 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
       }}
       className="block h-full"
     >
-      <Card className="cursor-pointer h-full flex flex-col hover:shadow-lg transition-shadow">
+      <Card className="cursor-pointer h-full flex flex-col hover:shadow-lg transition-shadow overflow-hidden">
           <div className="relative w-full aspect-square bg-muted border-b border-border overflow-hidden rounded-t-lg">
               <AppImage src={service.imageUrl || "/default-image.png"} alt={service.name} fill sizes="200px" className="object-cover" />
+              {service.seniorityLevel && (
+                <div className="absolute top-2 left-2">
+                  <Badge variant="secondary" className="text-[10px] bg-primary text-primary-foreground font-semibold shadow">
+                    {service.seniorityLevel}
+                  </Badge>
+                </div>
+              )}
           </div>
-          <CardContent className="p-2 flex-grow flex flex-col justify-between">
+          <CardContent className="p-2.5 flex-grow flex flex-col justify-between">
               <div className="flex-grow">
-                  <h4 className="text-xs sm:text-sm font-semibold truncate text-foreground group-hover:text-primary">{service.name}</h4>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
-                  <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
-                  {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
-                  {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
-                  {service.reviewCount !== undefined && service.reviewCount > 0 && <span className="text-muted-foreground/80">({service.reviewCount})</span>}
-              </div>
-            </div>
-              <div className="flex items-center justify-between mt-2">
-               <div className="flex items-center gap-2">
-                  <div className="flex flex-wrap items-baseline gap-2 mt-2">
-                    <p className="text-lg font-bold text-foreground">{mainPrice}</p>
-                     {priceSuffix && (
-                       <p className="text-sm text-muted-foreground">
-                         {priceSuffix.includes(symbol) || /\d/.test(priceSuffix) ? (
-                           <span className="line-through">{priceSuffix}</span>
-                         ) : (
-                           priceSuffix
-                         )}
-                       </p>
-                     )}
+                  <h4 className="text-xs sm:text-sm font-bold truncate text-foreground group-hover:text-primary">{service.name}</h4>
+                  
+                  {/* Category and Skill Level Badges */}
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {service.parentCategoryName && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-secondary/40 text-foreground/80 font-medium border-border/50">
+                        {service.parentCategoryName}
+                      </Badge>
+                    )}
+                    {service.seniorityLevel && (
+                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-primary/10 text-primary font-medium border-primary/20">
+                        {service.seniorityLevel}
+                      </Badge>
+                    )}
                   </div>
-                  {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
-                    <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-1 py-0.5 rounded border border-amber-100 w-fit">
-                      Min. {service.minQuantity} units
+
+                  {service.isProvider ? (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground mt-1">
+                      {service.experienceLevelLabel && <span>{service.experienceLevelLabel}</span>}
+                      {service.age && <span>· Age {service.age}</span>}
+                      {service.rating > 0 && (
+                        <div className="flex items-center gap-0.5 text-amber-600 font-semibold">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-500" />
+                          <span>{service.rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
+                      <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
+                      {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Working time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
+                      {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
+                      {service.reviewCount !== undefined && service.reviewCount > 0 && <span className="text-muted-foreground/80">({service.reviewCount})</span>}
                     </div>
                   )}
+              </div>
+              <div className="flex items-center justify-between mt-2 pt-1.5 border-t">
+               <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-baseline gap-1">
+                    <p className="text-base font-bold text-foreground">{mainPrice}</p>
+                    {service.isProvider && <span className="text-[11px] text-muted-foreground font-normal">/day</span>}
+                  </div>
                 </div>
 
                   {!isAvailable ? (
                       <Button size="sm" className="h-7 px-2 text-xs" disabled><Ban className="mr-1.5 h-3 w-3"/>Unavailable</Button>
                   ) : quantity === 0 ? (
-                      <Button size="sm" className="h-7 px-2 text-xs" onClick={(e) => { e.preventDefault(); handleInitialAdd(e); }} >
-                          <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add
+                      <Button size="sm" className="h-7 px-2.5 text-xs font-semibold" onClick={(e) => { e.preventDefault(); handleInitialAdd(e); }} >
+                          <ShoppingCart className="mr-1 h-3 w-3" /> {service.isProvider ? 'Book' : 'Add'}
                       </Button>
                   ) : (
                     <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} >
@@ -414,6 +436,90 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   const [recentServices, setRecentServices] = useState<FirestoreService[]>(() => initialData?.recentServices || getCache<FirestoreService[]>('recentServices', true) || []);
   const [categoryWiseServicesData, setCategoryWiseServicesData] = useState<Array<{category: FirestoreCategory, services: FirestoreService[] }>>(() => initialData?.categoryWiseServices || getCache<Array<{category: FirestoreCategory, services: FirestoreService[] }>>('categoryWiseServices', true) || []);
   const [activeAds, setActiveAds] = useState<HomepageAd[]>(() => (initialData?.featuresConfig.ads || getCache<FeaturesConfiguration>('featuresConfig', true)?.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
+  
+  // User Location State & Realtime Location Updates
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; area?: string; city?: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('fixbroUserLocation');
+        return stored ? JSON.parse(stored) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const handleLocationUpdate = () => {
+      try {
+        const stored = localStorage.getItem('fixbroUserLocation');
+        setUserLocation(stored ? JSON.parse(stored) : null);
+      } catch (e) {}
+    };
+    window.addEventListener('fixbroUserLocationChanged', handleLocationUpdate);
+    return () => window.removeEventListener('fixbroUserLocationChanged', handleLocationUpdate);
+  }, []);
+
+  const filterProvidersByLocation = useCallback((servicesList: FirestoreService[]) => {
+    const userLat = Number(userLocation?.latitude ?? (userLocation as any)?.lat);
+    const userLng = Number(userLocation?.longitude ?? (userLocation as any)?.lng);
+    const hasValidUserLocation = !isNaN(userLat) && !isNaN(userLng) && userLat !== 0;
+
+    if (!hasValidUserLocation) {
+      // Before login / guest without set location: show all providers
+      return servicesList;
+    }
+
+    const processed = servicesList
+      .map(service => {
+        let distanceKm: number | undefined = undefined;
+        const center = (service as any).workAreaCenter || (service as any).providerData?.workAreaCenter;
+        const centerLat = Number(center?.latitude ?? center?.lat);
+        const centerLng = Number(center?.longitude ?? center?.lng);
+
+        if (!isNaN(centerLat) && !isNaN(centerLng) && centerLat !== 0) {
+          distanceKm = getHaversineDistance(userLat, userLng, centerLat, centerLng);
+        }
+        return {
+          ...service,
+          distanceKm,
+        };
+      })
+      .filter(service => {
+        if (service.distanceKm !== undefined) {
+          const radius = Number((service as any).workAreaRadiusKm) || 15;
+          return service.distanceKm <= radius;
+        }
+        return true;
+      });
+
+    processed.sort((a, b) => {
+      if (a.distanceKm !== undefined && b.distanceKm !== undefined) {
+        return a.distanceKm - b.distanceKm;
+      }
+      if (a.distanceKm !== undefined) return -1;
+      if (b.distanceKm !== undefined) return 1;
+      return (b.rating || 0) - (a.rating || 0);
+    });
+
+    return processed;
+  }, [userLocation]);
+
+  const displayedPopularProviders = useMemo(() => {
+    return filterProvidersByLocation(popularServices);
+  }, [popularServices, filterProvidersByLocation]);
+
+  const displayedRecentProviders = useMemo(() => {
+    return filterProvidersByLocation(recentServices);
+  }, [recentServices, filterProvidersByLocation]);
+
+  const displayedCategoryWiseServices = useMemo(() => {
+    return categoryWiseServicesData.map(catGroup => ({
+      ...catGroup,
+      services: filterProvidersByLocation(catGroup.services),
+    }));
+  }, [categoryWiseServicesData, filterProvidersByLocation]);
   
   const [isLoadingPageData, setIsLoadingPageData] = useState(() => !initialData && !getCache('pageH1', true));
   const [isLoadingFeaturesConfig, setIsLoadingFeaturesConfig] = useState(() => !initialData && !getCache('featuresConfig', true));
@@ -732,7 +838,23 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         </section>
       );
     }
-    if (services.length === 0 && !isLoadingSection) return null; 
+    if (services.length === 0 && !isLoadingSection) {
+      if (userLocation?.latitude && userLocation?.longitude) {
+        return (
+          <section className="py-6 md:py-8">
+            <div className="container mx-auto px-4 text-center">
+              <h2 className="text-xl md:text-2xl font-headline font-semibold text-center mb-3 text-foreground flex items-center justify-center">
+                {icon} {title}
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                No providers currently available within your location radius ({userLocation.area ? `${userLocation.area}, ` : ''}{userLocation.city || 'Bangalore'}).
+              </p>
+            </div>
+          </section>
+        );
+      }
+      return null;
+    } 
     return (
         <>
         <section className="py-8 md:py-10">
@@ -814,12 +936,12 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         
         {featuresConfig.showMostPopularServices && (
             <LazySection>
-                {renderServiceSection("Most Popular Services", popularServices, <Star className="h-6 w-6 text-yellow-500" />, isLoadingPopular, 'AFTER_POPULAR_SERVICES')}
+                {renderServiceSection("Most Popular Providers", displayedPopularProviders, <Star className="h-6 w-6 text-yellow-500" />, isLoadingPopular, 'AFTER_POPULAR_SERVICES')}
             </LazySection>
         )}
         {featuresConfig.showRecentlyAddedServices && (
             <LazySection>
-                {renderServiceSection("Recently Added Services", recentServices, <Clock className="h-6 w-6 text-blue-500" />, isLoadingRecent, 'AFTER_RECENTLY_ADDED_SERVICES')}
+                {renderServiceSection("Recently Joined Providers", displayedRecentProviders, <Clock className="h-6 w-6 text-blue-500" />, isLoadingRecent, 'AFTER_RECENTLY_ADDED_SERVICES')}
             </LazySection>
         )}
         
@@ -827,17 +949,17 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             <LazySection>
                 <section className="py-8 md:py-10">
                     <div className="container mx-auto px-4">
-                        <SectionHeader title="Services By Category" icon={<ListChecks className="h-6 w-6 text-green-500" />} />
+                        <SectionHeader title="Daily Labour Providers By Category" icon={<ListChecks className="h-6 w-6 text-green-500" />} />
                         
                         {(isLoadingCategoryWise && categoryWiseServicesData.length === 0) ? (
                             <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-                        ) : categoryWiseServicesData.length > 0 ? (
-                            categoryWiseServicesData.map(catGroup => (
+                        ) : displayedCategoryWiseServices.length > 0 ? (
+                            displayedCategoryWiseServices.map(catGroup => (
                                 <div key={catGroup.category.id} className="mb-8">
                                     <h3 className="text-xl font-semibold mb-4 text-left text-foreground border-l-4 border-primary pl-3">{catGroup.category.name}</h3>
                                     {catGroup.services.length > 0 ? (
                                         <HomepageServiceCarousel services={catGroup.services} />
-                                    ) : ( <p className="text-sm text-muted-foreground ml-4">No services currently available in this category.</p> )}
+                                    ) : ( <p className="text-sm text-muted-foreground ml-4">{userLocation ? "No providers currently available within your location radius for this category." : "No services currently available in this category."}</p> )}
                                 </div>
                             ))
                         ) : (<p className="text-center text-muted-foreground">No category-specific services to display currently.</p>)}

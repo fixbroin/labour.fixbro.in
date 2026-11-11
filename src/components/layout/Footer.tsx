@@ -78,7 +78,7 @@ const Footer: React.FC<FooterProps> = ({ initialWebSettings, initialSiloData }) 
   const [isSubscribing, setIsSubscribing] = useState(false);
   const { toast } = useToast();
 
-  const websiteName = settings?.websiteName || "Fixbro";
+  const websiteName = settings?.websiteName || "Fixbro Daily Labour";
   const contactEmail = settings?.contactEmail || "support@fixbro.in"; 
   const socialLinks = settings?.socialMediaLinks;
 
@@ -202,7 +202,7 @@ const Footer: React.FC<FooterProps> = ({ initialWebSettings, initialSiloData }) 
           <div className="lg:col-span-4 space-y-6">
             <Logo logoUrl={settings?.logoUrl} websiteName={websiteName} />
             <p className="text-muted-foreground leading-relaxed max-w-sm text-sm">
-              {settings.homepageContent?.footerCompanyBio || "Your trusted partner for professional home services. We bring skilled experts directly to your doorstep, ensuring quality, reliability, and peace of mind."}
+              {settings.homepageContent?.footerCompanyBio || "Your trusted partner for verified daily wage workers and skilled daily labour. We connect you directly with experienced carpenters, painters, electricians, plumbers, and general helpers on fixed daily rates."}
             </p>
             <div className="flex items-center gap-4">
               {socialLinks?.facebook && (

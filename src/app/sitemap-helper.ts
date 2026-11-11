@@ -123,7 +123,7 @@ export async function getSitemapEntries() {
       const serviceData = docSnap.data() as FirestoreService;
       if (serviceData.slug) {
         entries.push({
-          url: `${appBaseUrl}/service/${serviceData.slug}`,
+          url: `${appBaseUrl}/provider/${serviceData.slug}`,
           lastModified: safeToISOString(serviceData.updatedAt || serviceData.createdAt, currentDate),
           changeFrequency: 'daily',
           priority: 0.8,
@@ -132,6 +132,30 @@ export async function getSitemapEntries() {
     });
   } catch (e) {
     console.error("Sitemap: Error fetching services:", e);
+  }
+
+  try {
+    const providersSnapshot = await adminDb
+      .collection('providerApplications')
+      .where('status', '==', 'approved')
+      .get();
+    providersSnapshot.forEach(docSnap => {
+      const pData = docSnap.data();
+      const slug = pData.slug || (pData.fullName ? pData.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null);
+      if (slug) {
+        const url = `${appBaseUrl}/provider/${slug}`;
+        if (!entries.some(e => e.url === url)) {
+          entries.push({
+            url,
+            lastModified: safeToISOString(pData.updatedAt || pData.createdAt, currentDate),
+            changeFrequency: 'daily',
+            priority: 0.85,
+          });
+        }
+      }
+    });
+  } catch (e) {
+    console.error("Sitemap: Error fetching provider applications:", e);
   }
 
   try {

@@ -1379,7 +1379,7 @@ export default function AdminImageGalleryPage() {
     return result;
   }, [filteredItems, parentCatsList]);
 
-  // Build Nested Grouped Service Hierarchy matching /admin/services
+  // Build Nested Grouped Service Hierarchy matching /admin/daily-providers
   const groupedServicesHierarchy = useMemo(() => {
     const serviceItems = filteredItems.filter(item => item.categoryType === 'service');
     const result: ParentCategoryGroup[] = [];
@@ -2486,7 +2486,7 @@ export default function AdminImageGalleryPage() {
             {orderedCategories.map(item => renderImageCard(item))}
           </div>
         ) : activeTab === 'service' ? (
-          /* NESTED CATEGORY & SUB-CATEGORY HIERARCHY MATCHING /admin/services */
+          /* NESTED CATEGORY & SUB-CATEGORY HIERARCHY MATCHING /admin/daily-providers */
           <div className="space-y-8">
             {groupedServicesHierarchy.length === 0 ? (
               <Card className="p-12 text-center shadow-sm">

@@ -10,7 +10,7 @@ import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
-import { formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
+import { formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof, formatEndTimeDisplay } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useMemo } from 'react';
 
@@ -157,15 +157,17 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
 
   const isCash = hasOnlinePaymentProof(job) ? false : isCashPayment(job.paymentMethod);
   const paymentMethod = isCash ? 'Pay After Service' : 'Online';
-  const providerGross = (job.subTotal || 0) + (job.visitingCharge || 0) - (job.discountAmount || 0);
-  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0) + (job.taxAmount || 0)) : 0;
+  const providerRateEarnings = (job.providerTotalEarnings && job.providerTotalEarnings > 0)
+    ? job.providerTotalEarnings
+    : (job.subTotal || 0);
+  const walletDeduction = Math.max(0, (job.totalAmount || 0) - providerRateEarnings);
+  const requiredCommission = isCash ? walletDeduction : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
     providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
   const isAccepted = job.status !== 'AssignedToProvider' && job.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const symbol = appConfig?.currencySymbol || "₹";
-  const extraChargesTotal = (job.additionalCharges || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const displayTotal = isCash ? (job.totalAmount || 0) : (providerGross + extraChargesTotal);
+  const displayTotal = isCash ? (job.totalAmount || 0) : providerRateEarnings;
 
   const dayCat = useMemo(() => !isJobCompleted ? getDayCategory(job.scheduledDate) : 'later', [job.scheduledDate, isJobCompleted]);
 
@@ -276,11 +278,9 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
           </div>
         </div>
 
-        {job.estimatedEndTime && (
-          <p className="text-green-600 font-medium">
-            <strong>Ends:</strong> {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}
-          </p>
-        )}
+        <p className="text-emerald-600 font-medium">
+          <strong>End Time:</strong> {formatEndTimeDisplay(job.estimatedEndTime, job.scheduledTimeSlot)}
+        </p>
         <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>
         <div className="flex items-center gap-2">
             <strong>Contact:</strong>
@@ -309,63 +309,38 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             )}
         </div>
 
-        <div className="flex flex-col gap-1 pt-2 border-t mt-2">
-          <p className="text-xs text-muted-foreground flex justify-between">
-            <span>Service Charge:</span>
-            <span className="font-bold text-foreground">{symbol}{(job.subTotal || 0).toFixed(decimals)}</span>
-          </p>
-          {job.visitingCharge !== undefined && job.visitingCharge > 0 && (
-            <p className="text-xs text-muted-foreground flex justify-between">
-              <span>Visiting Charge:</span>
-              <span className="font-bold text-foreground">+{symbol}{(job.visitingCharge || 0).toFixed(decimals)}</span>
-            </p>
-          )}
-          {job.discountAmount !== undefined && job.discountAmount > 0 && (
-            <p className="text-xs text-muted-foreground flex justify-between text-emerald-600 font-semibold">
-              <span>Discount:</span>
-              <span className="font-bold">-{symbol}{job.discountAmount.toFixed(decimals)}</span>
-            </p>
-          )}
-          {extraChargesTotal > 0 && (
-            <p className="text-xs text-muted-foreground flex justify-between text-emerald-600 font-semibold">
-              <span>Extra Charges Added:</span>
-              <span className="font-bold">+{symbol}{extraChargesTotal.toFixed(decimals)}</span>
-            </p>
-          )}
-          {isCash && job.platformFeeTotal !== undefined && job.platformFeeTotal > 0 && (
-            <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
-              <span>Platform Fee (Collect from Customer):</span>
-              <span className="font-bold">+{symbol}{(job.platformFeeTotal || 0).toFixed(decimals)}</span>
-            </p>
-          )}
-          {isCash && job.taxAmount !== undefined && job.taxAmount > 0 && (
-            <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
-              <span>Tax (Collect from Customer):</span>
-              <span className="font-bold">+{symbol}{(job.taxAmount || 0).toFixed(decimals)}</span>
-            </p>
-          )}
-          <p className="text-xs font-black flex justify-between border-t border-dashed pt-1 text-primary">
-            <span>Total Customer Pays:</span>
-            <span>{symbol}{displayTotal.toFixed(decimals)}</span>
-          </p>
-          <p className="text-xs text-muted-foreground flex justify-between mt-1 pt-1 border-t border-muted/50">
-            <span>Payment Method:</span>
-            <span className="font-semibold text-foreground">{paymentMethod}</span>
-          </p>
-          {extraChargesTotal > 0 && (
-            <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-snug">
-              {!isCash ? (
-                <span>
-                  <strong>Online Payment:</strong> {symbol}{providerGross.toFixed(decimals)} paid online. Additional charges of <strong>{symbol}{extraChargesTotal.toFixed(decimals)}</strong> collected in cash by you.
-                </span>
-              ) : (
-                <span>
-                  <strong>Pay After Service:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected by you.
-                </span>
-              )}
+        {!isCash ? (
+          <div className="flex flex-col gap-1 pt-2 border-t mt-2">
+            <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/60 flex items-center justify-between">
+              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Your Net Earnings (Online):</span>
+              <span className="text-sm font-extrabold text-emerald-600">{symbol}{providerRateEarnings.toFixed(decimals)}</span>
             </div>
-          )}
-        </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              100% withdrawable, 0% commission. Customer prepaid online.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1 pt-2 border-t mt-2 text-xs">
+            <p className="flex justify-between text-muted-foreground">
+              <span>Your Daily Earnings:</span>
+              <span className="font-bold text-foreground">{symbol}{providerRateEarnings.toFixed(decimals)}</span>
+            </p>
+            {walletDeduction > 0 && (
+              <p className="flex justify-between text-amber-700 dark:text-amber-400">
+                <span>Deducted from Wallet (Markup/Tax):</span>
+                <span className="font-bold">-{symbol}{walletDeduction.toFixed(decimals)}</span>
+              </p>
+            )}
+            <p className="text-xs font-black flex justify-between border-t border-dashed pt-1 text-primary">
+              <span>Collect from Customer:</span>
+              <span>{symbol}{(job.totalAmount || 0).toFixed(decimals)}</span>
+            </p>
+            <p className="text-xs text-muted-foreground flex justify-between mt-1 pt-1 border-t border-muted/50">
+              <span>Payment Method:</span>
+              <span className="font-semibold text-foreground">Pay After Service</span>
+            </p>
+          </div>
+        )}
 
         {isLowBalance && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl font-bold flex flex-col gap-1 mt-2 text-left">

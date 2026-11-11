@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import type { 
   FirestoreCategory, 
@@ -16,7 +16,7 @@ import type {
 } from '@/types/firestore';
 import ServiceCard from '@/components/service/ServiceCard';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Home as HomeIconLucide, PackageSearch, Loader2, Construction, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { ArrowLeft, Home as HomeIconLucide, PackageSearch, Loader2, Construction, ChevronLeft, ChevronRight, UserPlus, SlidersHorizontal, MapPin, Check } from 'lucide-react';
 import Link from 'next/link';
 import { getOverriddenCategoryName } from '@/lib/adminDataOverrides';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,7 +31,11 @@ import type { BreadcrumbItem } from '@/types/ui';
 import { replacePlaceholders, defaultSeoValues } from '@/lib/seoUtils';
 import { getSpinnedLocalContent } from '@/lib/seoGenerator';
 import { useLoading } from '@/contexts/LoadingContext';
-import { Carousel, CarouselContent, CarouselItem, type CarouselApi, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { getHaversineDistance } from '@/lib/locationUtils';
+import { Badge } from '@/components/ui/badge';
 import { getCache, setCache, getRemoteCacheVersions } from '@/lib/client-cache';
 import { cn } from '@/lib/utils';
 import { useFeaturesConfig } from '@/hooks/useFeaturesConfig';
@@ -208,7 +212,96 @@ export default function CategoryPageClient({
   const stickyNavRef = useRef<HTMLDivElement | null>(null);
   const [loadingSubCats, setLoadingSubCats] = useState<Set<string>>(new Set());
 
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [carouselApi, setCarouselApi] = useState<any>();
+
+  // User location and provider filter/sort state
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; area?: string; city?: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('fixbroUserLocation');
+        return stored ? JSON.parse(stored) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const [selectedSkillLevel, setSelectedSkillLevel] = useState<string>('all');
+  const [selectedSort, setSelectedSort] = useState<string>('nearest');
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleLocationUpdate = () => {
+      try {
+        const stored = localStorage.getItem('fixbroUserLocation');
+        if (stored) setUserLocation(JSON.parse(stored));
+      } catch (e) {}
+    };
+    window.addEventListener('fixbroUserLocationChanged', handleLocationUpdate);
+    return () => window.removeEventListener('fixbroUserLocationChanged', handleLocationUpdate);
+  }, []);
+
+  const allCategoryProviders = useMemo(() => {
+    const allServices = subCategoriesWithServices.flatMap(sc => sc.services);
+
+    let processed = allServices.map(service => {
+      let distanceKm: number | undefined = undefined;
+      const userLat = Number(userLocation?.latitude ?? (userLocation as any)?.lat);
+      const userLng = Number(userLocation?.longitude ?? (userLocation as any)?.lng);
+      const center = (service as any).workAreaCenter || (service as any).providerData?.workAreaCenter;
+      const centerLat = Number(center?.latitude ?? center?.lat);
+      const centerLng = Number(center?.longitude ?? center?.lng);
+
+      if (!isNaN(userLat) && !isNaN(userLng) && !isNaN(centerLat) && !isNaN(centerLng) && userLat !== 0 && centerLat !== 0) {
+        distanceKm = getHaversineDistance(userLat, userLng, centerLat, centerLng);
+      }
+      return {
+        ...service,
+        distanceKm,
+      };
+    });
+
+    if (userLocation?.latitude && userLocation?.longitude) {
+      processed = processed.filter(service => {
+        if (service.distanceKm !== undefined) {
+          const radius = Number((service as any).workAreaRadiusKm) || 15;
+          return service.distanceKm <= radius;
+        }
+        return true;
+      });
+    }
+
+    if (selectedSkillLevel !== 'all') {
+      processed = processed.filter(service => {
+        const level = (service.seniorityLevel || '').toLowerCase();
+        return level.includes(selectedSkillLevel.toLowerCase());
+      });
+    }
+
+    processed.sort((a, b) => {
+      if (selectedSort === 'nearest') {
+        if (a.distanceKm !== undefined && b.distanceKm !== undefined) {
+          return a.distanceKm - b.distanceKm;
+        }
+        if (a.distanceKm !== undefined) return -1;
+        if (b.distanceKm !== undefined) return 1;
+        return (b.rating || 0) - (a.rating || 0);
+      }
+      if (selectedSort === 'reviews') {
+        return (b.reviewCount || 0) - (a.reviewCount || 0) || (b.rating || 0) - (a.rating || 0);
+      }
+      if (selectedSort === 'price_asc') {
+        return (a.price || 0) - (b.price || 0);
+      }
+      if (selectedSort === 'price_desc') {
+        return (b.price || 0) - (a.price || 0);
+      }
+      return 0;
+    });
+
+    return processed;
+  }, [subCategoriesWithServices, userLocation, selectedSkillLevel, selectedSort]);
 
   // State for scroll-responsive header sync
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -603,111 +696,176 @@ export default function CategoryPageClient({
         Reliable experts for all your home repair and installation needs.
       </p>
 
-      {hasAnyServices ? (
-        <>
-          <div
-            ref={stickyNavRef}
-            className="sticky z-30 bg-background/95 backdrop-blur-md py-3 -mx-4 px-4 border-b mb-6 shadow-sm transition-all duration-300"
-            style={{ 
-              top: isHeaderVisible ? `${headerHeight}px` : '0px',
-            }}
+      {/* FILTER & SORT BAR */}
+      <div className="flex items-center justify-between gap-3 py-3 px-1 border-b border-border/50 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterDialogOpen(true)}
+            className="flex items-center gap-2 rounded-full border-primary/30 hover:bg-primary/5 text-xs sm:text-sm font-semibold h-9"
           >
-            <Carousel setApi={setCarouselApi} opts={{ align: "start", dragFree: true }} className="w-full relative">
-              <CarouselContent className="-ml-2">
-                {subCategoriesWithServices.map(subCat => (
-                  <CarouselItem key={subCat.id} className="pl-2 basis-auto">
-                    <SubCategoryCard 
-                        subCategory={subCat}
-                        isActive={activeSubCategorySlug === subCat.slug}
-                        onClick={() => handleSubCategoryClick(subCat.slug)}
-                    />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="absolute -left-4 top-1/2 -translate-y-1/2 h-6 w-6 disabled:hidden" />
-              <CarouselNext className="absolute -right-4 top-1/2 -translate-y-1/2 h-6 w-6 disabled:hidden" />
-            </Carousel>
-          </div>
+            <SlidersHorizontal className="h-4 w-4 text-primary" />
+            <span>Filter & Sort</span>
+            {(selectedSkillLevel !== 'all' || selectedSort !== 'nearest') && (
+              <span className="h-2 w-2 rounded-full bg-primary" />
+            )}
+          </Button>
 
-          <div className="space-y-2">
-          {featuresConfig.showCustomServiceButton && (
-            <div
-              onClick={(e) => handleAuthRequiredNav(e as React.MouseEvent<HTMLDivElement>, '/custom-service')}
-              className="relative block p-3 my-2 gap-3 bg-card border rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 w-full cursor-pointer group"
-            >
-              {/* MOBILE VIEW */}
-              <div className="flex flex-row md:hidden w-full gap-3">
-                <div className="flex-1 flex flex-col">
-                  <h3 className="font-bold text-base leading-tight text-foreground group-hover:text-primary transition-colors">Need Something Else?</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-4 mt-1">Can&apos;t find the service you’re looking for? Tell us what you need, and we’ll do our best to arrange it for you.</p>
-                </div>
-                <div className="flex flex-col items-center justify-between flex-shrink-0 w-28">
-                  <div className="relative w-full h-28 bg-muted/30 rounded-lg flex items-center justify-center overflow-hidden">
-                    <AppImage src="/custom.png" alt="Custom Service" fill className="object-contain p-2 transition-transform duration-300 group-hover:scale-105" />
-                  </div>
-                </div>
-              </div>
-              <div className="block md:hidden mt-3">
-                <Button size="sm" className="h-9 rounded-md w-full">Request a Custom Service</Button>
-              </div>
-              {/* DESKTOP VIEW */}
-              <div className="hidden md:flex flex-row items-center w-full gap-4">
-                <div className="relative w-40 h-40 flex-shrink-0 bg-muted/30 rounded-lg flex items-center justify-center overflow-hidden">
-                  <AppImage src="/custom.png" alt="Custom Service" fill className="object-contain p-3 transition-transform duration-300 group-hover:scale-105" />
-                </div>
-                <div className="flex-1 flex flex-col justify-center pt-4">
-                  <h3 className="font-bold text-lg leading-tight text-foreground group-hover:text-primary transition-colors">Need Something Else?</h3>
-                  <p className="text-sm text-muted-foreground mt-3 max-w-md">Can&apos;t find the specific service you’re looking for? Tell us what you need, and we’ll do our best to arrange it for you.</p>
-                </div>
-                <div className="flex flex-col justify-center pl-4 w-1/4">
-                    <Button size="lg" className="h-10 rounded-md w-full">Request a Custom Service</Button>
-                </div>
-              </div>
-            </div>
+          {selectedSkillLevel !== 'all' && (
+            <Badge variant="secondary" className="text-xs px-2 py-0.5 capitalize bg-primary/10 text-primary border-primary/20">
+              Skill: {selectedSkillLevel}
+            </Badge>
           )}
 
-            {subCategoriesWithServices.map((subCat) => (
-              <div 
-                key={subCat.id} 
-                id={`section-${subCat.slug}`}
-                ref={(el) => { 
-                    subCategoryRefs.current[subCat.slug] = el;
-                    // Trigger the loading when the section mounts if not already loaded
-                    if (el && !subCat.hasStartedLoading) {
-                        loadSubCategoryServices(subCat.id);
-                    }
-                }}
-                className="pt-2"
-                style={{
-                    scrollMarginTop: `${(isHeaderVisible ? headerHeight : 0) + (stickyNavRef.current?.clientHeight || 80) + 10}px`
-                } as React.CSSProperties}
-              >
-                <div>
-                    <div className="flex items-center mb-6">
-                    {subCat.imageUrl ? (
-                        <div className="w-10 h-10 relative rounded-md overflow-hidden mr-3 shadow">
-                            <AppImage src={subCat.imageUrl} alt={subCat.name} fill sizes="40px" className="w-full h-full object-cover" data-ai-hint={subCat.imageHint || "sub-category title"}/>
-                        </div>
-                    ) : null }
-                    <h3 className="text-2xl font-headline font-medium text-foreground">{subCat.name}</h3>
-                    </div>
-                    {subCat.isLoadingServices ? (
-                        <div className="grid grid-cols-1 gap-4">
-                        {/* Match skeleton height to prevent jumps */}
-                        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-xl" />)}
-                        </div>
-                    ) : subCat.services.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4">
-                        {subCat.services.map((service, serviceIndex) => (
-                        <ServiceCard key={service.id} service={service} priority={serviceIndex < 4} />
-                        ))}
-                    </div>
-                    ) : (
-                    <p className="text-muted-foreground text-center py-4">No services available in this sub-category yet.</p>
-                    )}
+          {userLocation?.city && (
+            <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 text-primary" />
+              <span>Near {userLocation.area ? `${userLocation.area}, ` : ''}{userLocation.city}</span>
+            </div>
+          )}
+        </div>
+
+        <span className="text-xs sm:text-sm text-muted-foreground font-medium">
+          {allCategoryProviders.length} provider{allCategoryProviders.length === 1 ? '' : 's'} available
+        </span>
+      </div>
+
+      {/* FILTER & SORT DIALOG */}
+      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+        <DialogContent className="max-w-[92vw] sm:max-w-md bg-background rounded-2xl p-5">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <SlidersHorizontal className="h-5 w-5 text-primary" />
+              Filter & Sort Providers
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Sort Options */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sort By</h4>
+              <RadioGroup value={selectedSort} onValueChange={setSelectedSort} className="space-y-1.5">
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="nearest" id="sort-nearest" />
+                  <Label htmlFor="sort-nearest" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>📍 Nearest First (Proximity)</span>
+                    {selectedSort === 'nearest' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
                 </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="reviews" id="sort-reviews" />
+                  <Label htmlFor="sort-reviews" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>⭐ Most Reviews / Highest Rating</span>
+                    {selectedSort === 'reviews' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="price_asc" id="sort-price-asc" />
+                  <Label htmlFor="sort-price-asc" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>💰 Price: Low to High</span>
+                    {selectedSort === 'price_asc' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="price_desc" id="sort-price-desc" />
+                  <Label htmlFor="sort-price-desc" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>💰 Price: High to Low</span>
+                    {selectedSort === 'price_desc' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Skill Level Filter */}
+            <div className="space-y-2 pt-2 border-t">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Skill Level</h4>
+              <RadioGroup value={selectedSkillLevel} onValueChange={setSelectedSkillLevel} className="space-y-1.5">
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="all" id="skill-all" />
+                  <Label htmlFor="skill-all" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>All Skill Levels</span>
+                    {selectedSkillLevel === 'all' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="beginner" id="skill-beginner" />
+                  <Label htmlFor="skill-beginner" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>Beginner / Fresher</span>
+                    {selectedSkillLevel === 'beginner' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="intermediate" id="skill-intermediate" />
+                  <Label htmlFor="skill-intermediate" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>Intermediate</span>
+                    {selectedSkillLevel === 'intermediate' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/30 cursor-pointer">
+                  <RadioGroupItem value="expert" id="skill-expert" />
+                  <Label htmlFor="skill-expert" className="cursor-pointer text-sm font-medium flex items-center justify-between w-full">
+                    <span>Expert / Senior</span>
+                    {selectedSkillLevel === 'expert' && <Check className="h-4 w-4 text-primary" />}
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+
+          <DialogFooter className="flex sm:flex-row gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedSkillLevel('all');
+                setSelectedSort('nearest');
+              }}
+              className="w-full sm:w-auto"
+            >
+              Reset
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setIsFilterDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
+              Apply Filters
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* PROVIDERS LIST */}
+      {hasAnyServices ? (
+        <>
+          <div className="space-y-4">
+            {allCategoryProviders.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4">
+                {allCategoryProviders.map((service: FirestoreService, serviceIndex: number) => (
+                  <ServiceCard key={service.id} service={service} priority={serviceIndex < 4} />
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="border border-border rounded-2xl p-8 text-center bg-card shadow-sm my-6">
+                <p className="text-muted-foreground text-base">
+                  {userLocation 
+                    ? `No providers currently available within your location radius (${userLocation.area ? `${userLocation.area}, ` : ''}${userLocation.city || 'Bangalore'}).` 
+                    : "No providers found matching your current filter. Try resetting filters to see more providers."}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedSkillLevel('all');
+                    setSelectedSort('nearest');
+                  }}
+                  className="mt-4"
+                >
+                  Reset Filters
+                </Button>
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -730,12 +888,6 @@ export default function CategoryPageClient({
             </div>
         </div>
       )}
-      
-      <SubCategoryFloatingButton 
-        subCategories={subCategoriesWithServices}
-        onSubCategoryClick={handleSubCategoryClick}
-        activeSubCategorySlug={activeSubCategorySlug}
-      />
 
       <StickyCartContinueButton />
 

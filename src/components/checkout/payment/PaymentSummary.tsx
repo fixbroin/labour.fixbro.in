@@ -192,9 +192,44 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     }
 
     try {
+      let adminMarkupFee = 200;
+      try {
+        const provSettingsSnap = await getDoc(doc(db, "webSettings", "providerDefaultSettings"));
+        if (provSettingsSnap.exists()) {
+          const ps = provSettingsSnap.data() as any;
+          if (typeof ps?.adminMarkupFee === 'number') {
+            adminMarkupFee = ps.adminMarkupFee;
+          }
+        }
+      } catch (e) {}
+
       const detailsPromises = entries.map(async (entry) => {
         const serviceSnap = await getDoc(doc(db, "adminServices", entry.serviceId));
-        return serviceSnap.exists() ? { ...serviceSnap.data(), id: serviceSnap.id } as FirestoreService : null;
+        if (serviceSnap.exists()) {
+          return { ...serviceSnap.data(), id: serviceSnap.id } as FirestoreService;
+        }
+        const provSnap = await getDoc(doc(db, "providerApplications", entry.serviceId));
+        if (provSnap.exists()) {
+          const p = provSnap.data() as any;
+          const baseDailyRate = typeof p.dailyRate === 'number' ? p.dailyRate : 1200;
+          const dailyRate = baseDailyRate + adminMarkupFee;
+          return {
+            id: provSnap.id,
+            name: p.fullName || 'Daily Labour Provider',
+            description: p.bio || '',
+            price: dailyRate,
+            discountedPrice: dailyRate,
+            imageUrl: p.profilePhotoUrl || '/default-image.png',
+            parentCategoryId: p.workCategoryId,
+            isTaxInclusive: true,
+            hasPriceVariants: false,
+            priceVariants: [],
+            isProvider: true,
+            providerPhone: p.mobileNumber || p.phone,
+            providerUserId: p.userId || p.id,
+          } as any as FirestoreService;
+        }
+        return null;
       });
       const resolved = (await Promise.all(detailsPromises)).filter(Boolean) as FirestoreService[];
       const map = resolved.reduce((acc, s) => ({ ...acc, [s.id]: s }), {});
@@ -280,7 +315,9 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     const minBooking = (categoryOverrides && typeof categoryOverrides.minimumBookingAmount === 'number') ? categoryOverrides.minimumBookingAmount : appConfig.minimumBookingAmount;
     const policyDesc = (categoryOverrides && categoryOverrides.minimumBookingPolicyDescription) ? categoryOverrides.minimumBookingPolicyDescription : appConfig.minimumBookingPolicyDescription;
 
-    if (appConfig.enableMinimumBookingPolicy && typeof minBooking === 'number' && typeof vcAmount === 'number') {
+    const hasProviderItem = cartEntries.some(entry => serviceDetailsMap[entry.serviceId]?.isProvider);
+
+    if (!hasProviderItem && appConfig.enableMinimumBookingPolicy && typeof minBooking === 'number' && typeof vcAmount === 'number') {
       if (netAmount < minBooking) {
         displayedVC = vcAmount;
         baseVC = getBasePrice(displayedVC, appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent);
@@ -416,7 +453,11 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
         isTaxInclusive: detail.isTaxInclusive === true,
         taxPercentApplied: itemTaxRate,
         taxAmountForItem: taxAmountForItem,
-        imageUrl: detail.imageUrl || null
+        imageUrl: detail.imageUrl || null,
+        providerId: detail.isProvider ? detail.id : undefined,
+        providerUserId: (detail as any).providerUserId || undefined,
+        providerPhone: (detail as any).providerPhone || undefined,
+        isProvider: detail.isProvider || false,
       };
     }).filter(Boolean);
 
@@ -425,10 +466,18 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
 
     const effectiveUserId = auth.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('fixbro_user_uid') : null) || undefined;
 
+    const primaryProvider = bookingServices.find(s => s && (s.providerId || s.isProvider));
+    const primaryProviderId = primaryProvider?.providerId || primaryProvider?.serviceId;
+    const allProviderIds = Array.from(new Set(bookingServices.map(s => s?.providerId || s?.serviceId).filter(Boolean)));
+    const maxBookingDays = Math.max(...bookingServices.map(s => s?.quantity || 1), 1);
+
     const newBookingData = {
       bookingId: newBookingId,
       bookingNumber: 0,
       ...(effectiveUserId && { userId: effectiveUserId }),
+      ...(primaryProviderId && { providerId: primaryProviderId }),
+      ...(allProviderIds.length > 0 && { providerIds: allProviderIds }),
+      bookingDurationDays: maxBookingDays,
       customerName,
       customerEmail,
       customerPhone,

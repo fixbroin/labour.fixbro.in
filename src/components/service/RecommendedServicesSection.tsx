@@ -149,9 +149,9 @@ const RecommendedServiceCard: React.FC<RecommendedServiceCardProps> = ({
   return (
     <div className="w-full h-full flex flex-col group">
       <Link
-        href={`/service/${service.slug}`}
+        href={`/provider/${service.slug}`}
         onClick={(e: React.MouseEvent) => {
-          if (currentPathname === `/service/${service.slug}`) {
+          if (currentPathname === `/provider/${service.slug}`) {
             e.preventDefault();
           } else {
             showLoading();
@@ -159,14 +159,14 @@ const RecommendedServiceCard: React.FC<RecommendedServiceCardProps> = ({
         }}
         className="flex flex-col h-full bg-card rounded-2xl border border-border/80 shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 overflow-hidden cursor-pointer"
       >
-        {/* Thumbnail Image Container */}
-        <div className="relative w-full aspect-[4/3] bg-muted overflow-hidden">
+        {/* Thumbnail Image Container - Always Square */}
+        <div className="relative w-full aspect-square bg-muted overflow-hidden">
           <AppImage
             src={displayImageUrl}
             alt={service.name}
             fill
             sizes="(max-width: 640px) 210px, (max-width: 768px) 230px, 250px"
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
           />
           {hasDiscount && (
             <Badge className="absolute top-2 left-2 bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5">
@@ -214,6 +214,7 @@ const RecommendedServiceCard: React.FC<RecommendedServiceCardProps> = ({
               <div className="flex items-baseline gap-1.5">
                 <span className="text-base sm:text-lg font-extrabold text-foreground">
                   {formatCurrency(effectivePrice, symbol, decimals, code)}
+                  {service.isProvider && <span className="text-xs font-normal text-muted-foreground ml-1">/ day</span>}
                 </span>
                 {hasDiscount && (
                   <span className="text-xs text-muted-foreground line-through">

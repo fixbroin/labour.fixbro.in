@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Bell, Menu, X, ShoppingCart, LogOut, UserCircle, Briefcase, Settings2, Moon, Sun, MessageSquare, UserPlus, MapPin as AddressIcon, Construction, Handshake, ChevronDown, LayoutDashboard, ClipboardList } from 'lucide-react'; // Added Handshake
+import { Search, Bell, Menu, X, ShoppingCart, LogOut, UserCircle, Briefcase, Settings2, Moon, Sun, MessageSquare, UserPlus, MapPin as AddressIcon, MapPin, Construction, Handshake, ChevronDown, LayoutDashboard, ClipboardList } from 'lucide-react'; // Added Handshake
 import Logo from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
 import { cn, formatCurrency } from '@/lib/utils';
 import SearchPopup from '@/components/shared/SearchPopup';
+import UserLocationMapModal, { type UserSavedLocation } from '@/components/shared/UserLocationMapModal';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { usePathname, useRouter } from 'next/navigation';
@@ -73,6 +74,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
   const [cartItemCount, setCartItemCount] = useState(0);
   const router = useRouter();
   const currentPathnameFromHook = usePathname();
+  const pathname = currentPathnameFromHook;
   const { showLoading } = useLoading();
 
   const { count: unreadCountFromHook, isLoading: isLoadingCount } = useUnreadNotificationsCount(user?.uid);
@@ -131,6 +133,67 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
   useEffect(() => {
     setHeaderUnreadCount(unreadCountFromHook);
   }, [unreadCountFromHook]);
+
+  // User Location State & Modal
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [userLocation, setUserLocation] = useState<any>(null);
+
+  const hasCheckedInitialLocationRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('fixbroUserLocation');
+      if (stored) setUserLocation(JSON.parse(stored));
+    } catch (e) {}
+
+    const handleLocationUpdate = () => {
+      try {
+        const stored = localStorage.getItem('fixbroUserLocation');
+        if (stored) setUserLocation(JSON.parse(stored));
+      } catch (e) {}
+    };
+    window.addEventListener('fixbroUserLocationChanged', handleLocationUpdate);
+    return () => window.removeEventListener('fixbroUserLocationChanged', handleLocationUpdate);
+  }, []);
+
+  // Reset check flag when user logs in so we always verify their location
+  useEffect(() => {
+    if (user?.uid && user.uid !== lastUserIdRef.current) {
+      lastUserIdRef.current = user.uid;
+      hasCheckedInitialLocationRef.current = false;
+    }
+  }, [user]);
+
+  // Auto-prompt on login if user has no coordinates saved (on Home or Category pages)
+  useEffect(() => {
+    if (authIsLoading || !user || hasCheckedInitialLocationRef.current) return;
+
+    const isTargetPage = pathname === '/' || pathname.startsWith('/category');
+    if (!isTargetPage) return;
+
+    const hasCoordsInProfile = !!(firestoreUser as any)?.coordinates?.latitude;
+    const hasCoordsInLocal = !!userLocation?.latitude;
+
+    if (!hasCoordsInProfile && !hasCoordsInLocal) {
+      hasCheckedInitialLocationRef.current = true;
+      const timer = setTimeout(() => {
+        setIsLocationModalOpen(true);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [user, authIsLoading, firestoreUser, userLocation, pathname]);
+
+  const userLocationDisplay = useMemo(() => {
+    if (userLocation?.area) {
+      return `${userLocation.area}, ${userLocation.city || 'BLR'}`;
+    }
+    if (userLocation?.city) return userLocation.city;
+    if ((firestoreUser as any)?.savedArea) {
+      return `${(firestoreUser as any).savedArea}, ${(firestoreUser as any).savedCity || 'BLR'}`;
+    }
+    return "Select Location...";
+  }, [userLocation, firestoreUser]);
 
   useEffect(() => {
     const getInitialTheme = () => {
@@ -339,6 +402,19 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
               )}
             
             <div className="flex items-center gap-2">
+              {/* Work Location Pill */}
+              <button
+                type="button"
+                onClick={() => setIsLocationModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-semibold transition-all max-w-[105px] sm:max-w-[160px] shrink-0"
+                title="Change work location"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="truncate" suppressHydrationWarning>
+                  {userLocationDisplay}
+                </span>
+              </button>
+
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -508,6 +584,10 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
         </div>
       </header>
       <SearchPopup isOpen={isSearchPopupOpen} onClose={() => setIsSearchPopupOpen(false)} />
+      <UserLocationMapModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
     </>
   );
 };

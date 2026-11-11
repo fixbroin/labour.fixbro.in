@@ -97,33 +97,32 @@ const prompt = ai.definePrompt({
   },
 
   prompt: `
-You are an advanced Local SEO expert for Fixbro.
+You are an advanced Local SEO expert for Fixbro Daily Labour.
 
-Fixbro provides:
-- Carpenter services
-- Plumbing services
-- Electrician services
-- TV installation services
-- Painting services
-- Furniture assembly services
-- Interior services
-- Home repair services
+Fixbro Daily Labour provides verified daily wage workers for full-day on-site labour:
+- Carpenter daily labour
+- Painting daily labour
+- Electrician daily labour
+- Plumbing daily labour
+- Masonry & construction labour
+- General helpers & site labour
+- Furniture & interior daily workers
 
 TARGET:
 City: {{cityName}}
 Category: {{categoryName}}
+Trade: {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}}
 
 IMPORTANT SEO RULES:
 
 1. Strongly optimize for:
-- carpenter near me
-- plumber near me
-- electrician near me
-- tv installation near me
-- painting services near me
-- furniture assembly near me
+- {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} daily labour
+- {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} daily labour near me
+- daily wage {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}}
+- hire {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} daily labour
+- daily labour {{cityName}}
 
-2. NEVER use the word "handyman" (nobody in India searches for handyman; use "home services", specific trade names like carpenter, plumber, electrician, and service names).
+2. NEVER use the word "handyman" (nobody in India searches for handyman; use "daily labour", "daily wage workers", and specific trade names).
 Avoid overusing:
 - best
 - top-rated
@@ -131,7 +130,7 @@ Avoid overusing:
 
 3. Use natural human-friendly SEO.
 
-4. Category + city should appear naturally.
+4. Category + daily labour + city should appear naturally.
 
 5. Improve Google CTR.
 
@@ -143,7 +142,7 @@ Avoid overusing:
 
 9. Use India local SEO intent.
 
-10. SEO content should rank for local searches.
+10. SEO content should rank for local daily labour searches.
 
 11. imageHint: One or two keywords for an AI image search.
 
@@ -151,36 +150,36 @@ OUTPUT RULES:
 
 1. h1_title
 Format:
-"{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Services in {{cityName}}"
+"{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Daily Labour in {{cityName}}"
 
 Examples:
-"Carpenter Services in Bangalore"
-"Electrician Services in Bangalore"
+"Carpenter Daily Labour in Bangalore"
+"Electrician Daily Labour in Bangalore"
 
 2. meta_title
 Rules:
 - Strictly 35 to 55 characters
 - NEVER include brand/company name (e.g. Fixbro, FixBro). The website template automatically appends it.
-- Format: "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} | {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Near Me" or "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} | Near Me"
+- Format: "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Daily Labour in {{cityName}} | Near Me" or "Hire {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} | Near Me"
 - Natural, search optimized
 
 Examples:
-"Carpenter in Bangalore | Carpenter Near Me"
-"TV Installation in Bangalore | TV Installation Near Me"
-"Plumber in Bangalore | Pipe Repair Near Me"
+"Carpenter Daily Labour in Bangalore | Near Me"
+"Painter Daily Labour in Bangalore | Near Me"
+"Electrician Daily Labour in Bangalore | Near Me"
 
 3. meta_description
 Rules:
 - Strictly under 155 characters
 - Mention:
-  - "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} near you"
-  - trusted verified experts
-  - upfront pricing & same-day visit
+  - "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} daily labour in {{cityName}} near you"
+  - background-checked daily wage workers
+  - full-day booking & upfront rates
   - call to action: "Book online now!"
 - NEVER include company name (template appends it).
 
 Example:
-"Book trusted carpenter in Bangalore near you. Doorstep furniture repair, assembly & woodwork by verified experts. Upfront rates. Book online now!"
+"Hire verified carpenter daily labour in Bangalore near you. Background-checked daily wage workers for full-day work with upfront daily rates. Book online now!"
 
 4. meta_keywords
 Rules:
@@ -189,16 +188,16 @@ Rules:
 - High search intent only
 
 Example:
-carpenter bangalore,
-carpenter near me bangalore,
-furniture repair bangalore,
-wood work bangalore,
-bed assembly bangalore,
-wardrobe installation bangalore,
-carpenter services bangalore,
-door repair bangalore,
-furniture assembly bangalore,
-wooden work bangalore
+carpenter daily labour bangalore,
+carpenter daily labour near me,
+daily wage carpenter bangalore,
+hire carpenter for a day bangalore,
+carpenter labour chowk bangalore,
+daily labour carpenter near me,
+woodwork daily labour bangalore,
+furniture daily labour bangalore,
+daily labour contractor bangalore,
+carpenter daily wage near me
 
 5. seo_content
 Rules:
@@ -211,11 +210,10 @@ Rules:
 
 - Mention:
   - major {{cityName}} areas
-  - service quality
-  - verified experts
-  - same day service
-  - affordable pricing
-  - customer trust
+  - full-day working hours (09:30 AM to 05:30 PM with 1-hour lunch break)
+  - verified daily wage workers
+  - transparent daily pricing with zero hidden commissions
+  - Start & Complete OTP verification for customer peace of mind
 
 - Content must feel human written.
 - Avoid robotic repetition.
@@ -223,11 +221,11 @@ Rules:
 6. faqs
 Rules:
 - Generate 5 FAQs
-- Highly local SEO focused
-- Mention {{cityName}} areas naturally
+- Highly local daily labour SEO focused (working hours, daily wage rates, OTP verification, tools, multiday bookings)
+- Mention {{cityName}} naturally
 - Questions should match real Google searches
 
-7. imageHint: Keywords for finding a relevant high-quality image.
+7. imageHint: Keywords for finding a relevant high-quality image (e.g. "carpenter daily labour bangalore").
 
 Generate highly optimized city category SEO now.
 `,

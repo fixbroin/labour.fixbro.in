@@ -121,9 +121,13 @@ export default function ProviderEarningsPage() {
             const extraCharges = (b.additionalCharges || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
             const totalBookingGross = baseGross + extraCharges;
 
+            const isDailyLabour = typeof b.providerTotalEarnings === 'number' && b.providerTotalEarnings > 0;
+
             if (isCash) {
-                const commission = calculateProviderFee(totalBookingGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
-                const cashNet = totalBookingGross - commission;
+                const commission = isDailyLabour 
+                    ? Math.max(0, (b.totalAmount || 0) - b.providerTotalEarnings!)
+                    : calculateProviderFee(totalBookingGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
+                const cashNet = isDailyLabour ? b.providerTotalEarnings! : (totalBookingGross - commission);
                 if (bDate >= startOfMonthStr) {
                     mStats.gross += totalBookingGross;
                     mStats.commission += commission;
@@ -135,9 +139,9 @@ export default function ProviderEarningsPage() {
                     }
                 }
             } else {
-                // Online Payment: baseGross was paid online, extraCharges collected in cash on-site
-                const onlineGross = baseGross;
-                const onlineCommission = calculateProviderFee(onlineGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
+                // Online Payment (Daily Labour: 100% provider daily rate credited, 0% commission)
+                const onlineGross = isDailyLabour ? b.providerTotalEarnings! : baseGross;
+                const onlineCommission = isDailyLabour ? 0 : calculateProviderFee(onlineGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
                 const onlineNet = onlineGross - onlineCommission;
                 
                 const extraCommission = extraCharges > 0 

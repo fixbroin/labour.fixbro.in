@@ -23,6 +23,7 @@ import type { FirestoreUser } from '@/types/firestore';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import ProviderProfileDetails from "@/components/provider/ProviderProfileDetails";
+import ProviderRateAndSkillCard from "@/components/provider/ProviderRateAndSkillCard";
 
 const updateEmailSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -233,6 +234,9 @@ export default function ProfilePage() {
           isSendingOtp={isSendingOtp}
           isPhoneVerified={isPhoneVerified}
         />
+
+        {/* Skill Level & Daily Rate Management Card */}
+        <ProviderRateAndSkillCard />
 
         <Card>
           <CardHeader>

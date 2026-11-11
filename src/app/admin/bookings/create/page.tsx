@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, getTimestampMillis, formatCurrency, formatDateInTimezone, formatTimeInTimezone } from "@/lib/utils";
+import { cn, getTimestampMillis, formatCurrency, formatDateInTimezone, formatTimeInTimezone, formatEndTimeDisplay } from "@/lib/utils";
 import { 
   Loader2, ArrowLeft, Search, User, MapPin, Phone, Mail, 
   CalendarDays, Clock, CheckCircle2, IndianRupee, Tag, 
@@ -543,9 +543,21 @@ export default function AdminCreateBookingPage() {
       // Assign Sequential Booking Number
       const nextBookingNumber = await assignNewBookingNumber();
 
+      const startOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      let completeOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      while (completeOtp === startOtp) {
+        completeOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      }
+
       const bookingData: any = {
         bookingId: newBookingId, 
         bookingNumber: nextBookingNumber,
+        startOtp,
+        completeOtp,
+        workStartedAt: null,
+        workCompletedAt: null,
+        workedDuration: null,
+        providerTotalEarnings: summary.itemTotal,
         userId: selectedUser?.uid || null, 
         customerName: customerDetails.name, 
         customerEmail: customerDetails.email, 
@@ -778,9 +790,8 @@ export default function AdminCreateBookingPage() {
                           <p className="text-[10px] font-bold text-green-700 uppercase">Selected Schedule</p>
                           <p className="text-xs font-bold">{formatDateInTimezone(selectedDate, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} at {selectedSlot}</p>
                           {selectedEndDateTime && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Estimated Completion: {formatTimeInTimezone(new Date(selectedEndDateTime), appConfig?.timezone || 'Asia/Kolkata')}
-                              {formatDateInTimezone(new Date(selectedEndDateTime), appConfig?.timezone || 'Asia/Kolkata', 'YYYY-MM-DD') !== formatDateInTimezone(selectedDate, appConfig?.timezone || 'Asia/Kolkata', 'YYYY-MM-DD') && ` on ${formatDateInTimezone(new Date(selectedEndDateTime), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)}`}
+                            <p className="text-[10px] mt-0.5 font-bold text-emerald-600">
+                              End Time: {formatEndTimeDisplay(selectedEndDateTime, selectedSlot)}
                             </p>
                           )}
                         </div>

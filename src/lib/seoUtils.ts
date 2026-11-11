@@ -4,104 +4,104 @@ import type { FirestoreSEOSettings } from '@/types/firestore';
 import { cleanSeoString, getCategorySearchTerm } from './seoAdvancedUtils';
 
 export const defaultSeoValues: FirestoreSEOSettings = {
-  siteName: 'Fixbro - Home Services in Bangalore',
+  siteName: 'Fixbro Daily Labour - Hire Daily Labour in Bangalore',
 
   // Automatically added to every meta title
-  defaultMetaTitleSuffix: ' | Fixbro',
+  defaultMetaTitleSuffix: ' | Fixbro Daily Labour',
 
   defaultMetaDescription:
-    'Book trusted carpenter, plumber, electrician, TV installation, painting, interior work, furniture assembly, and home repair services near you in Bangalore. Verified professionals, upfront pricing, and same-day service.',
+    'Hire trusted daily labour, carpenters, electricians, plumbers, painters, and skilled daily wage workers near you in Bangalore. Background-verified workers, full-day labour booking, upfront daily rates.',
 
   defaultMetaKeywords:
-    'carpenter near me, plumber near me, electrician near me, tv installation near me, painting services near me, interior designers near me, furniture assembly near me, home repair services bangalore',
+    'daily labour near me, carpenter daily labour, electrician daily labour, painter daily labour, daily wage workers bangalore, hire daily labour, daily labour in bangalore',
 
   homepageMetaTitle:
-    'Verified Carpenter, TV Installation, Interior & Home Services in Bangalore | Fixbro',
+    'Hire Daily Labour, Carpenter, Painter & Electrician in Bangalore | Fixbro Daily Labour',
 
   homepageMetaDescription:
-    'Book verified carpenter, TV installation, interior work, painting, electrical, plumbing, and home maintenance services in Bangalore. Same-day service, upfront pricing, and 99.9% satisfaction guaranteed.',
+    'Book verified daily labour and skilled daily wage workers in Bangalore. Hire carpenters, painters, electricians, and helpers for full-day work with upfront daily rates.',
 
   homepageMetaKeywords:
-    'carpenter near me, tv installation near me, interior designers near me, electrician near me, plumber near me, painting services near me, furniture assembly near me, home services bangalore, home services near me',
+    'daily labour near me, carpenter daily labour, electrician daily labour, painter daily labour, daily wage workers bangalore, hire daily labour, daily labour in bangalore',
 
   homepageH1:
-    'Trusted Home Services Near You in Bangalore',
+    'Hire Trusted Daily Labour Near You in Bangalore',
 
   categoryPageTitlePattern:
-    'Best {{categorySearchTerm}} & Home Services Near Me in Bangalore',
+    '{{categorySearchTerm}} Daily Labour Near Me in Bangalore',
 
   categoryPageDescriptionPattern:
-    'Book top-rated, background-verified {{categorySearchTerm}} and home services near you in Bangalore. Professional installation, repair, and maintenance with same-day availability and upfront pricing.',
+    'Hire top-rated, background-verified {{categorySearchTerm}} daily labour near you in Bangalore. Professional full-day labour booking with upfront daily rates and same-day availability.',
 
   categoryPageKeywordsPattern:
-    '{{categorySearchTerm}} near me, best {{categorySearchTerm}} near me, affordable {{categorySearchTerm}} in bangalore, local {{categorySearchTerm}} services, home services bangalore',
+    '{{categorySearchTerm}} daily labour near me, best {{categorySearchTerm}} daily labour, {{categorySearchTerm}} daily wage worker, hire {{categorySearchTerm}} in bangalore, carpenter daily labour',
 
   categoryPageH1Pattern:
-    '{{categorySearchTerm}} Services in Bangalore',
+    '{{categorySearchTerm}} Daily Labour in Bangalore',
 
   cityCategoryPageTitlePattern:
-    '{{categorySearchTerm}} in {{cityName}} | {{categorySearchTerm}} Services Near Me',
+    '{{categorySearchTerm}} Daily Labour in {{cityName}} | Near Me',
 
   cityCategoryPageDescriptionPattern:
-    'Hire the best professional {{categorySearchTerm}} in {{cityName}} for repair, installation, and maintenance services. Background-verified experts, upfront pricing, and same-day doorstep service.',
+    'Hire verified {{categorySearchTerm}} daily labour in {{cityName}} near you. Book background-checked daily wage {{categorySearchTerm}} workers for full-day work with upfront daily rates.',
 
   cityCategoryPageKeywordsPattern:
-    '{{categorySearchTerm}} {{cityName}}, {{categorySearchTerm}} near me, best {{categorySearchTerm}} in {{cityName}}, affordable {{categorySearchTerm}}, home services {{cityName}}',
+    '{{categorySearchTerm}} daily labour {{cityName}}, {{categorySearchTerm}} daily labour near me, hire daily wage {{categorySearchTerm}} in {{cityName}}, best {{categorySearchTerm}} daily labour',
 
   cityCategoryPageH1Pattern:
-    '{{categorySearchTerm}} Services in {{cityName}}',
+    '{{categorySearchTerm}} Daily Labour in {{cityName}}',
 
   areaCategoryPageTitlePattern:
-    '{{categorySearchTerm}} in {{areaName}}, {{cityName}} | {{categorySearchTerm}} Near Me',
+    '{{categorySearchTerm}} Daily Labour in {{areaName}}, {{cityName}} | Near Me',
 
   areaCategoryPageDescriptionPattern:
-    'Looking for professional {{categorySearchTerm}} in {{areaName}}, {{cityName}}? Book background-verified local experts for repair, installation, and maintenance with same-day doorstep service.',
+    'Looking for {{categorySearchTerm}} daily labour in {{areaName}}, {{cityName}}? Book verified local daily wage workers for full-day work. Upfront daily rates & same-day dispatch.',
 
   areaCategoryPageKeywordsPattern:
-    '{{categorySearchTerm}} {{areaName}}, {{categorySearchTerm}} near me {{areaName}}, best {{categorySearchTerm}} {{areaName}}, home services {{areaName}}',
+    '{{categorySearchTerm}} daily labour {{areaName}}, {{categorySearchTerm}} daily labour near me, {{categorySearchTerm}} daily wage worker in {{areaName}}, hire {{categorySearchTerm}} in {{areaName}}',
 
   areaCategoryPageH1Pattern:
-    '{{categorySearchTerm}} Services in {{areaName}}',
+    '{{categorySearchTerm}} Daily Labour in {{areaName}}',
 
   servicePageTitlePattern:
-    '{{serviceName}} in Bangalore | {{serviceName}} Near Me',
+    '{{serviceName}} Daily Labour in Bangalore | Near Me',
 
   servicePageDescriptionPattern:
-    'Book professional {{serviceName}} in Bangalore with FixBro. Verified technicians, transparent rates, and same-day availability near you.',
+    'Book verified {{serviceName}} daily labour in Bangalore with Fixbro Daily Labour. Background-checked workers, full-day labour, transparent daily rates near you.',
 
   servicePageKeywordsPattern:
-    '{{serviceName}} near me, best {{serviceName}} in bangalore, affordable {{serviceName}}, local {{serviceName}} services, book {{serviceName}}',
+    '{{serviceName}} daily labour, {{serviceName}} near me, best {{serviceName}} in bangalore, daily wage {{serviceName}}, hire {{serviceName}}',
 
   servicePageH1Pattern:
-    '{{serviceName}} in Bangalore',
+    '{{serviceName}} Daily Labour in Bangalore',
 
   areaPageTitlePattern:
-    'Carpenter, TV Installation, Interior & Home Services in {{areaName}} | Near Me',
+    'Daily Labour in {{areaName}}, {{cityName}} | Near Me',
 
   areaPageDescriptionPattern:
-    'Book verified carpenters, TV installation, interior experts, electricians, and home services near you in {{areaName}}, {{cityName}}. Top-rated local professionals at upfront rates.',
+    'Book verified daily labour, carpenters, electricians, and skilled workers near you in {{areaName}}, {{cityName}}. Full-day labour booking with upfront daily rates.',
 
   areaPageKeywordsPattern:
-    'home services {{areaName}}, carpenter {{areaName}}, tv installation {{areaName}}, interior designers {{areaName}}, electrician {{areaName}}, home services near me, repair services {{areaName}}',
+    'daily labour {{areaName}}, daily labour near me {{areaName}}, carpenter daily labour {{areaName}}, electrician daily labour {{areaName}}, hire daily wage workers {{areaName}}',
 
   areaPageH1Pattern:
-    'Home Services in {{areaName}}',
+    'Daily Labour in {{areaName}}',
 
   cityPageTitlePattern:
-    'Carpenter, TV Installation, Interior & Home Services in {{cityName}} | Near Me',
+    'Daily Labour in {{cityName}} | Daily Wage Workers Near Me',
 
   cityPageDescriptionPattern:
-    'Book trusted carpenter, TV installation, interior work, painting, electrical, and home services near you in {{cityName}}. Professional, verified experts, upfront pricing.',
+    'Book verified daily labour and skilled trade workers (carpenter, electrician, painter) near you in {{cityName}}. Full-day booking with upfront daily rates.',
 
   cityPageKeywordsPattern:
-    'home services {{cityName}}, carpenter {{cityName}}, tv installation {{cityName}}, interior designers {{cityName}}, electrician {{cityName}}, home services near me, repair services {{cityName}}',
+    'daily labour {{cityName}}, daily labour near me, hire daily labour {{cityName}}, carpenter daily labour {{cityName}}, electrician daily labour {{cityName}}, daily wage workers {{cityName}}',
 
   cityPageH1Pattern:
-    'Home Services in {{cityName}}',
+    'Daily Labour in {{cityName}}',
 
   structuredDataType: 'LocalBusiness',
 
-  structuredDataName: 'Fixbro',
+  structuredDataName: 'Fixbro Daily Labour',
 
   structuredDataStreetAddress:
     '#44, G S Palya Road, Konappana Agrahara, Electronic City Phase 2',
@@ -136,59 +136,59 @@ export const defaultSeoValues: FirestoreSEOSettings = {
 cityCategorySeoContentTemplate: `
 <section class="space-y-5">
 
-  <h2>Professional {{categoryName}} Services in {{cityName}}</h2>
+  <h2>Professional {{categoryName}} Daily Labour in {{cityName}}</h2>
 
   <p>
-    Looking for trusted {{categoryName}} services in {{cityName}}? Fixbro helps homeowners, tenants, businesses, and property managers connect with experienced professionals for quality service solutions. Whether you need installation, repair, maintenance, replacement, assembly, inspection, or support services, our experts are ready to help.
+    Looking for verified {{categoryName}} daily labour in {{cityName}}? Fixbro Daily Labour connects contractors, homeowners, interior managers, and businesses with experienced daily wage workers for full-day job bookings. Whether you need skilled carpenters, electricians, plumbers, painters, or helpers, our workers are verified and ready to work.
   </p>
 
   <p>
-    Our {{categoryName}} professionals in {{cityName}} are selected based on experience, skills, and service quality standards. Every job is handled using professional tools and proven techniques to ensure reliable results and customer satisfaction.
+    Our {{categoryName}} daily wage professionals in {{cityName}} work a full day (09:30 AM – 05:30 PM with a 1:00 PM – 2:00 PM lunch break) using standard professional tools to ensure high-efficiency progress and dependable workmanship.
   </p>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Verified Professionals</strong><br>
-      Skilled experts with practical field experience.
+      <strong>Background-Verified Workers</strong><br>
+      Identity-cleared trade workers with verified experience.
     </div>
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Transparent Pricing</strong><br>
-      Know estimated costs before work begins.
+      <strong>Transparent Daily Rates</strong><br>
+      Fixed full-day wage rates with zero hidden commissions.
     </div>
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Quick Booking</strong><br>
-      Easy scheduling with flexible appointment options.
+      <strong>Full-Day Labour Booking</strong><br>
+      Standard 7-hour active workday dedicated to your project.
     </div>
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Quality Workmanship</strong><br>
-      Professional service delivered using proper tools.
+      <strong>Doorstep Arrival &amp; OTP Verification</strong><br>
+      Secure start and completion OTPs ensure reliable attendance.
     </div>
 
   </div>
 
-  <h3>Why Choose Fixbro for {{categoryName}} in {{cityName}}?</h3>
+  <h3>Why Hire {{categoryName}} Daily Labour via Fixbro in {{cityName}}?</h3>
 
   <ul>
-    <li>Experienced local professionals</li>
-    <li>Convenient online booking process</li>
-    <li>Coverage across major areas of {{cityName}}</li>
-    <li>Residential and commercial service support</li>
-    <li>Professional tools and modern techniques</li>
-    <li>Reliable customer assistance</li>
+    <li>Experienced local daily wage trade workers</li>
+    <li>Dedicated single-day or multi-day labour bookings</li>
+    <li>Direct doorstep arrival across all localities of {{cityName}}</li>
+    <li>Residential, commercial, and renovation site support</li>
+    <li>Upfront fixed daily rates with no unexpected extra fees</li>
+    <li>Guaranteed attendance and dedicated customer care</li>
   </ul>
 
-  <h3>Popular {{categoryName}} Requirements in {{cityName}}</h3>
+  <h3>Popular {{categoryName}} Daily Labour Work in {{cityName}}</h3>
 
   <p>
-    Customers commonly book services for installation work, repairs, maintenance, replacements, inspections, upgrades, emergency support, and routine service requirements.
+    Customers commonly book daily wage workers for furniture making, repair work, full-day site preparation, wall painting, wiring installations, pipe repairs, and structural renovation tasks.
   </p>
 
   <p>
-    Book trusted {{categoryName}} services near you in {{cityName}} and get professional assistance from experienced experts through Fixbro.
+    Book trusted {{categoryName}} daily labour near you in {{cityName}} with Fixbro Daily Labour today.
   </p>
 
 </section>
@@ -196,82 +196,82 @@ cityCategorySeoContentTemplate: `
 
 cityCategoryFaqsTemplate: [
   {
-    question: "What {{categoryName}} services are available in {{cityName}}?",
-    answer: "Fixbro offers installation, repair, maintenance, replacement, inspection, assembly, and other professional {{categoryName}} services across {{cityName}}."
+    question: "What are the working hours for {{categoryName}} daily labour in {{cityName}}?",
+    answer: "Our standard daily labour schedule runs from 09:30 AM to 05:30 PM, which includes a 1-hour lunch break from 01:00 PM to 02:00 PM (7 active working hours)."
   },
   {
-    question: "How do I book {{categoryName}} services in {{cityName}}?",
-    answer: "Simply choose your required service, select an available time slot, provide your address details, and confirm your booking online."
+    question: "How do I book {{categoryName}} daily wage workers in {{cityName}}?",
+    answer: "Simply choose your category, select an approved worker based on skill level and daily rate, pick your date, and confirm your booking online or via Pay After Service."
   },
   {
-    question: "Are your {{categoryName}} professionals verified?",
-    answer: "Yes. All service professionals undergo verification and quality assessment before joining the Fixbro platform."
+    question: "Are {{categoryName}} daily labour workers background-verified?",
+    answer: "Yes. All daily labour workers undergo Government ID verification, trade skill checks, and background assessment before being listed on Fixbro Daily Labour."
   },
   {
-    question: "Do you provide same-day {{categoryName}} services in {{cityName}}?",
-    answer: "Same-day appointments may be available depending on professional availability and service demand in your area."
+    question: "Can I book {{categoryName}} workers for multiple days?",
+    answer: "Yes, you can easily book workers for a single day or consecutive days directly during checkout."
   },
   {
-    question: "What are the charges for {{categoryName}} services in {{cityName}}?",
-    answer: "Service pricing depends on the type of work, complexity, materials required, and duration. Pricing details are displayed before booking confirmation."
+    question: "What are the daily wage rates for {{categoryName}} in {{cityName}}?",
+    answer: "Daily rates depend on the worker's seniority level (Fresher, Intermediate, Senior, Expert). The exact daily wage is transparently displayed upfront on each worker's profile."
   },
   {
-    question: "Do you provide services for homes and offices?",
-    answer: "Yes. Our professionals provide {{categoryName}} services for residential properties, apartments, villas, offices, shops, and commercial establishments."
+    question: "Do daily labour workers bring their own tools?",
+    answer: "Yes, our skilled trade workers bring their standard professional hand tools required for regular daily labour tasks."
   }
 ],
 
 areaCategorySeoContentTemplate: `
 <section class="space-y-5">
 
-  <h2>{{categoryName}} Services in {{areaName}}, {{cityName}}</h2>
+  <h2>{{categoryName}} Daily Labour in {{areaName}}, {{cityName}}</h2>
 
   <p>
-    Need professional {{categoryName}} services in {{areaName}}? Fixbro connects customers with trusted local experts who provide reliable service solutions for homes, apartments, offices, retail shops, and commercial properties throughout {{areaName}}.
+    Need verified {{categoryName}} daily labour in {{areaName}}? Fixbro Daily Labour connects you with local, background-checked daily wage workers ready to provide full-day labour for homes, commercial interiors, renovation sites, and construction projects across {{areaName}}.
   </p>
 
   <p>
-    Our local professionals understand the service requirements of customers in {{areaName}} and provide prompt assistance, quality workmanship, and convenient scheduling options. From small repairs to complete installations and maintenance projects, we help ensure every job is completed efficiently.
+    Our daily wage trade specialists in {{areaName}} arrive punctually for a full 8-hour workday (09:30 AM – 05:30 PM) equipped with trade tools, ensuring your scheduled project work finishes on time.
   </p>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Local Experts</strong><br>
-      Professionals serving {{areaName}} and nearby locations.
+      <strong>Local Daily Labour</strong><br>
+      Workers located directly in {{areaName}} and adjacent sectors.
     </div>
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Fast Response</strong><br>
-      Quick service scheduling and local availability.
+      <strong>Full-Day Fixed Wage</strong><br>
+      Fixed daily pricing with transparent online or cash settlement.
     </div>
 
     <div class="p-4 bg-muted/30 rounded-lg">
-      <strong>Trusted Service</strong><br>
-      Reliable workmanship and customer-focused support.
+      <strong>Secure OTP Verification</strong><br>
+      Start OTP and Complete OTP safeguard your booking.
     </div>
 
   </div>
 
-  <h3>Benefits of Booking in {{areaName}}</h3>
+  <h3>Benefits of Booking Daily Labour in {{areaName}}</h3>
 
   <ul>
-    <li>Dedicated local service professionals</li>
-    <li>Faster arrival and response times</li>
-    <li>Flexible appointment scheduling</li>
-    <li>Residential and commercial support</li>
-    <li>Professional tools and equipment</li>
-    <li>Reliable service quality standards</li>
+    <li>Prompt local arrival without long travel delays</li>
+    <li>Verified identity and trade skills (Fresher to Senior levels)</li>
+    <li>Dedicated full-day focus on your booked task only</li>
+    <li>Transparent flat daily rates with zero hidden charges</li>
+    <li>Flexible scheduling across residential and commercial sites</li>
+    <li>Prompt customer support and attendance assurance</li>
   </ul>
 
-  <h3>Serving Customers Across {{areaName}}</h3>
+  <h3>Serving Projects Across {{areaName}}</h3>
 
   <p>
-    We help customers in apartments, independent houses, villas, gated communities, office spaces, retail outlets, and commercial buildings throughout {{areaName}} with dependable {{categoryName}} services.
+    We supply reliable daily labour to apartments, independent houses, villas, gated communities, corporate offices, and retail renovation sites throughout {{areaName}}.
   </p>
 
   <p>
-    If you are searching for trusted {{categoryName}} near {{areaName}}, {{cityName}}, Fixbro helps you connect with experienced professionals for quality service and dependable support.
+    Find trusted {{categoryName}} daily labour near you in {{areaName}}, {{cityName}} on Fixbro Daily Labour today.
   </p>
 
 </section>
@@ -279,28 +279,28 @@ areaCategorySeoContentTemplate: `
 
 areaCategoryFaqsTemplate: [
   {
-    question: "Do you provide {{categoryName}} services in {{areaName}}?",
-    answer: "Yes. Fixbro provides professional {{categoryName}} services throughout {{areaName}} and nearby localities in {{cityName}}."
+    question: "Can I get {{categoryName}} daily labour in {{areaName}} on the same day?",
+    answer: "Yes. Many of our registered daily labour workers reside in or near {{areaName}}, enabling fast doorstep arrival and same-day work."
   },
   {
-    question: "How quickly can a professional reach {{areaName}}?",
-    answer: "Arrival time depends on professional availability and booking schedules. Local professionals help reduce waiting times."
+    question: "How does the job start and completion OTP work in {{areaName}}?",
+    answer: "When your worker arrives at your location in {{areaName}}, share your 4-digit Start OTP to begin work. Once the full day is completed, share your Complete OTP to finalize the job."
   },
   {
-    question: "Can I schedule a specific appointment time in {{areaName}}?",
-    answer: "Yes. You can choose an available date and time slot during the booking process."
+    question: "What are the daily labour working hours in {{areaName}}?",
+    answer: "Work starts at 09:30 AM and ends at 05:30 PM with a 1-hour lunch break between 01:00 PM and 02:00 PM."
   },
   {
-    question: "Do you provide services for apartments and gated communities in {{areaName}}?",
-    answer: "Yes. Our professionals regularly serve apartments, villas, gated communities, offices, and commercial properties in {{areaName}}."
+    question: "Can I book daily labour for apartment interiors in {{areaName}}?",
+    answer: "Yes, our workers regularly work in gated communities, apartments, villas, and commercial properties throughout {{areaName}}."
   },
   {
-    question: "Are emergency or urgent services available in {{areaName}}?",
-    answer: "Urgent service availability depends on the category and professional availability in your locality."
+    question: "What if the worker does not show up at my site in {{areaName}}?",
+    answer: "Fixbro guarantees your booking. If a worker fails to attend, we will promptly reassign another available worker or issue a full refund."
   },
   {
-    question: "Why choose Fixbro in {{areaName}}?",
-    answer: "Fixbro connects customers with experienced professionals, transparent pricing, convenient booking, and reliable service support."
+    question: "Why hire daily labour through Fixbro Daily Labour in {{areaName}}?",
+    answer: "We offer verified identity checks, transparent daily wage cards, secure OTP start/finish tracking, and dedicated customer support."
   }
 ],
 

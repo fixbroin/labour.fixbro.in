@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { FirestoreCategory } from '@/types/firestore';
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Loader2, Image as ImageIcon, Trash2, Wand2, Edit2, Lock, Sparkles } from "lucide-react";
+import { Loader2, Image as ImageIcon, Trash2, Wand2, Edit2, Lock, Sparkles, Clock, PlusCircle, DollarSign } from "lucide-react";
+import type { CategorySeniorityRate } from '@/types/firestore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from "@/hooks/use-toast";
 import NextImage from 'next/image';
 import { storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from '@/lib/mysqlStorage';
-import { collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
+import { collection, query, where, getDocs, limit, doc, getDoc } from '@/lib/mysqlDb';
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { generateCategorySeo } from '@/ai/flows/generateCategorySeoFlow';
@@ -51,9 +53,10 @@ const categoryFormSchema = z.object({
     question: z.string(),
     answer: z.string()
   })).optional(),
-  visitingChargeAmount: z.preprocess(val => val === '' ? undefined : Number(val), z.number().min(0).optional()),
-  minimumBookingAmount: z.preprocess(val => val === '' ? undefined : Number(val), z.number().min(0).optional()),
-  minimumBookingPolicyDescription: z.string().optional().or(z.literal('')),
+  workingStartTime: z.string().default("09:30 AM"),
+  workingEndTime: z.string().default("05:30 PM"),
+  lunchStartTime: z.string().default("01:00 PM"),
+  lunchEndTime: z.string().default("02:00 PM"),
 });
 
 type CategoryFormData = z.infer<typeof categoryFormSchema>;
@@ -99,15 +102,45 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [isSlugEditable, setIsSlugEditable] = useState(false);
+  const [seniorityRates, setSeniorityRates] = useState<CategorySeniorityRate[]>(initialData?.seniorityRates || []);
+  const [availableSkillLevels, setAvailableSkillLevels] = useState<{ id: string; label: string }[]>([]);
+
+  useEffect(() => {
+    async function loadSkillLevels() {
+      try {
+        const docRef = doc(db, "providerControlOptions", "skillLevels");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const lvls = (data.levels || []).map((l: any) => ({ id: l.id || l.label, label: l.label }));
+          setAvailableSkillLevels(lvls);
+
+          if (!initialData?.seniorityRates || initialData.seniorityRates.length === 0) {
+            const defaults = lvls.map((lvl: any, idx: number) => ({
+              skillLevelId: lvl.id,
+              skillLevelLabel: lvl.label,
+              minRate: 600 + (idx * 300),
+              maxRate: 1000 + (idx * 400),
+            }));
+            setSeniorityRates(defaults);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading skill levels:", err);
+      }
+    }
+    loadSkillLevels();
+  }, [initialData]);
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       name: "", slug: "", order: nextOrder, isActive: true, imageUrl: "", imageHint: "",
       h1_title: "", seo_title: "", seo_description: "", seo_keywords: "", seo_content: "", faqs: [],
-      visitingChargeAmount: "" as any,
-      minimumBookingAmount: "" as any,
-      minimumBookingPolicyDescription: `A visiting charge of ${symbol}{VISITING_CHARGE} will be applied if your booking total is below ${symbol}{MINIMUM_BOOKING_AMOUNT}.`,
+      workingStartTime: initialData?.workingHours?.start || "09:30 AM",
+      workingEndTime: initialData?.workingHours?.end || "05:30 PM",
+      lunchStartTime: initialData?.lunchBreak?.start || "01:00 PM",
+      lunchEndTime: initialData?.lunchBreak?.end || "02:00 PM",
     },
   });
 
@@ -158,9 +191,10 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         seo_keywords: initialData.seo_keywords || "",
         seo_content: initialData.seo_content || "",
         faqs: initialData.faqs || [],
-        visitingChargeAmount: initialData.visitingChargeAmount !== undefined ? initialData.visitingChargeAmount : "" as any,
-        minimumBookingAmount: initialData.minimumBookingAmount !== undefined ? initialData.minimumBookingAmount : "" as any,
-        minimumBookingPolicyDescription: initialData.minimumBookingPolicyDescription || `A visiting charge of ${symbol}{VISITING_CHARGE} will be applied if your booking total is below ${symbol}{MINIMUM_BOOKING_AMOUNT}.`,
+        workingStartTime: initialData.workingHours?.start || "09:30 AM",
+        workingEndTime: initialData.workingHours?.end || "05:30 PM",
+        lunchStartTime: initialData.lunchBreak?.start || "01:00 PM",
+        lunchEndTime: initialData.lunchBreak?.end || "02:00 PM",
       });
       setCurrentImagePreview(initialData.imageUrl || null);
       setOriginalImageUrlFromInitialData(initialData.imageUrl || null);
@@ -168,9 +202,10 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
       form.reset({
         name: "", slug: "", order: nextOrder, isActive: true, imageUrl: "", imageHint: "",
         h1_title: "", seo_title: "", seo_description: "", seo_keywords: "", seo_content: "", faqs: [],
-        visitingChargeAmount: "" as any,
-        minimumBookingAmount: "" as any,
-        minimumBookingPolicyDescription: `A visiting charge of ${symbol}{VISITING_CHARGE} will be applied if your booking total is below ${symbol}{MINIMUM_BOOKING_AMOUNT}.`,
+        workingStartTime: "09:30 AM",
+        workingEndTime: "05:30 PM",
+        lunchStartTime: "01:00 PM",
+        lunchEndTime: "02:00 PM",
       });
       setCurrentImagePreview(null);
       setOriginalImageUrlFromInitialData(null);
@@ -392,9 +427,15 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         seo_keywords: formData.seo_keywords,
         seo_content: formData.seo_content,
         faqs: formData.faqs,
-        visitingChargeAmount: typeof formData.visitingChargeAmount === 'number' ? formData.visitingChargeAmount : undefined,
-        minimumBookingAmount: typeof formData.minimumBookingAmount === 'number' ? formData.minimumBookingAmount : undefined,
-        minimumBookingPolicyDescription: formData.minimumBookingPolicyDescription || undefined,
+        workingHours: {
+          start: formData.workingStartTime || "09:30 AM",
+          end: formData.workingEndTime || "05:30 PM",
+        },
+        lunchBreak: {
+          start: formData.lunchStartTime || "01:00 PM",
+          end: formData.lunchEndTime || "02:00 PM",
+        },
+        seniorityRates: seniorityRates.filter(r => r.minRate > 0 && r.maxRate >= r.minRate),
         id: initialData?.id,
       });
 
@@ -575,44 +616,151 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
           )}
         />
 
+        {/* Daily Labour Schedule */}
         <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-md font-semibold text-muted-foreground">Visiting Fee Settings (Optional)</h3>
-          <p className="text-xs text-muted-foreground">Override the global visiting charge settings for this category. Leave blank to use defaults.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField control={form.control} name="visitingChargeAmount" render={({ field }) => (
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            <h3 className="text-base font-semibold text-foreground">Daily Labour Working Schedule</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">Default working hours and lunch break for daily workers in this category.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <FormField control={form.control} name="workingStartTime" render={({ field }) => (
               <FormItem>
-                <FormLabel>Visiting Charge ({symbol})</FormLabel>
+                <FormLabel className="text-xs font-medium">Work Start Time</FormLabel>
                 <FormControl>
-                  <Input type="number" step="any" placeholder="e.g., 150" {...field} disabled={effectiveIsSubmitting} />
+                  <Input placeholder="09:30 AM" {...field} disabled={effectiveIsSubmitting} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}/>
-            <FormField control={form.control} name="minimumBookingAmount" render={({ field }) => (
+            <FormField control={form.control} name="workingEndTime" render={({ field }) => (
               <FormItem>
-                <FormLabel>Min Booking Amount for Free Delivery ({symbol})</FormLabel>
+                <FormLabel className="text-xs font-medium">Work End Time</FormLabel>
                 <FormControl>
-                  <Input type="number" step="any" placeholder="e.g., 399" {...field} disabled={effectiveIsSubmitting} />
+                  <Input placeholder="05:30 PM" {...field} disabled={effectiveIsSubmitting} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}/>
+            <FormField control={form.control} name="lunchStartTime" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-medium">Lunch Break Start</FormLabel>
+                <FormControl>
+                  <Input placeholder="01:00 PM" {...field} disabled={effectiveIsSubmitting} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}/>
+            <FormField control={form.control} name="lunchEndTime" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-medium">Lunch Break End</FormLabel>
+                <FormControl>
+                  <Input placeholder="02:00 PM" {...field} disabled={effectiveIsSubmitting} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}/>
           </div>
-          <FormField control={form.control} name="minimumBookingPolicyDescription" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Min Booking Policy Description Override</FormLabel>
-              <FormControl>
-                <Textarea 
-                  placeholder={`e.g., A visiting charge of ${symbol}{VISITING_CHARGE} will be applied if your booking total is below ${symbol}{MINIMUM_BOOKING_AMOUNT}.`}
-                  {...field} 
-                  rows={2} 
-                  disabled={effectiveIsSubmitting} 
-                />
-              </FormControl>
-              <FormDescription>Use placeholders: <code>{"{MINIMUM_BOOKING_AMOUNT}"}</code> and <code>{"{VISITING_CHARGE}"}</code> to substitute values dynamically.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}/>
+        </div>
+
+        {/* Category Seniority Rates */}
+        <div className="space-y-4 pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Seniority-Based Daily Wage Limits</h3>
+              <p className="text-xs text-muted-foreground">Set allowable minimum and maximum daily rates (₹) for workers registering under each seniority level.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const nextLvl = availableSkillLevels[seniorityRates.length % (availableSkillLevels.length || 1)] || { id: "level-" + Date.now(), label: "New Level" };
+                setSeniorityRates(prev => [
+                  ...prev,
+                  { skillLevelId: nextLvl.id, skillLevelLabel: nextLvl.label, minRate: 800, maxRate: 1500 }
+                ]);
+              }}
+              disabled={effectiveIsSubmitting}
+            >
+              <PlusCircle className="mr-1.5 h-4 w-4" /> Add Rate Rule
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {seniorityRates.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-2">No seniority rates configured yet. Click &quot;Add Rate Rule&quot; to set minimum and maximum rates.</p>
+            ) : (
+              seniorityRates.map((tier, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+                  <div className="w-full sm:w-1/3">
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Seniority / Skill Level</label>
+                    <Select
+                      value={tier.skillLevelId}
+                      onValueChange={(val) => {
+                        const found = availableSkillLevels.find(l => l.id === val);
+                        setSeniorityRates(prev => prev.map((item, i) => i === idx ? { ...item, skillLevelId: val, skillLevelLabel: found ? found.label : val } : item));
+                      }}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Select Level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSkillLevels.map(lvl => (
+                          <SelectItem key={lvl.id} value={lvl.id}>
+                            {lvl.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="w-full sm:w-1/4">
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Min Daily Rate ({symbol})</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="h-9"
+                      value={tier.minRate}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setSeniorityRates(prev => prev.map((item, i) => i === idx ? { ...item, minRate: val } : item));
+                      }}
+                      placeholder="800"
+                    />
+                  </div>
+
+                  <div className="w-full sm:w-1/4">
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Max Daily Rate ({symbol})</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="h-9"
+                      value={tier.maxRate}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setSeniorityRates(prev => prev.map((item, i) => i === idx ? { ...item, maxRate: val } : item));
+                      }}
+                      placeholder="1500"
+                    />
+                  </div>
+
+                  <div className="self-end sm:self-center mt-2 sm:mt-5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 text-destructive hover:text-destructive/80"
+                      onClick={() => setSeniorityRates(prev => prev.filter((_, i) => i !== idx))}
+                      title="Remove Rate Rule"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="space-y-4 pt-4 border-t">

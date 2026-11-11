@@ -16,12 +16,13 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
-import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof, formatEndTimeDisplay } from '@/lib/utils';
+import JobOtpVerificationModal from '@/components/provider/JobOtpVerificationModal';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
 import type { UserActivityEventType } from '@/types/firestore';
 import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
+import { getProviderDefaultSettingsAction } from '@/app/actions/providerDefaultSettingsActions';
 
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -78,10 +79,22 @@ export default function ProviderBookingDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<BookingStatus | null>(null);
-  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [otpActionType, setOtpActionType] = useState<'start' | 'complete'>('start');
+  const [requireOtpSetting, setRequireOtpSetting] = useState(true);
   const [providerWalletBalance, setProviderWalletBalance] = useState<number | null>(null);
   const [minBalanceForJobs, setMinBalanceForJobs] = useState<number | null>(null);
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
+
+  useEffect(() => {
+    getProviderDefaultSettingsAction()
+      .then((settings) => {
+        if (typeof settings?.requireOtpForJobStartComplete === 'boolean') {
+          setRequireOtpSetting(settings.requireOtpForJobStartComplete);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const providerFeeType = appConfig?.providerFeeType || 'percentage';
   const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
@@ -92,16 +105,24 @@ export default function ProviderBookingDetailsPage() {
   const isCash = hasOnlinePaymentProof(booking) ? false : isCashPayment(booking?.paymentMethod);
   const paymentMethod = isCash ? 'Pay After Service' : 'Online';
   const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
-  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;
+  const providerRateEarnings = (booking?.providerTotalEarnings && booking.providerTotalEarnings > 0)
+    ? booking.providerTotalEarnings
+    : (booking?.subTotal || 0);
+  const walletDeduction = Math.max(0, (booking?.totalAmount || 0) - providerRateEarnings);
+  const requiredCommission = isCash ? walletDeduction : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
     providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
   const isAccepted = booking?.status !== 'AssignedToProvider' && booking?.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const extraChargesTotal = (booking?.additionalCharges || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const displayTotal = isCash ? (booking?.totalAmount || 0) : (providerGross + extraChargesTotal);
+  const displayTotal = isCash ? (booking?.totalAmount || 0) : providerRateEarnings;
 
-
-  const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
+  const updateBookingStatus = async (
+    newStatus: BookingStatus, 
+    additionalCharges?: {name: string, amount: number}[], 
+    finalizedPaymentMethod?: string,
+    enteredOtp?: string
+  ) => {
     if (!booking?.id || !providerUser) return;
     setIsProcessingAction(true);
     setProcessingStatus(newStatus);
@@ -111,25 +132,24 @@ export default function ProviderBookingDetailsPage() {
         providerUser.uid,
         newStatus,
         additionalCharges,
-        finalizedPaymentMethod
+        finalizedPaymentMethod,
+        enteredOtp
       );
 
       if (!result.success) {
         throw new Error(result.message);
       }
 
-      // Optimistically update local booking state immediately (0 seconds lag)
+      // Optimistically update local booking state immediately
       setBooking(prev => {
         if (!prev) return null;
         const updated: FirestoreBooking = {
           ...prev,
           status: newStatus,
+          ...(newStatus === 'InProgressByProvider' && { workStartedAt: Timestamp.now() }),
+          ...(newStatus === 'Completed' && { workCompletedAt: Timestamp.now() }),
           updatedAt: Timestamp.now(),
         };
-        if (additionalCharges && additionalCharges.length > 0) {
-          updated.additionalCharges = additionalCharges;
-          updated.totalAmount = (prev.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
-        }
         if (finalizedPaymentMethod) {
           updated.paymentMethod = finalizedPaymentMethod;
         }
@@ -146,39 +166,57 @@ export default function ProviderBookingDetailsPage() {
         } else if (newStatus === 'Completed') {
           eventType = 'providerCompleteWork';
         }
-
         logUserActivity(
           eventType,
-          { 
-            bookingId: booking.bookingId || bookingId, 
+          {
+            bookingId: booking.bookingId || bookingId,
             bookingDocId: booking.id,
             status: newStatus,
-            additionalCharges: additionalCharges || [],
-            paymentMethod: finalizedPaymentMethod || booking.paymentMethod || 'N/A'
           },
           providerUser.uid,
           null,
           providerUser.displayName
-        ).catch(err => console.error("Error logging provider activity:", err));
+        ).catch(e => console.error("Error logging provider activity:", e));
       }
 
-      toast({ title: "Success", description: `Job status updated to ${newStatus.replace(/([A-Z])/g, ' $1')}.` });
-      setIsCompleteDialogOpen(false);
-
-      // --- TRIGGER POST-PROCESS (Emails, Push, WhatsApp) ---
-      fetch('/api/bookings/post-process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingDocId: booking.id }),
-      }).catch(err => console.error("Provider trigger error:", err));
-
-    } catch (error) {
-      console.error("Error updating job status:", error);
-      toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
+      toast({
+        title: "Success",
+        description: newStatus === 'InProgressByProvider' ? "Work started successfully!" : newStatus === 'Completed' ? "Job completed successfully!" : "Status updated.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Action Failed",
+        description: err.message || "Could not update status.",
+        variant: "destructive",
+      });
+      throw err;
     } finally {
       setIsProcessingAction(false);
       setProcessingStatus(null);
     }
+  };
+
+  const handleStartWorkClick = () => {
+    if (requireOtpSetting) {
+      setOtpActionType('start');
+      setIsOtpModalOpen(true);
+    } else {
+      updateBookingStatus('InProgressByProvider');
+    }
+  };
+
+  const handleCompleteWorkClick = () => {
+    if (requireOtpSetting) {
+      setOtpActionType('complete');
+      setIsOtpModalOpen(true);
+    } else {
+      updateBookingStatus('Completed');
+    }
+  };
+
+  const handleVerifyOtp = async (enteredOtp: string) => {
+    const targetStatus = otpActionType === 'start' ? 'InProgressByProvider' : 'Completed';
+    await updateBookingStatus(targetStatus, undefined, undefined, enteredOtp);
   };
 
   useEffect(() => {
@@ -413,12 +451,10 @@ export default function ProviderBookingDetailsPage() {
               </div>
             </div>
 
-            {booking.estimatedEndTime && (
-              <p className="text-green-600 font-bold text-sm mt-3 flex items-center gap-1.5">
-                <Clock className="h-4 w-4 shrink-0" />
-                <span>Estimated Completion: {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}</span>
-              </p>
-            )}
+            <p className="text-emerald-600 font-bold text-sm mt-3 flex items-center gap-1.5">
+              <Clock className="h-4 w-4 shrink-0" />
+              <span>End Time: {formatEndTimeDisplay(booking.estimatedEndTime, booking.scheduledTimeSlot)}</span>
+            </p>
 
             {booking.dailyTimeline && booking.dailyTimeline.length > 1 && (
               <div className="mt-4 py-2.5 px-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 rounded-xl space-y-2 text-sm text-muted-foreground max-w-xl">
@@ -469,44 +505,45 @@ export default function ProviderBookingDetailsPage() {
           </section>
           <Separator/>
            <section>
-            <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
-             <div className="text-sm space-y-1">
-                <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(decimals)}</p>
-                {(booking.discountAmount ?? 0) > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount?.toFixed(decimals)} ({booking.discountCode})</p>}
-                {Boolean(isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0) && booking.appliedPlatformFees!.map((fee, idx) => (
-                   <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(decimals)}</p>
-                 ))}
-                {Boolean(booking.visitingCharge && booking.visitingCharge > 0) && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge?.toFixed(decimals)}</p>}
-
-                {booking.additionalCharges && booking.additionalCharges.length > 0 && (
-                  <div className="bg-amber-50 p-2 rounded-md border border-amber-100 my-2">
-                    <p className="font-bold text-amber-800 text-xs uppercase mb-1">Additional Charges Added During Service:</p>
-                    {booking.additionalCharges.map((c, i) => (
-                      <div key={i} className="flex justify-between text-amber-900">
-                        <span>{c.name}</span>
-                        <span>+ {symbol}{c.amount.toFixed(decimals)}</span>
-                      </div>
-                    ))}
+            <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Earnings & Payment Details</h3>
+            {!isCash ? (
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 space-y-2.5">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-medium">Payment Status:</span>
+                  <Badge className="bg-emerald-600 text-white font-bold">Paid Online (Prepaid)</Badge>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-emerald-200/60">
+                  <span className="font-bold text-foreground">Your Net Earnings (100% Withdrawable):</span>
+                  <span className="font-extrabold text-2xl text-emerald-600">
+                    {symbol}{providerRateEarnings.toFixed(decimals)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Zero commission deducted. The customer prepaid online via FixBro. This full amount is credited directly to your withdrawable balance once work is completed.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-muted/40 border space-y-3 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-foreground">Total Cash to Collect from Customer:</span>
+                  <span className="font-extrabold text-xl text-primary">{symbol}{(booking.totalAmount || 0).toFixed(decimals)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <span>Your Daily Labour Net Earnings:</span>
+                  <span className="font-bold text-foreground">{symbol}{providerRateEarnings.toFixed(decimals)}</span>
+                </div>
+                {walletDeduction > 0 && (
+                  <div className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-400">
+                    <span>Admin Markup & Platform Fees (Auto-Deducted from Wallet):</span>
+                    <span className="font-bold">-{symbol}{walletDeduction.toFixed(decimals)}</span>
                   </div>
                 )}
-
-                {Boolean(isCash && booking.taxAmount && booking.taxAmount > 0) && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount?.toFixed(decimals)}</p>}
-                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
-                <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
-                {extraChargesTotal > 0 && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed">
-                    {!isCash ? (
-                      <p>
-                        <strong>Online Payment:</strong> {symbol}{providerGross.toFixed(decimals)} was paid online. Additional charges of <strong>{symbol}{extraChargesTotal.toFixed(decimals)}</strong> collected in cash by you.
-                      </p>
-                    ) : (
-                      <p>
-                        <strong>Pay After Service:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected by you.
-                      </p>
-                    )}
-                  </div>
-                )}
-             </div>
+                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
+                  <strong>Pay After Service Notice:</strong> Customer will pay you {symbol}{(booking.totalAmount || 0).toFixed(decimals)} in cash/UPI upon completion. The platform fee &amp; markup (-{symbol}{walletDeduction.toFixed(decimals)}) is auto-deducted from your prepaid wallet balance.
+                </div>
+              </div>
+            )}
            </section>
 
           {booking.notes && !isJobCompleted && (
@@ -519,10 +556,19 @@ export default function ProviderBookingDetailsPage() {
             </>
           )}
            <Separator />
-           <div className="text-xs text-muted-foreground">
+           <div className="text-xs text-muted-foreground space-y-1">
              <p>Booked On: {formatTimestampForDisplay(booking.createdAt)}</p>
              {booking.updatedAt && <p>Last Updated: {formatTimestampForDisplay(booking.updatedAt)}</p>}
-           </div>            {isLowBalance && (
+             {booking.workStartedAt && (
+               <p className="text-foreground font-medium flex items-center gap-1.5 pt-1">
+                 <Clock className="h-3.5 w-3.5 text-primary" />
+                 Work Started: {formatTimestampForDisplay(booking.workStartedAt)}
+                 {booking.workCompletedAt && ` | Finished: ${formatTimestampForDisplay(booking.workCompletedAt)}`}
+                 {booking.workedDuration && ` (Duration: ${booking.workedDuration})`}
+               </p>
+             )}
+           </div>
+           {isLowBalance && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl font-bold flex flex-col gap-1.5 mt-2">
                 <div className="flex items-center gap-1.5">
                   <span>⚠️</span>
@@ -587,7 +633,7 @@ export default function ProviderBookingDetailsPage() {
 
             {booking.status === 'ProviderAccepted' && (
                 <Button 
-                    onClick={() => updateBookingStatus('InProgressByProvider')} 
+                    onClick={handleStartWorkClick} 
                     disabled={isProcessingAction}
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                 >
@@ -607,7 +653,7 @@ export default function ProviderBookingDetailsPage() {
 
             {booking.status === 'InProgressByProvider' && (
                 <Button 
-                    onClick={() => setIsCompleteDialogOpen(true)} 
+                    onClick={handleCompleteWorkClick} 
                     disabled={isProcessingAction}
                     className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
                 >
@@ -628,13 +674,13 @@ export default function ProviderBookingDetailsPage() {
       </Card>
 
       {booking && (
-        <CompleteBookingDialog 
-          isOpen={isCompleteDialogOpen}
-          onClose={() => setIsCompleteDialogOpen(false)}
-          onConfirm={(charges, pMethod) => updateBookingStatus('Completed', charges, pMethod)}
-          booking={booking}
-          originalAmount={booking.totalAmount}
-          currentPaymentMethod={booking.paymentMethod || "Pay After Service"}
+        <JobOtpVerificationModal
+          isOpen={isOtpModalOpen}
+          onClose={() => setIsOtpModalOpen(false)}
+          onVerify={handleVerifyOtp}
+          bookingId={booking.bookingId}
+          customerName={booking.customerName}
+          actionType={otpActionType}
           isProcessing={isProcessingAction}
         />
       )}

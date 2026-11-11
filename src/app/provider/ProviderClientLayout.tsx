@@ -63,6 +63,20 @@ export default function ProviderClientLayout({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const router = useRouter();
   const { showLoading, hideLoading } = useLoading();
+
+  const isDashboardRoute = pathname === '/provider' || 
+    pathname.startsWith('/provider/booking') ||
+    pathname.startsWith('/provider/earnings') ||
+    pathname.startsWith('/provider/id-card') ||
+    pathname.startsWith('/provider/leaves') ||
+    pathname.startsWith('/provider/my-jobs') ||
+    pathname.startsWith('/provider/notifications') ||
+    pathname.startsWith('/provider/profile') ||
+    pathname.startsWith('/provider/quotation-invoice') ||
+    pathname.startsWith('/provider/reviews') ||
+    pathname.startsWith('/provider/service-area') ||
+    pathname.startsWith('/provider/wallet') ||
+    pathname.startsWith('/provider/withdrawal');
   const [isProviderApproved, setIsProviderApproved] = useState<boolean | null>(() => {
     if (typeof window !== 'undefined') {
       const cached = sessionStorage.getItem(`provider_approved_${providerUser?.uid}`);
@@ -87,6 +101,7 @@ export default function ProviderClientLayout({ children }: PropsWithChildren) {
   const processedJobNotificationIdsRef = useRef<string[]>([]);
 
   useEffect(() => {
+    if (!isDashboardRoute) return;
     // Dynamically update manifest
     const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (manifestLink) {
@@ -261,6 +276,7 @@ export default function ProviderClientLayout({ children }: PropsWithChildren) {
   const hasPlayedInitialSoundRef = useRef(false);
 
   useEffect(() => {
+    if (!isDashboardRoute) return;
     const checkProviderStatus = async () => {
       if (!providerUser || authIsLoading) return;
 
@@ -426,6 +442,10 @@ export default function ProviderClientLayout({ children }: PropsWithChildren) {
       hideLoading();
     };
   }, [pathname, providerUser, hideLoading]);
+
+  if (!isDashboardRoute) {
+    return <>{children}</>;
+  }
 
   if (authIsLoading) {
     return (

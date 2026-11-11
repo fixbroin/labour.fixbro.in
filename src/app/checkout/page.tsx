@@ -11,7 +11,7 @@ import { useLoading } from '@/contexts/LoadingContext';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { usePaymentOptions } from '@/hooks/usePaymentOptions';
-import { getActiveCheckoutEntries } from '@/lib/cartManager';
+import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import ScheduleSelection from '@/components/checkout/ScheduleSelection';
@@ -55,6 +55,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromoCodeInfo | null>(null);
   const [sumOfItemPrices, setSumOfItemPrices] = useState(0);
+  const [checkoutCartItems, setCheckoutCartItems] = useState<CartEntry[]>([]);
 
   // Modals state
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -108,6 +109,7 @@ export default function CheckoutPage() {
     }
 
     const cartItems = getActiveCheckoutEntries();
+    setCheckoutCartItems(cartItems);
     if (cartItems.length === 0) {
       router.push('/cart');
       return;
@@ -433,6 +435,8 @@ export default function CheckoutPage() {
             initialSlot={scheduledSlot || undefined}
             latitude={selectedAddress?.latitude ?? undefined}
             longitude={selectedAddress?.longitude ?? undefined}
+            providerIds={checkoutCartItems.map(i => i.serviceId)}
+            durationDays={checkoutCartItems.length > 0 ? Math.max(...checkoutCartItems.map(i => i.quantity || 1), 1) : 1}
           />
         </DialogContent>
       </Dialog>

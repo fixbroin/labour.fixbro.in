@@ -360,19 +360,6 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
     serviceZoneCirclesRef.current.forEach(circle => circle.setMap(null));
     serviceZoneCirclesRef.current = [];
 
-    serviceZones.forEach(zone => {
-      const circle = new window.google.maps.Circle({
-        strokeColor: "#45A0A2",
-        strokeOpacity: 0.7,
-        strokeWeight: 1,
-        fillColor: "#45A0A2",
-        fillOpacity: 0.15,
-        map,
-        center: { lat: zone.center.latitude, lng: zone.center.longitude },
-        radius: zone.radiusKm * 1000,
-      });
-      serviceZoneCirclesRef.current.push(circle);
-    });
 
     mapClickListenerRef.current = map.addListener('click', (e: google.maps.MapMouseEvent) => {
         if (e.latLng && mapInstanceRef.current) {
@@ -443,19 +430,6 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
     serviceZoneCirclesRef.current = [];
 
     // Draw updated circles
-    serviceZones.forEach(zone => {
-      const circle = new window.google.maps.Circle({
-        strokeColor: "#45A0A2",
-        strokeOpacity: 0.7,
-        strokeWeight: 1,
-        fillColor: "#45A0A2",
-        fillOpacity: 0.15,
-        map: mapInstanceRef.current,
-        center: { lat: zone.center.latitude, lng: zone.center.longitude },
-        radius: zone.radiusKm * 1000,
-      });
-      serviceZoneCirclesRef.current.push(circle);
-    });
 
     // Re-check serviceability with current marker position
     if (markerRef.current) {

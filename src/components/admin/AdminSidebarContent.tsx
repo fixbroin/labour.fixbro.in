@@ -12,7 +12,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Logo from '@/components/shared/Logo';
-import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight, RefreshCw, ShieldCheck, Image as ImageIcon, Smartphone, UserPlus, Armchair, Home, Sliders, Contact2, Download } from 'lucide-react';
+import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight, RefreshCw, ShieldCheck, Image as ImageIcon, Smartphone, UserPlus, Armchair, Home, Sliders, Contact2, Download, SlidersHorizontal } from 'lucide-react';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ const navItems = [
   { href: '/admin/provider-applications', label: 'Provider Applications', icon: Users2 },
   { href: '/admin/provider-withdrawals', label: 'Wallet & Withdrawal Complaint', icon: Banknote },
   { href: '/admin/provider-controls', label: 'Provider Controls', icon: Settings },
+  { href: '/admin/provider-default-settings', label: 'Provider Default Settings', icon: SlidersHorizontal },
   { href: '/admin/provider-id-cards', label: 'Provider ID Cards', icon: Contact2 },
   { href: '/admin/join-provider-settings', label: 'Join Provider Page', icon: UserPlus },
   { type: 'separator', label: 'Marketplace (Free)' },
@@ -46,8 +47,7 @@ const navItems = [
   { href: '/admin/marketplace-settings', label: 'Marketplace Settings', icon: Sliders },
   { type: 'separator', label: 'Content Management' },
   { href: '/admin/categories', label: 'Categories', icon: List },
-  { href: '/admin/sub-categories', label: 'Sub-Categories', icon: Layers },
-  { href: '/admin/services', label: 'Services', icon: ShoppingBag },
+  { href: '/admin/daily-providers', label: 'Daily Providers', icon: Users2 },
   { href: '/admin/slideshows', label: 'Slideshows', icon: PlaySquare },
   { href: '/admin/blog', label: 'Blog', icon: FileText },
   { href: '/admin/reviews', label: 'Reviews', icon: MessageSquare },
@@ -189,6 +189,7 @@ export default function AdminSidebarContent() {
     '/admin/theme-settings', '/admin/newsletter-popups', '/admin/chat', '/admin/inquiries',
     '/admin/seo-overrides', '/admin/quotation-invoice', '/admin/features',
     '/admin/provider-controls', 
+    '/admin/provider-default-settings',
     '/admin/provider-applications', 
     '/admin/cookie-settings', 
     '/admin/visitor-info',

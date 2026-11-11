@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     servicesSnapshot.forEach(doc => {
       const data = doc.data();
       if (data.slug) {
-        urls.push(`${baseUrl}/service/${data.slug}`);
+        urls.push(`${baseUrl}/provider/${data.slug}`);
       }
     });
 

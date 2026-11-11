@@ -21,9 +21,10 @@ import { cn, formatDateInTimezone, formatTimeInTimezone, getBookingScheduledTime
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import type { FirestoreNotification, UserActivityEventType } from '@/types/firestore';
-import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import JobOtpVerificationModal from '@/components/provider/JobOtpVerificationModal';
 import { logUserActivity } from '@/lib/activityLogger';
 import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
+import { getProviderDefaultSettingsAction } from '@/app/actions/providerDefaultSettingsActions';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import ProviderJobCard from '@/components/provider/ProviderJobCard';
 
@@ -63,9 +64,21 @@ export default function ProviderDashboardPage() {
   const [providerWalletBalance, setProviderWalletBalance] = useState<number>(0);
   const [minBalanceForJobs, setMinBalanceForJobs] = useState<number>(50);
 
-  // Completion Dialog State
-  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
-  const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
+  // OTP Modal State
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [selectedJobForOtp, setSelectedJobForOtp] = useState<FirestoreBooking | null>(null);
+  const [otpActionType, setOtpActionType] = useState<'start' | 'complete'>('start');
+  const [requireOtpSetting, setRequireOtpSetting] = useState(true);
+
+  useEffect(() => {
+    getProviderDefaultSettingsAction()
+      .then((settings) => {
+        if (typeof settings?.requireOtpForJobStartComplete === 'boolean') {
+          setRequireOtpSetting(settings.requireOtpForJobStartComplete);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!providerUser || authIsLoading) return;
@@ -114,34 +127,15 @@ export default function ProviderDashboardPage() {
     return () => unsubscribe();
   }, [providerUser, authIsLoading, toast, displayLimit]);
 
-  const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
-    // SINGLE COMPLETION POPUP (Charges + Payment Method)
-    if (newStatus === 'Completed' && !finalizedPaymentMethod) {
-        const job = bookings.find(b => b.id === bookingId);
-        if (job) {
-            setBookingToComplete(job);
-            setIsCompleteDialogOpen(true);
-        }
-        return;
-    }
-
+  const updateBookingStatus = async (
+    bookingId: string, 
+    newStatus: BookingStatus, 
+    additionalCharges?: {name: string, amount: number}[], 
+    finalizedPaymentMethod?: string,
+    enteredOtp?: string
+  ) => {
     setProcessingBookingAction(bookingId);
     try {
-      const bookingDocRef = doc(db, "bookings", bookingId); 
-      const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
-      
-      if (newStatus === "Completed") {
-        const job = bookings.find(b => b.id === bookingId);
-        if (job && job.status !== "Completed") {
-          updateData.isReviewedByCustomer = false;
-        }
-        if (additionalCharges && additionalCharges.length > 0) {
-            updateData.additionalCharges = additionalCharges;
-            updateData.totalAmount = ((job?.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + c.amount, 0));
-        }
-        if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
-      }
-
       if (!providerUser?.uid) {
         throw new Error("No authenticated provider session found.");
       }
@@ -151,29 +145,24 @@ export default function ProviderDashboardPage() {
         providerUser.uid,
         newStatus,
         additionalCharges,
-        finalizedPaymentMethod
+        finalizedPaymentMethod,
+        enteredOtp
       );
 
       if (!result.success) {
         throw new Error(result.message);
       }
 
-      // Optimistically update local bookings state immediately (0 seconds lag)
+      // Optimistically update local bookings state immediately
       setBookings(prev => prev.map(b => {
         if (b.id !== bookingId) return b;
-        const updated: FirestoreBooking = {
+        return {
           ...b,
           status: newStatus,
+          ...(newStatus === 'InProgressByProvider' && { workStartedAt: Timestamp.now() }),
+          ...(newStatus === 'Completed' && { workCompletedAt: Timestamp.now() }),
           updatedAt: Timestamp.now()
         };
-        if (additionalCharges && additionalCharges.length > 0) {
-          updated.additionalCharges = additionalCharges;
-          updated.totalAmount = (b.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
-        }
-        if (finalizedPaymentMethod) {
-          updated.paymentMethod = finalizedPaymentMethod;
-        }
-        return updated;
       }));
 
       // Log provider activity
@@ -186,41 +175,64 @@ export default function ProviderDashboardPage() {
         } else if (newStatus === 'Completed') {
           eventType = 'providerCompleteWork';
         }
-
         const targetJob = bookings.find(b => b.id === bookingId);
-        const bookingHumanId = targetJob?.bookingId || bookingId;
-
         logUserActivity(
           eventType,
-          { 
-            bookingId: bookingHumanId, 
+          {
+            bookingId: targetJob?.bookingId || bookingId,
             bookingDocId: bookingId,
             status: newStatus,
-            additionalCharges: additionalCharges || [],
-            paymentMethod: finalizedPaymentMethod || targetJob?.paymentMethod || 'N/A'
           },
           providerUser.uid,
           null,
           providerUser.displayName
-        ).catch(err => console.error("Error logging provider activity:", err));
+        ).catch(e => console.error("Error logging provider activity:", e));
       }
-      
-      // TRIGGER POST-PROCESS (Invoice + Emails)
-      fetch('/api/bookings/post-process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingDocId: bookingId }),
-      }).catch(err => console.error("Notification trigger error:", err));
 
-      toast({ title: "Success", description: `Job status updated to ${newStatus.replace(/([A-Z])/g, ' $1')}.` });
-      setIsCompleteDialogOpen(false);
-      setBookingToComplete(null);
-    } catch (error) {
-      console.error("Error updating job status:", error);
-      toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
+      toast({
+        title: "Success",
+        description: newStatus === 'InProgressByProvider' ? "Work started successfully!" : newStatus === 'Completed' ? "Job completed successfully!" : "Status updated.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Action Failed",
+        description: err.message || "Failed to update booking status.",
+        variant: "destructive"
+      });
+      throw err;
     } finally {
       setProcessingBookingAction(null);
     }
+  };
+
+  const handleStartWork = (id: string) => {
+    const job = bookings.find(b => b.id === id);
+    if (!job) return;
+    if (requireOtpSetting) {
+      setSelectedJobForOtp(job);
+      setOtpActionType('start');
+      setIsOtpModalOpen(true);
+    } else {
+      updateBookingStatus(id, 'InProgressByProvider');
+    }
+  };
+
+  const handleCompleteWork = (id: string) => {
+    const job = bookings.find(b => b.id === id);
+    if (!job) return;
+    if (requireOtpSetting) {
+      setSelectedJobForOtp(job);
+      setOtpActionType('complete');
+      setIsOtpModalOpen(true);
+    } else {
+      updateBookingStatus(id, 'Completed');
+    }
+  };
+
+  const handleVerifyOtp = async (enteredOtp: string) => {
+    if (!selectedJobForOtp?.id) return;
+    const targetStatus = otpActionType === 'start' ? 'InProgressByProvider' : 'Completed';
+    await updateBookingStatus(selectedJobForOtp.id, targetStatus, undefined, undefined, enteredOtp);
   };
 
   const newJobRequests = useMemo(() => {
@@ -313,8 +325,8 @@ export default function ProviderDashboardPage() {
             <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
               {ongoingJobs.map((job, idx) => (
                 <ProviderJobCard key={job.id} job={job} type="ongoing" queuePosition={idx + 1}
-                  onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
-                  onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
+                  onStartWork={handleStartWork}
+                  onCompleteWork={handleCompleteWork}
                   isProcessingAction={processingBookingAction === job.id}
                   providerWalletBalance={providerWalletBalance}
                   minBalanceForJobs={minBalanceForJobs}
@@ -388,8 +400,8 @@ export default function ProviderDashboardPage() {
               <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {ongoingJobs.map((job, idx) => (
                   <ProviderJobCard key={job.id} job={job} type="ongoing" queuePosition={idx + 1}
-                    onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
-                    onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
+                    onStartWork={handleStartWork}
+                    onCompleteWork={handleCompleteWork}
                     isProcessingAction={processingBookingAction === job.id}
                     providerWalletBalance={providerWalletBalance}
                     minBalanceForJobs={minBalanceForJobs}
@@ -431,15 +443,15 @@ export default function ProviderDashboardPage() {
         )}
       </section>
 
-      {bookingToComplete && (
-        <CompleteBookingDialog 
-          isOpen={isCompleteDialogOpen}
-          onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }}
-          onConfirm={(charges, pMethod) => updateBookingStatus(bookingToComplete.id!, 'Completed', charges, pMethod)}
-          booking={bookingToComplete}
-          originalAmount={bookingToComplete.totalAmount}
-          currentPaymentMethod={bookingToComplete.paymentMethod || "Pay After Service"}
-          isProcessing={processingBookingAction === bookingToComplete.id}
+      {selectedJobForOtp && (
+        <JobOtpVerificationModal
+          isOpen={isOtpModalOpen}
+          onClose={() => { setIsOtpModalOpen(false); setSelectedJobForOtp(null); }}
+          onVerify={handleVerifyOtp}
+          bookingId={selectedJobForOtp.bookingId}
+          customerName={selectedJobForOtp.customerName}
+          actionType={otpActionType}
+          isProcessing={processingBookingAction === selectedJobForOtp.id}
         />
       )}
     </div>

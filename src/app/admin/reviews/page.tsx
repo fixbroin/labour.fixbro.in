@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -8,12 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { PlusCircle, Edit, Trash2, Loader2, Star, MessageSquare, Filter, Wand2, Check, ChevronsUpDown } from "lucide-react"; 
+import { PlusCircle, Edit, Trash2, Loader2, Star, MessageSquare, Filter, Wand2, Check, ChevronsUpDown, UserCheck } from "lucide-react"; 
 import type { FirestoreReview, ReviewStatus, FirestoreService, FirestoreSubCategory, FirestoreCategory } from '@/types/firestore';
-import ReviewForm, { type ReviewFormData } from '@/components/admin/ReviewForm';
+import ReviewForm, { type ReviewFormData, type ReviewTargetProvider } from '@/components/admin/ReviewForm';
 import BulkReviewGeneratorDialog from '@/components/admin/BulkReviewGeneratorDialog';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, onSnapshot, limit, startAfter, type DocumentSnapshot } from '@/lib/mysqlDb';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where, Timestamp, onSnapshot, limit, startAfter, type DocumentSnapshot } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -35,6 +34,7 @@ export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<FirestoreReview[]>([]);
   const [displayLimit, setDisplayLimit] = useState(50);
   
+  const [providers, setProviders] = useState<ReviewTargetProvider[]>([]);
   const [services, setServices] = useState<Pick<FirestoreService, 'id' | 'name' | 'subCategoryId'>[]>([]);
   const [subCategories, setSubCategories] = useState<Pick<FirestoreSubCategory, 'id' | 'name' | 'parentId'>[]>([]);
   const [parentCategories, setParentCategories] = useState<Pick<FirestoreCategory, 'id' | 'name'>[]>([]);
@@ -53,25 +53,41 @@ export default function AdminReviewsPage() {
   const [isPrerequisitesLoading, setIsPrerequisitesLoading] = useState(false);
 
   const fetchPrerequisites = async () => {
-    if (services.length > 0) return; // Already loaded
+    if (providers.length > 0 || services.length > 0) return; // Already loaded
     setIsPrerequisitesLoading(true);
     try {
-        const servicesQuery = query(collection(db, "adminServices"), orderBy("name"));
-        const subCatsQuery = query(collection(db, "adminSubCategories"), orderBy("name"));
-        const catsQuery = query(collection(db, "adminCategories"), orderBy("name"));
-        
-        const [servicesSnap, subCatsSnap, catsSnap] = await Promise.all([
-            getDocs(servicesQuery), getDocs(subCatsQuery), getDocs(catsQuery)
-        ]);
+      const servicesQuery = query(collection(db, "adminServices"), orderBy("name"));
+      const subCatsQuery = query(collection(db, "adminSubCategories"), orderBy("name"));
+      const catsQuery = query(collection(db, "adminCategories"), orderBy("name"));
+      const provsQuery = query(collection(db, "providerApplications"));
+      
+      const [servicesSnap, subCatsSnap, catsSnap, provsSnap] = await Promise.all([
+        getDocs(servicesQuery), getDocs(subCatsQuery), getDocs(catsQuery), getDocs(provsQuery)
+      ]);
 
-        setServices(servicesSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name as string, subCategoryId: doc.data().subCategoryId as string })));
-        setSubCategories(subCatsSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name as string, parentId: doc.data().parentId as string })));
-        setParentCategories(catsSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name as string })));
+      setServices(servicesSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name as string, subCategoryId: doc.data().subCategoryId as string })));
+      setSubCategories(subCatsSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name as string, parentId: doc.data().parentId as string })));
+      setParentCategories(catsSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name as string })));
+
+      const fetchedProvs: ReviewTargetProvider[] = provsSnap.docs
+        .map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            fullName: d.fullName || 'Daily Labour Provider',
+            workCategoryName: d.workCategoryName || d.categoryName || '',
+            seniorityLevel: d.seniorityLevel || 'experienced',
+            profilePhotoUrl: d.profilePhotoUrl || d.photoUrl || '',
+          };
+        })
+        .filter((p) => Boolean(p.fullName));
+      setProviders(fetchedProvs);
+
     } catch (error) {
-        console.error("Error fetching prerequisites:", error);
-        toast({ title: "Error", description: "Could not load service data.", variant: "destructive" });
+      console.error("Error fetching prerequisites:", error);
+      toast({ title: "Error", description: "Could not load provider or service data.", variant: "destructive" });
     } finally {
-        setIsPrerequisitesLoading(false);
+      setIsPrerequisitesLoading(false);
     }
   };
 
@@ -134,12 +150,14 @@ export default function AdminReviewsPage() {
     }
   };
 
-  const handleFormSubmit = async (data: ReviewFormData & { serviceName: string, adminCreated: boolean, id?: string }) => {
+  const handleFormSubmit = async (data: ReviewFormData & { serviceName: string; providerId?: string; providerName?: string; adminCreated: boolean; id?: string }) => {
     setIsSubmitting(true);
     
-    const payload: Omit<FirestoreReview, 'id' | 'createdAt' | 'updatedAt'> & { updatedAt?: Timestamp, createdAt?: Timestamp } = {
+    const payload: Omit<FirestoreReview, 'id' | 'createdAt' | 'updatedAt'> & { updatedAt?: Timestamp; createdAt?: Timestamp } = {
       serviceId: data.serviceId,
       serviceName: data.serviceName,
+      providerId: data.providerId,
+      providerName: data.providerName,
       userName: data.userName,
       rating: data.rating,
       comment: data.comment,
@@ -156,6 +174,37 @@ export default function AdminReviewsPage() {
         await addDoc(collection(db, "adminReviews"), { ...payload, createdAt: Timestamp.now() });
         toast({ title: "Success", description: "Review added successfully." });
       }
+
+      // If review is linked to a provider, recalculate and update their aggregate rating in providerApplications
+      if (data.providerId) {
+        try {
+          const qProv = query(
+            collection(db, "adminReviews"),
+            where("providerId", "==", data.providerId),
+            where("status", "==", "Approved")
+          );
+          const snap = await getDocs(qProv);
+          let sum = 0;
+          let count = 0;
+          snap.forEach((d) => {
+            const r = d.data();
+            if (typeof r.rating === 'number') {
+              sum += r.rating;
+              count++;
+            }
+          });
+          if (count > 0) {
+            const avg = Number((sum / count).toFixed(1));
+            await updateDoc(doc(db, "providerApplications", data.providerId), {
+              rating: avg,
+              reviewCount: count,
+            });
+          }
+        } catch (aggErr) {
+          console.error("Could not recalculate provider aggregate rating:", aggErr);
+        }
+      }
+
       setIsFormOpen(false);
       setEditingReview(null);
     } catch (error) {
@@ -169,7 +218,7 @@ export default function AdminReviewsPage() {
   const handleChangeStatus = async (reviewId: string, newStatus: ReviewStatus) => {
      try {
         await updateDoc(doc(db, "adminReviews", reviewId), { status: newStatus, updatedAt: Timestamp.now()});
-        toast({title: "Status Updated", description: `Review status changed to ${newStatus}.`})
+        toast({title: "Status Updated", description: `Review status changed to ${newStatus}.`});
      } catch (error) {
         console.error("Error updating review status:", error);
         toast({title: "Error", description: "Could not update review status.", variant: "destructive"});
@@ -181,8 +230,13 @@ export default function AdminReviewsPage() {
       <Card>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle className="text-2xl flex items-center"><MessageSquare className="mr-2 h-6 w-6 text-primary" />Manage Reviews</CardTitle>
-            <CardDescription>Create, edit, delete, and manage the status of service reviews.</CardDescription>
+            <CardTitle className="text-2xl flex items-center">
+              <MessageSquare className="mr-2 h-6 w-6 text-primary" />
+              Manage Reviews
+            </CardTitle>
+            <CardDescription>
+              Create, edit, delete, and AI-generate verified customer reviews for Daily Labour providers.
+            </CardDescription>
           </div>
           <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
             <div className="w-full sm:min-w-[180px]">
@@ -270,7 +324,7 @@ export default function AdminReviewsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Service</TableHead>
+                  <TableHead>Provider / Service</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead className="text-center">Rating</TableHead>
                   <TableHead>Comment</TableHead>
@@ -289,7 +343,18 @@ export default function AdminReviewsPage() {
                 ) : (
                   filteredReviews.slice(0, displayLimit).map((review) => (
                     <TableRow key={review.id}>
-                      <TableCell className="font-medium text-xs max-w-[150px] truncate" title={review.serviceName}>{review.serviceName}</TableCell>
+                      <TableCell className="font-medium text-xs max-w-[170px]" title={review.providerName || review.serviceName}>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground truncate">{review.providerName || review.serviceName}</span>
+                          {review.providerName ? (
+                            <span className="text-[10px] text-primary font-medium flex items-center gap-1">
+                              <UserCheck className="h-3 w-3 inline" /> Daily Labour Provider
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">Service</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs">{review.userName}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center">
@@ -338,7 +403,7 @@ export default function AdminReviewsPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will permanently delete the review by &quot;{review.userName}&quot; for &quot;{review.serviceName}&quot;.
+                                  This will permanently delete the review by &quot;{review.userName}&quot; for &quot;{review.providerName || review.serviceName}&quot;.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -382,28 +447,29 @@ export default function AdminReviewsPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingReview(null); } }}>
         <DialogContent className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] p-0 flex flex-col">
-           <DialogHeader className="p-3 pb-4 border-b bg-background z-10"> {/* Removed sticky, header will scroll */}
+          <DialogHeader className="p-3 pb-4 border-b bg-background z-10">
             <DialogTitle>{editingReview ? 'Edit Review' : 'Add New Review'}</DialogTitle>
             <DialogDescription>
-              {editingReview ? `Update details for review by ${editingReview.userName}.` : 'Fill in the details for a new review.'}
+              {editingReview ? `Update details for review by ${editingReview.userName}.` : 'Fill in the details for a new review for a daily labour provider.'}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-grow overflow-y-auto"> {/* This div handles scrolling of the ReviewForm */}
+          <div className="flex-grow overflow-y-auto">
             {isLoading ? (
               <div className="p-3 py-8 text-center flex justify-center items-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary"/>
-                  <span className="ml-2">Loading services...</span>
+                  <span className="ml-2">Loading data...</span>
               </div>
-            ) : services.length === 0 && !editingReview ? (
+            ) : providers.length === 0 && services.length === 0 && !editingReview ? (
               <div className="p-3 py-8 text-center">
-                  <p className="text-destructive">Cannot add new reviews because no services exist.</p>
-                  <p className="text-muted-foreground text-sm mt-2">Please add at least one service first.</p>
+                  <p className="text-destructive">Cannot add new reviews because no providers or services exist.</p>
+                  <p className="text-muted-foreground text-sm mt-2">Please add at least one provider or service first.</p>
               </div>
             ) : (
               <ReviewForm
                   onSubmit={handleFormSubmit}
                   initialData={editingReview}
+                  providers={providers}
                   services={services}
                   onCancel={() => { setIsFormOpen(false); setEditingReview(null); }}
                   isSubmitting={isSubmitting}
@@ -416,6 +482,7 @@ export default function AdminReviewsPage() {
         isOpen={isBulkGenerateOpen}
         onClose={() => setIsBulkGenerateOpen(false)}
         onGenerationComplete={() => { /* onSnapshot handles refresh */ }}
+        providers={providers}
         services={services}
         subCategories={subCategories}
         parentCategories={parentCategories}

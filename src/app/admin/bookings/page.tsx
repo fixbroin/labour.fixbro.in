@@ -31,7 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency, getBookingScheduledTimestamp } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency, getBookingScheduledTimestamp, formatEndTimeDisplay } from '@/lib/utils';
 import AppImage from '@/components/ui/AppImage';
 import { getDashboardData, getArchivedBookings, type DashboardData } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
@@ -739,16 +739,18 @@ export default function AdminBookingsPage() {
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
 
-      if (newStatus === "Completed" && booking.providerId) {
+      if ((newStatus === "Completed" || newStatus === "InProgressByProvider") && booking.providerId) {
         const result = await updateBookingStatusByProviderAction(
           booking.id,
           booking.providerId,
           newStatus,
           additionalCharges,
-          finalizedPaymentMethod
+          finalizedPaymentMethod,
+          undefined,
+          true // Admin override to start/complete without requiring customer OTP
         );
         if (!result.success) {
-          throw new Error(result.message || "Failed to complete booking.");
+          throw new Error(result.message || `Failed to update booking to ${newStatus}.`);
         }
       } else {
         await updateDoc(doc(db, "bookings", booking.id), updateData);
@@ -1042,11 +1044,9 @@ export default function AdminBookingsPage() {
             </div>
           </div>
 
-          {booking.estimatedEndTime && (
-            <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md w-fit">
-              <History className="h-3 w-3 mr-1.5" />Ends: {formatDateInTimezone(booking.estimatedEndTime, appConfig.timezone, { day: '2-digit', month: '2-digit' })} {formatTimeInTimezone(booking.estimatedEndTime, appConfig.timezone)}
-            </div>
-          )}
+          <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md w-fit">
+            <Clock className="h-3 w-3 mr-1.5" />End Time: {formatEndTimeDisplay(booking.estimatedEndTime, booking.scheduledTimeSlot)}
+          </div>
 
           {/* Provider Assignment Status Banner */}
           <div>
@@ -1388,11 +1388,9 @@ export default function AdminBookingsPage() {
                                   <span>{b.scheduledTimeSlot}</span>
                                 </div>
                               </div>
-                              {b.estimatedEndTime && (
                                 <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit">
-                                  <History className="h-3 w-3 mr-1" />Ends: {formatDateInTimezone(b.estimatedEndTime, appConfig.timezone, { day: '2-digit', month: '2-digit' })} {formatTimeInTimezone(b.estimatedEndTime, appConfig.timezone)}
+                                  <Clock className="h-3 w-3 mr-1" />End Time: {formatEndTimeDisplay(b.estimatedEndTime, b.scheduledTimeSlot)}
                                 </div>
-                              )}
                             </div>
                           </TableCell>
                           <TableCell className="align-top pt-3">

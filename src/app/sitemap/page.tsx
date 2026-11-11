@@ -284,7 +284,7 @@ export default async function SitemapPage() {
                                         {services.map(service => (
                                             <li key={service.id} className="flex items-center gap-2 group">
                                                 <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20 group-hover:bg-primary transition-colors" />
-                                                <Link href={`/service/${service.slug}`} className="text-muted-foreground hover:text-primary text-xs transition-colors">{service.name}</Link>
+                                                <Link href={`/provider/${service.slug}`} className="text-muted-foreground hover:text-primary text-xs transition-colors">{service.name}</Link>
                                             </li>
                                         ))}
                                     </ul>

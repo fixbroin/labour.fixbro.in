@@ -463,3 +463,56 @@ export function getBookingScheduledTimestamp(b: any): number {
   return getTimestampMillis(b.createdAt);
 }
 
+
+/**
+ * Safely extracts and formats the service End Time for display.
+ * Displays simply the end time (e.g., "05:30 PM") set by admin/schedule.
+ * Never outputs "Invalid Date".
+ */
+export function formatEndTimeDisplay(endTime?: string | null, scheduledTimeSlot?: string | null): string {
+  if (endTime && typeof endTime === 'string') {
+    const trimmed = endTime.trim();
+    // Case 1: Already a time string like "05:30 PM" or "5:30 PM" or "05:30PM"
+    if (/^\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)$/i.test(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+    // Case 2: 24-hour time string like "17:30"
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      const [hStr, mStr] = trimmed.split(':');
+      let h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+    // Case 3: Valid date/timestamp string
+    if (trimmed !== 'Invalid Date' && !trimmed.includes('Invalid')) {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) {
+        try {
+          return new Intl.DateTimeFormat('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'Asia/Kolkata',
+          }).format(d);
+        } catch (e) {}
+      }
+    }
+  }
+
+  // Case 4: Extract end time from scheduledTimeSlot, e.g. "Full Day (09:30 AM - 05:30 PM)" or "09:30 AM - 05:30 PM"
+  if (scheduledTimeSlot && typeof scheduledTimeSlot === 'string') {
+    const match = scheduledTimeSlot.match(/-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    if (match && match[1]) {
+      const matched = match[1].trim().toUpperCase();
+      if (!matched.includes('AM') && !matched.includes('PM')) {
+        return `${matched} PM`;
+      }
+      return matched;
+    }
+  }
+
+  // Default fallback to standard working end time set by admin
+  return '05:30 PM';
+}

@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, ShoppingCart, Clock, Users, Ban, Percent, ChevronRight, Info } from 'lucide-react';
+import { Star, ShoppingCart, Clock, Users, Ban, Percent, ChevronRight, Info, Briefcase, MapPin, Calendar } from 'lucide-react';
 import type { FirestoreService } from '@/types/firestore';
 import QuantitySelector from '@/components/shared/QuantitySelector';
 import { getCartEntries, saveCartEntries, syncCartToFirestore } from '@/lib/cartManager';
@@ -204,12 +204,12 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
   };
 
   const handleNavigation = useCallback(() => {
-    const intendedHref = `/service/${service.slug}`;
+    const intendedHref = service.isProvider ? `/provider/${service.slug}` : `/service/${service.slug}`;
     if (intendedHref !== currentPathname) {
       showLoading();
       router.push(intendedHref);
     }
-  }, [service.slug, currentPathname, showLoading, router]);
+  }, [service.isProvider, service.slug, currentPathname, showLoading, router]);
 
   const taskTimeDisplay = service.taskTimeValue && service.taskTimeUnit ? `${service.taskTimeValue}${service.taskTimeUnit.charAt(0)}` : null;
   const displayImageUrl = service.imageUrl && service.imageUrl.trim() !== '' ? service.imageUrl : "/default-image.png";
@@ -218,13 +218,14 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
   const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity, symbol, decimals, code);
   
   const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
+  const cardHref = service.isProvider ? `/provider/${service.slug}` : `/service/${service.slug}`;
 
   return (
     <div className="relative block my-2 w-full group">
     <Link 
-      href={`/service/${service.slug}`}
+      href={cardHref}
       onClick={(e: React.MouseEvent) => {
-        if (currentPathname === `/service/${service.slug}`) {
+        if (currentPathname === cardHref) {
           e.preventDefault();
         } else {
           showLoading();
@@ -236,16 +237,62 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
         <div className="flex flex-row md:hidden w-full gap-3">
           {/* Left Side (Details) - Mobile */}
           <div className="flex-1 flex flex-col">
-            <h3 className="font-bold text-base font-headline leading-tight text-foreground line-clamp-3 group-hover:text-primary transition-colors">{service.name}</h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="font-bold text-base font-headline leading-tight text-foreground line-clamp-2 group-hover:text-primary transition-colors">{service.name}</h3>
+              {service.parentCategoryName && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-secondary/40 text-foreground/80 border-border/50 font-medium">
+                  {service.parentCategoryName}
+                </Badge>
+              )}
+              {service.seniorityLevel && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20 font-medium">
+                  {service.seniorityLevel}
+                </Badge>
+              )}
+              {service.distanceKm !== undefined && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200 font-semibold flex items-center gap-0.5 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+                  <MapPin className="h-2.5 w-2.5" />
+                  {service.distanceKm.toFixed(1)} km
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{service.description}</p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
-                <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
-                {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
-                {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground mt-2">
+                {service.isProvider ? (
+                  <>
+                    {service.experienceLevelLabel && (
+                      <div className="flex items-center gap-1" title="Experience">
+                        <Briefcase className="h-3 w-3 text-primary"/>
+                        <span>{service.experienceLevelLabel}</span>
+                      </div>
+                    )}
+                    {service.age ? (
+                      <div className="flex items-center gap-1" title="Age">
+                        <Users className="h-3 w-3 text-primary"/>
+                        <span>{service.age} yrs</span>
+                      </div>
+                    ) : null}
+                    {service.rating > 0 ? (
+                      <div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}>
+                        <Star className="h-3 w-3 text-amber-500 fill-amber-400" />
+                        <span>{service.rating.toFixed(1)}</span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
+                    {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Working time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
+                    {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
+                  </>
+                )}
             </div>
             <div className="flex flex-wrap items-baseline gap-2 mt-2">
-                <p className="text-lg font-bold text-foreground">{mainPrice}</p>
-                {priceSuffix && (
+                <p className="text-lg font-bold text-foreground">
+                  {mainPrice}
+                  {service.isProvider && <span className="text-xs font-normal text-muted-foreground ml-1">/ day</span>}
+                </p>
+                {priceSuffix && !service.isProvider && (
                      <p className="text-sm text-muted-foreground">
                        {priceSuffix.includes(symbol) || /\d/.test(priceSuffix) ? (
                          <span className="line-through">{priceSuffix}</span>
@@ -254,19 +301,6 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                        )}
                      </p>
                 )}
-                 {promoText && (
-                          <Badge 
-                            className="bg-green-600 text-white text-[10px] font-semibold px-2 py-1 rounded mt-1 flex items-center gap-1">
-                               {!service.hasPriceVariants && (
-                                <Percent className="w-3 h-3" strokeWidth={2.75} />
-                                )} {promoText}
-                         </Badge>
-                )}
-                {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
-                  <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 w-fit">
-                    <Info className="h-3 w-3" /> Min. {service.minQuantity} units required
-                  </div>
-                )}
             </div>
             <div className="text-sm text-primary font-medium mt-1 flex items-center">
                 View Details <ChevronRight className="h-3 w-3 ml-0.5 group-hover:translate-x-1 transition-transform" />
@@ -274,7 +308,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
           </div>
           {/* Right Side (Image & Actions) - Mobile */}
           <div className="flex flex-col items-center justify-between flex-shrink-0 w-28">
-            <div className="relative w-full h-28">
+            <div className="relative w-full h-28 rounded-lg overflow-hidden border">
                 <AppImage src={displayImageUrl} alt={service.name} fill sizes="112px" className="object-cover rounded-lg group-hover:scale-105 transition-transform duration-500" data-ai-hint={aiHintValue} priority={priority}/>
             </div>
             <div className="w-full mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
@@ -282,7 +316,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                     <Button size="sm" className="h-9 rounded-md px-4 w-full" disabled><Ban className="mr-1.5 h-4 w-4"/>Unavailable</Button>
                 ) : quantity === 0 ? (
                     <Button size="sm" className="h-9 rounded-md px-4 w-full" onClick={(e) => { e.preventDefault(); handleInitialAddToCart(e); }}>
-                        <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add
+                        <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Book
                     </Button>
                 ) : (
                     <QuantitySelector initialQuantity={quantity} onQuantityChange={handleQuantityChange} minQuantity={0} enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0} maxQuantity={service.maxQuantity}/>
@@ -293,32 +327,83 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
 
         {/* Desktop Layout */}
         <div className="hidden md:flex flex-row items-center w-full gap-4">
-            <div className="relative w-40 h-40 flex-shrink-0">
+            <div className="relative w-36 h-36 flex-shrink-0 rounded-xl overflow-hidden border">
                 <AppImage
                     src={displayImageUrl}
                     alt={service.name}
                     fill
-                    sizes="128px"
-                    className="object-cover rounded-lg group-hover:scale-105 transition-transform duration-500"
+                    sizes="144px"
+                    className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-500"
                     data-ai-hint={aiHintValue}
                     priority={priority}
                 />
             </div>
             <div className="flex-1 flex flex-col self-stretch">
-                <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-2 group-hover:text-primary transition-colors">{service.name}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1 group-hover:text-primary transition-colors">{service.name}</h3>
+                  {service.parentCategoryName && (
+                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-secondary/40 text-foreground/80 border-border/50 font-medium">
+                      {service.parentCategoryName}
+                    </Badge>
+                  )}
+                  {service.seniorityLevel && (
+                    <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-primary/10 text-primary border-primary/20 font-medium">
+                      {service.seniorityLevel}
+                    </Badge>
+                  )}
+                  {service.distanceKm !== undefined && (
+                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200 font-semibold flex items-center gap-1 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+                      <MapPin className="h-3 w-3" />
+                      {service.distanceKm.toFixed(1)} km away
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{service.description}</p>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-2">
-                    <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
-                    {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
-                    {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
-                    {service.reviewCount !== undefined && service.reviewCount > 0 && <span className="text-muted-foreground/80">({service.reviewCount})</span>}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground mt-2">
+                    {service.isProvider ? (
+                      <>
+                        {service.experienceLevelLabel && (
+                          <div className="flex items-center gap-1.5" title="Experience">
+                            <Briefcase className="h-4 w-4 text-primary"/>
+                            <span>{service.experienceLevelLabel}</span>
+                          </div>
+                        )}
+                        {service.age ? (
+                          <div className="flex items-center gap-1.5" title="Age">
+                            <Users className="h-4 w-4 text-primary"/>
+                            <span>{service.age} yrs</span>
+                          </div>
+                        ) : null}
+                        {service.rating > 0 ? (
+                          <div className="flex items-center gap-1.5" title={`${service.rating.toFixed(1)} rating`}>
+                            <Star className="h-4 w-4 text-amber-500 fill-amber-400" />
+                            <span>{service.rating.toFixed(1)}</span>
+                          </div>
+                        ) : null}
+                        {service.workingHours?.start && (
+                          <div className="flex items-center gap-1.5" title="Working Hours">
+                            <Clock className="h-4 w-4 text-primary"/>
+                            <span>{service.workingHours.start} - {service.workingHours.end}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
+                        {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Working time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
+                        {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
+                      </>
+                    )}
                 </div>
                 <div className="flex-grow"></div>
                 <div className="flex items-end justify-between">
                      <div>
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                            <p className="text-xl font-bold text-foreground">{mainPrice}</p>
-                            {priceSuffix && (
+                            <p className="text-xl font-bold text-foreground">
+                              {mainPrice}
+                              {service.isProvider && <span className="text-sm font-normal text-muted-foreground ml-1">/ day</span>}
+                            </p>
+                            {priceSuffix && !service.isProvider && (
                                 <p className="text-base text-muted-foreground">
                                   {priceSuffix.includes(symbol) || /\d/.test(priceSuffix) ? (
                                     <span className="line-through">{priceSuffix}</span>
@@ -326,20 +411,6 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                                     priceSuffix
                                   )}
                                 </p>
-                            )}
-                            
-                            {promoText && (
-                              <Badge 
-                                className="bg-green-600 text-white text-sm font-semibold px-2 py-1 rounded mt-1 flex items-center gap-1">
-                                   {!service.hasPriceVariants && (
-                                   <Percent className="w-4 h-4" strokeWidth={2.75} />
-                                  )}{promoText}
-                             </Badge>
-                            )}
-                            {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
-                              <div className="flex items-center gap-1.5 text-xs text-amber-600 font-bold mt-1 bg-amber-50 px-2 py-1 rounded border border-amber-100 w-fit">
-                                <Info className="h-4 w-4" /> Min. {service.minQuantity} units required
-                              </div>
                             )}
                         </div>
                         <div className="text-sm text-primary font-medium mt-1 flex items-center">
@@ -354,7 +425,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                     <Button size="lg" className="h-10 rounded-md w-full" disabled><Ban className="mr-1.5 h-4 w-4"/>Unavailable</Button>
                  ) : quantity === 0 ? (
                     <Button size="lg" className="h-10 rounded-md w-full" onClick={(e) => { e.preventDefault(); handleInitialAddToCart(e); }}>
-                        <ShoppingCart className="mr-1.5 h-4 w-4" />Add
+                        <ShoppingCart className="mr-1.5 h-4 w-4" /> Book
                     </Button>
                  ) : (
                     <QuantitySelector initialQuantity={quantity} onQuantityChange={handleQuantityChange} minQuantity={0} enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0} maxQuantity={service.maxQuantity}/>

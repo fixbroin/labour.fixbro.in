@@ -145,7 +145,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{service.description}</p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
                 <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>1</span></div>
-                {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
+                {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Working time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
                 {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
             </div>
             <div className="flex items-baseline gap-2 mt-2">
@@ -192,7 +192,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                 <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{service.description}</p>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-2">
                     <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>1</span></div>
-                    {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
+                    {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Working time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
                     {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
                 </div>
                 {/* Spacer */}

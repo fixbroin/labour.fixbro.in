@@ -150,14 +150,14 @@ export async function GET(req: NextRequest) {
             const popularServicesQuery = db.collection('adminServices').where('isActive', '==', true).orderBy('rating', 'desc').orderBy('reviewCount', 'desc').limit(5);
             const popularServicesSnapshot = await popularServicesQuery.get();
             const popularServices = popularServicesSnapshot.docs.map(doc => doc.data() as FirestoreService);
-            popularServicesHtml = `<ul>${popularServices.map(s => `<li><a href="${baseUrl}/service/${s.slug}">${s.name}</a></li>`).join('')}</ul>`;
+            popularServicesHtml = `<ul>${popularServices.map(s => `<li><a href="${baseUrl}/provider/${s.slug}">${s.name}</a></li>`).join('')}</ul>`;
             
             const popularCategoriesSnapshot = await db.collection("adminCategories").orderBy('order', 'asc').limit(5).get();
             const popularCategories = popularCategoriesSnapshot.docs.map(doc => doc.data() as FirestoreCategory);
             popularCategoriesHtml = `<ul>${popularCategories.map(c => `<li><a href="${baseUrl}/category/${c.slug}">${c.name}</a></li>`).join('')}</ul>`;
 
             // All Content
-            allServicesHtml = `<ul>${allServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+            allServicesHtml = `<ul>${allServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/provider/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
             allCategoriesHtml = `<ul>${allCategoriesSnap.docs.map(doc => `<li><a href="${baseUrl}/category/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
             
             contentLoaded = true;
@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
             if (subCatIds.length > 0) {
                 const categoryServicesSnap = await db.collection("adminServices").where("subCategoryId", "in", subCatIds).where("isActive", "==", true).orderBy("name", "asc").get();
                 if (!categoryServicesSnap.empty) {
-                    html = `<ul>${categoryServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+                    html = `<ul>${categoryServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/provider/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
                 }
             }
             categoryServicesCache.set(categoryIdToFetch, html);

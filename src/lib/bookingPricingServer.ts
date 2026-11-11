@@ -46,6 +46,18 @@ export async function calculateServerBookingTotal(
   const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : {};
   const currency = appConfig.currencyCode || 'INR';
 
+  // Fetch Provider Default Settings for adminMarkupFee
+  let adminMarkupFee = 200;
+  try {
+    const provSettingsSnap = await adminDb.collection('webSettings').doc('providerDefaultSettings').get();
+    if (provSettingsSnap.exists) {
+      const ps = provSettingsSnap.data() as any;
+      if (typeof ps?.adminMarkupFee === 'number') {
+        adminMarkupFee = ps.adminMarkupFee;
+      }
+    }
+  } catch (e) {}
+
   // 2. Fetch and resolve each service from database
   let baseSubTotal = 0;
   let totalItemTax = 0;
@@ -55,36 +67,73 @@ export async function calculateServerBookingTotal(
   for (const entry of cartEntries) {
     if (!entry.serviceId || !entry.quantity || entry.quantity < 1) continue;
 
-    const serviceDoc = await adminDb.collection('adminServices').doc(entry.serviceId).get();
+    let serviceDoc = await adminDb.collection('adminServices').doc(entry.serviceId).get();
+    let isProviderService = false;
+    let providerData: any = null;
+
     if (!serviceDoc.exists) {
-      throw new Error(`Service "${entry.serviceId}" does not exist in catalog.`);
+      const provDoc = await adminDb.collection('providerApplications').doc(entry.serviceId).get();
+      if (provDoc.exists) {
+        isProviderService = true;
+        providerData = provDoc.data();
+      } else {
+        throw new Error(`Service or Provider "${entry.serviceId}" does not exist in catalog.`);
+      }
     }
 
-    const serviceData = serviceDoc.data() as FirestoreService;
     const qty = Math.max(1, Math.floor(entry.quantity));
-    const displayedPrice = calculateIncrementalTotalPriceForItem(serviceData, qty);
-    sumOfDisplayedItemPrices += displayedPrice;
 
-    const taxRate = (serviceData.taxPercent || 0) > 0 ? serviceData.taxPercent || 0 : 0;
-    const isTaxInclusive = serviceData.isTaxInclusive === true;
-    const basePrice = getBasePriceForInvoice(displayedPrice, isTaxInclusive, taxRate);
-    const taxAmount = basePrice * (taxRate / 100);
+    if (isProviderService && providerData) {
+      const baseDailyRate = Number(providerData.dailyRate) || 1200;
+      const dailyRate = baseDailyRate + adminMarkupFee;
+      const displayedPrice = dailyRate * qty;
+      sumOfDisplayedItemPrices += displayedPrice;
+      baseSubTotal += displayedPrice;
 
-    baseSubTotal += basePrice;
-    totalItemTax += taxAmount;
+      resolvedServices.push({
+        serviceId: entry.serviceId,
+        name: providerData.fullName || 'Daily Labour Provider',
+        quantity: qty,
+        pricePerUnit: dailyRate,
+        discountedPricePerUnit: dailyRate,
+        isTaxInclusive: true,
+        taxPercentApplied: 0,
+        taxAmountForItem: 0,
+        _basePriceForBooking: dailyRate,
+        baseDailyRate,
+        adminMarkupFee,
+        imageUrl: providerData.profilePhotoUrl || null,
+        providerId: entry.serviceId,
+        providerUserId: providerData.userId || entry.serviceId,
+        providerPhone: providerData.mobileNumber || providerData.phone || '',
+        isProvider: true,
+      });
+    } else {
+      const serviceData = serviceDoc.data() as FirestoreService;
+      const displayedPrice = calculateIncrementalTotalPriceForItem(serviceData, qty);
+      sumOfDisplayedItemPrices += displayedPrice;
 
-    resolvedServices.push({
-      serviceId: entry.serviceId,
-      name: serviceData.name,
-      quantity: qty,
-      pricePerUnit: displayedPrice / qty,
-      discountedPricePerUnit: serviceData.discountedPrice || null,
-      isTaxInclusive,
-      taxPercentApplied: taxRate,
-      taxAmountForItem: taxAmount,
-      _basePriceForBooking: basePrice / qty,
-      imageUrl: serviceData.imageUrl || null,
-    });
+      const taxRate = (serviceData.taxPercent || 0) > 0 ? serviceData.taxPercent || 0 : 0;
+      const isTaxInclusive = serviceData.isTaxInclusive === true;
+      const basePrice = getBasePriceForInvoice(displayedPrice, isTaxInclusive, taxRate);
+      const taxAmount = basePrice * (taxRate / 100);
+
+      baseSubTotal += basePrice;
+      totalItemTax += taxAmount;
+
+      resolvedServices.push({
+        serviceId: entry.serviceId,
+        name: serviceData.name,
+        quantity: qty,
+        pricePerUnit: displayedPrice / qty,
+        discountedPricePerUnit: serviceData.discountedPrice || null,
+        isTaxInclusive,
+        taxPercentApplied: taxRate,
+        taxAmountForItem: taxAmount,
+        _basePriceForBooking: basePrice / qty,
+        imageUrl: serviceData.imageUrl || null,
+      });
+    }
   }
 
   if (resolvedServices.length === 0) {
@@ -115,11 +164,12 @@ export async function calculateServerBookingTotal(
   const vcAmount = typeof customVisitingCharge === 'number' ? customVisitingCharge : (appConfig.visitingChargeAmount || 0);
   const minBooking = typeof customMinBooking === 'number' ? customMinBooking : (appConfig.minimumBookingAmount || 0);
 
-  // 4. Visiting Charge Calculation
+  // 4. Visiting Charge Calculation (Zero for Daily Labour Providers)
   let baseVisitingCharge = 0;
   let visitingChargeTax = 0;
+  const hasProviderServices = resolvedServices.some(s => s.isProvider);
 
-  if (appConfig.enableMinimumBookingPolicy && minBooking > 0 && vcAmount > 0) {
+  if (!hasProviderServices && appConfig.enableMinimumBookingPolicy && minBooking > 0 && vcAmount > 0) {
     if (sumOfDisplayedItemPrices < minBooking) {
       const isVcTaxInclusive = !!appConfig.isVisitingChargeTaxInclusive;
       const vcTaxPercent = appConfig.visitingChargeTaxPercent || 0;

@@ -51,6 +51,8 @@ const StickyCartContinueButton = () => {
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
   const [cartItemCount, setCartItemCount] = useState(0);
+  const [distinctPersonsCount, setDistinctPersonsCount] = useState(0);
+  const [totalDaysCount, setTotalDaysCount] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
@@ -62,22 +64,49 @@ const StickyCartContinueButton = () => {
   const updateCartState = async () => {
     setIsLoadingPrice(true);
     const entries = getCartEntries();
-    const totalItems = entries.reduce((sum, entry) => sum + entry.quantity, 0);
-    setCartItemCount(totalItems);
+    const distinctPersons = entries.length;
+    const totalDays = entries.reduce((sum, entry) => sum + entry.quantity, 0);
+    setDistinctPersonsCount(distinctPersons);
+    setTotalDaysCount(totalDays);
+    setCartItemCount(totalDays);
 
-    if (totalItems > 0) {
+    if (totalDays > 0) {
         let calculatedTotal = 0;
         try {
+            let markupFee = 200;
+            try {
+                const stored = localStorage.getItem('fixbro_provider_default_settings');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (typeof parsed?.adminMarkupFee === 'number') markupFee = parsed.adminMarkupFee;
+                }
+            } catch (e) {}
+
             const servicePromises = entries.map(entry => getDoc(doc(db, "adminServices", entry.serviceId)));
             const serviceDocs = await Promise.all(servicePromises);
             
-            entries.forEach((entry, index) => {
+            for (let index = 0; index < entries.length; index++) {
+                const entry = entries[index];
                 const serviceDoc = serviceDocs[index];
-                if (serviceDoc.exists()) {
+                if (serviceDoc && serviceDoc.exists()) {
                     const serviceData = serviceDoc.data() as FirestoreService;
-                    calculatedTotal += calculateIncrementalTotalPriceForItem(serviceData, entry.quantity);
+                    const itemPrice = calculateIncrementalTotalPriceForItem(serviceData, entry.quantity);
+                    calculatedTotal += serviceData.isProvider ? itemPrice + (markupFee * entry.quantity) : itemPrice;
+                } else {
+                    // Daily Labour Provider application lookup
+                    try {
+                        const provDoc = await getDoc(doc(db, "providerApplications", entry.serviceId));
+                        if (provDoc && provDoc.exists()) {
+                            const provData = provDoc.data() as any;
+                            const baseDailyRate = Number(provData.dailyRate) || 1200;
+                            const dailyRate = baseDailyRate + markupFee;
+                            calculatedTotal += dailyRate * entry.quantity;
+                        }
+                    } catch (provErr) {
+                        console.error("Error looking up provider in sticky cart:", provErr);
+                    }
                 }
-            });
+            }
             setTotalPrice(calculatedTotal);
         } catch (error) {
             console.error("Error calculating total price for sticky cart:", error);
@@ -99,9 +128,17 @@ const StickyCartContinueButton = () => {
       }
     };
 
+    const handleLocalCartChange = () => {
+      updateCartState();
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('fixbroCartUpdated', handleLocalCartChange);
+    window.addEventListener('cartUpdated', handleLocalCartChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('fixbroCartUpdated', handleLocalCartChange);
+      window.removeEventListener('cartUpdated', handleLocalCartChange);
     };
   }, []);
  
@@ -141,8 +178,10 @@ const StickyCartContinueButton = () => {
       {formatCurrency(totalPrice, symbol, decimals, code)}
     </span>
   )}
-  <span className="text-sm text-muted-foreground">
-    {cartItemCount} service(s)
+  <span className="text-xs sm:text-sm leading-tight text-muted-foreground font-medium">
+    {distinctPersonsCount > 1
+      ? `${distinctPersonsCount} persons`
+      : `${totalDaysCount} ${totalDaysCount === 1 ? 'day' : 'days'}`}
   </span>
 </div>
         <Link href="/cart" onClick={handleNavigateToCart} passHref>

@@ -63,17 +63,16 @@ const prompt = ai.definePrompt({
   },
 
   prompt: `
-You are an advanced Local SEO expert for Fixbro.
+You are an advanced Local SEO expert for Fixbro Daily Labour.
 
-Fixbro provides (strictly prioritize in this order):
-1. Carpenter services (Top Priority #1)
-2. TV installation services (Priority #2)
-3. Interior services (Priority #3)
-4. Electrician services
-5. Plumbing services
-6. Painting services
-7. Furniture assembly services
-8. Home repair services
+Fixbro Daily Labour provides verified daily wage workers for full-day on-site labour:
+1. Carpenter daily labour (Top Priority #1)
+2. Painting daily labour (Priority #2)
+3. Electrician daily labour (Priority #3)
+4. Plumbing daily labour
+5. Masonry & construction labour
+6. Helpers & general daily labour
+7. Renovation & interior daily workers
 
 TARGET CITY:
 {{cityName}}
@@ -81,15 +80,15 @@ TARGET CITY:
 IMPORTANT SEO RULES:
 
 1. Focus strongly on high-search keywords:
-- carpenter near me
-- tv installation near me
-- interior designers near me
-- electrician near me
-- plumber near me
-- painting services near me
-- furniture assembly near me
+- daily labour near me
+- carpenter daily labour near me
+- painter daily labour near me
+- electrician daily labour near me
+- daily wage workers near me
+- hire daily labour in {{cityName}}
+- daily labour {{cityName}}
 
-2. NEVER use the word "handyman" (nobody in India searches for handyman; use "home services", specific category names like carpenter, tv installation, interior, and "near me" keywords).
+2. NEVER use the word "handyman" (nobody in India searches for handyman; use "daily labour", "daily wage workers", and specific trade names like carpenter, painter, electrician).
 Avoid overusing:
 - best
 - top-rated
@@ -114,28 +113,27 @@ OUTPUT RULES:
 
 1. h1_title
 Format:
-"Carpenter, TV Installation & Home Services in {{cityName}}"
+"Daily Labour in {{cityName}}" or "Carpenter, Painter & Daily Labour in {{cityName}}"
 
 2. seo_title
 Rules:
 - Strictly 35 to 55 characters
 - NEVER include brand/company name (e.g. Fixbro, FixBro). The website template automatically appends it.
-- Format: "Home Services in {{cityName}} | Near Me" or "Carpenter, TV Installation in {{cityName}} | Near Me"
+- Format: "Daily Labour in {{cityName}} | Near Me" or "Carpenter & Daily Labour in {{cityName}} | Near Me"
 - Natural, search optimized
 
 3. seo_description
 Rules:
 - Strictly under 155 characters
 - Mention:
-  - "Home services in {{cityName}} near you"
-  - trusted verified experts
-  - carpenter, TV installation & interior
-  - upfront pricing & same-day visit
+  - "Hire verified daily labour in {{cityName}} near you"
+  - verified daily wage trade workers
+  - full-day booking & upfront daily rates
   - call to action: "Book online now!"
 - NEVER include company name (template appends it).
 
 Example:
-"Book trusted home services in Bangalore near you. Verified carpenter, TV installation & interior doorstep visit with upfront pricing. Book online now!"
+"Hire verified daily labour in {{cityName}} near you. Background-checked daily wage workers for full-day work with upfront daily rates. Book online now!"
 
 4. seo_keywords
 Rules:
@@ -144,16 +142,16 @@ Rules:
 - Use high search intent keywords
 
 Example:
-carpenter bangalore,
-carpenter near me bangalore,
-tv installation bangalore,
-tv installation near me bangalore,
-interior designers bangalore,
-electrician bangalore,
-plumber bangalore,
-furniture assembly bangalore,
-painting services bangalore,
-home services near me bangalore
+daily labour {{cityName}},
+daily labour near me,
+carpenter daily labour {{cityName}},
+painter daily labour {{cityName}},
+electrician daily labour {{cityName}},
+daily wage workers {{cityName}},
+hire daily labour {{cityName}},
+full day daily labour {{cityName}},
+local daily labour {{cityName}},
+daily wage carpenter near me
 
 Generate highly optimized city SEO now.
 `,

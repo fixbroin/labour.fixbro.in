@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock } from "lucide-react"; // Added Phone
+import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock, KeyRound, ShieldCheck } from "lucide-react"; // Added Phone
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
@@ -25,7 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import AppImage from "@/components/ui/AppImage";
 import { triggerPushNotification } from "@/lib/fcmUtils";
 import { ADMIN_EMAIL } from "@/contexts/AuthContext";
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatCurrency } from "@/lib/utils";
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatCurrency, formatEndTimeDisplay } from "@/lib/utils";
 
 
 // Enriched booking type to include provider details
@@ -690,14 +690,12 @@ export default function MyBookingsPage() {
                     <p className="text-muted-foreground">Time Slot</p>
                     <p className="font-medium">{booking.scheduledTimeSlot}</p>
                   </div>
-                  {booking.estimatedEndTime && (
-                    <div>
-                      <p className="text-muted-foreground text-green-600 font-semibold">Estimated Completion</p>
-                      <p className="font-medium text-green-700">
-                        {formatDateInTimezone(booking.estimatedEndTime, appConfig.timezone, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {formatTimeInTimezone(booking.estimatedEndTime, appConfig.timezone)}
-                      </p>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-muted-foreground text-emerald-600 font-semibold">End Time</p>
+                    <p className="font-bold text-emerald-700">
+                      {formatEndTimeDisplay(booking.estimatedEndTime, booking.scheduledTimeSlot)}
+                    </p>
+                  </div>
                   {booking.dailyTimeline && booking.dailyTimeline.length > 1 && (
                     <div className="sm:col-span-2 md:col-span-3 py-2.5 px-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 rounded-xl space-y-2 text-sm text-muted-foreground my-1">
                       <p className="font-bold text-xs text-blue-800 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1">
@@ -748,6 +746,65 @@ export default function MyBookingsPage() {
                     <p className="text-muted-foreground">Booked On</p>
                     <p className="font-medium">{formatBookingTimestamp(booking.createdAt)}</p>
                   </div>
+
+                  {/* Dual OTP Job Security Box for Customers */}
+                  {(booking.status === 'Confirmed' || booking.status === 'AssignedToProvider' || booking.status === 'ProviderAccepted') && booking.startOtp && (
+                    <div className="sm:col-span-2 md:col-span-3 p-3.5 bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <KeyRound className="h-4 w-4 text-emerald-600" />
+                          <span className="font-bold text-sm text-emerald-800 dark:text-emerald-300">Job Start OTP</span>
+                        </div>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                          Share this 4-digit code with your service provider when they arrive on-site to begin work.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-4 py-2 rounded-lg border border-emerald-300 shadow-sm shrink-0">
+                        <span className="text-xl font-mono font-extrabold tracking-widest text-emerald-600">{booking.startOtp}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {booking.status === 'InProgressByProvider' && (
+                    <div className="sm:col-span-2 md:col-span-3 p-3.5 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-800 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <KeyRound className="h-4 w-4 text-blue-600" />
+                          <span className="font-bold text-sm text-blue-800 dark:text-blue-300">Job Completion OTP</span>
+                          <Badge variant="outline" className="bg-blue-100 text-blue-700 text-[10px] uppercase font-bold border-blue-300">
+                            Work In Progress
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                          Share this code with your provider ONLY when all scheduled work is fully completed.
+                        </p>
+                        {booking.workStartedAt && (
+                          <p className="text-[11px] text-muted-foreground pt-0.5">
+                            Work started: {formatBookingTimestamp(booking.workStartedAt)}
+                          </p>
+                        )}
+                      </div>
+                      {booking.completeOtp && (
+                        <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-4 py-2 rounded-lg border border-blue-300 shadow-sm shrink-0">
+                          <span className="text-xl font-mono font-extrabold tracking-widest text-blue-600">{booking.completeOtp}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {booking.status === 'Completed' && (booking.workedDuration || booking.workStartedAt) && (
+                    <div className="sm:col-span-2 md:col-span-3 p-3 bg-muted/40 border rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span>Work Duration: <strong className="text-foreground">{booking.workedDuration || 'Full Day'}</strong></span>
+                      </div>
+                      {booking.workStartedAt && booking.workCompletedAt && (
+                        <span className="text-muted-foreground">
+                          ({formatTimeInTimezone(new Date(getTimestampMillis(booking.workStartedAt)), 'Asia/Kolkata')} – {formatTimeInTimezone(new Date(getTimestampMillis(booking.workCompletedAt)), 'Asia/Kolkata')})
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {booking.providerDetails && shouldShowProviderDetails(booking.status) && (
                     <div className="sm:col-span-2 md:col-span-3 pt-4 border-t">

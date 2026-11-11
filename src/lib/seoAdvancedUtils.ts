@@ -105,7 +105,7 @@ export function stripBrandSuffix(title: string | undefined | null, brandName?: s
   if (!title) return '';
   let cleaned = title.trim();
 
-  const brands = ['fixbro', 'fixbro'];
+  const brands = ['fixbro daily labour', 'fixbro'];
   if (brandName && brandName.trim()) {
     brands.push(brandName.trim().toLowerCase());
   }

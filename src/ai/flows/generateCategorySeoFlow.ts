@@ -36,8 +36,8 @@ const prompt = ai.definePrompt({
   name: 'generateCategorySeoPrompt',
   input: { schema: GenerateCategorySeoInputSchema },
   output: { schema: GenerateCategorySeoOutputSchema },
-  prompt: `Local SEO Copywriter for Home Services.
-Generate high-conversion SEO content for category page.
+  prompt: `Local SEO Copywriter for Fixbro Daily Labour.
+Generate high-conversion SEO content for category daily labour page.
 
 Category: {{categoryName}}
 Trade: {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}}
@@ -45,10 +45,10 @@ City: {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}
 
 CRITICAL SEO RULES:
 1. NEVER include brand/company names (e.g. "Fixbro", "FixBro") in seo_title. The website template automatically appends it.
-2. seo_title MUST be strictly between 35 and 55 characters. Use trade noun. Format: "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} | {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Near Me" (or "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} | Near Me").
-3. seo_description MUST be under 155 characters: "Book trusted {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} near you. Doorstep service by verified experts, upfront pricing & same-day visit. Book online now!".
-4. seo_keywords MUST be 10 high-search phrases mixing category/trade + city and "near me".
-5. faqs MUST be 3-5 real customer questions regarding pricing, warranty, and same-day service.
+2. seo_title MUST be strictly between 35 and 55 characters. Format: "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Daily Labour in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} | Near Me" or "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Daily Labour | Near Me".
+3. seo_description MUST be under 155 characters: "Hire verified {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} daily labour in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} near you. Background-checked daily wage workers for full-day work. Book now!".
+4. seo_keywords MUST be 10 high-search phrases mixing category/trade + "daily labour" + city and "near me".
+5. faqs MUST be 3-5 real customer questions regarding daily labour shift hours (09:30 AM – 05:30 PM), daily wage rates, background checks, and OTP verification.
 
 Return ONLY valid JSON.`,
 });

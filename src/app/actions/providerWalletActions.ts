@@ -8,6 +8,7 @@ import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getPushTemplate } from '@/app/actions/pushSettingsActions';
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getTimestampMillis } from '@/lib/utils';
+import { getProviderDefaultSettingsAction } from '@/app/actions/providerDefaultSettingsActions';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
@@ -482,7 +483,9 @@ export async function updateBookingStatusByProviderAction(
   providerId: string,
   newStatus: string,
   additionalCharges?: { name: string; amount: number }[],
-  finalizedPaymentMethod?: string
+  finalizedPaymentMethod?: string,
+  enteredOtp?: string,
+  isAdminOverride?: boolean
 ) {
   try {
     const bookingDocRef = doc(db, 'bookings', bookingId);
@@ -507,7 +510,7 @@ export async function updateBookingStatusByProviderAction(
       updatedAt: Timestamp.now(),
     };
 
-    // 1. Acceptance Checks & Wallet Deductions
+    // 1. Acceptance Checks & Wallet Deductions (Pay After Service)
     if (newStatus === 'ProviderAccepted') {
       const paymentMethod = finalizedPaymentMethod || bookingData.paymentMethod || 'Pay After Service';
       
@@ -526,12 +529,26 @@ export async function updateBookingStatusByProviderAction(
           throw new Error(`Insufficient wallet balance. You must maintain at least ${symbol}${settings.minBalanceForJobs.toFixed(decimals)} in your prepaid wallet to accept cash jobs. Please top up your wallet.`);
         }
 
-        // Calculate commission (exclude platform fee and tax fee from commission base)
-        const commissionBase = (bookingData.subTotal || 0) + (bookingData.visitingCharge || 0) - (bookingData.discountAmount || 0);
-        const commission = calculateProviderFee(commissionBase, appConfig.providerFeeType, appConfig.providerFeeValue);
-        const platformFeeVal = bookingData.platformFeeTotal || 0;
-        const taxFeeVal = bookingData.taxAmount || 0;
-        const totalDeduction = commission + platformFeeVal + taxFeeVal;
+        // Daily Labour exact rule: customer hands total amount on-site. Admin markup fee + platform fee + tax auto-deducted from wallet.
+        let totalDeduction = 0;
+        let descriptionText = '';
+
+        if (typeof bookingData.providerTotalEarnings === 'number' && bookingData.providerTotalEarnings > 0) {
+          const providerEarnings = bookingData.providerTotalEarnings;
+          totalDeduction = Math.max(0, (bookingData.totalAmount || 0) - providerEarnings);
+          const adminFee = bookingData.adminMarkupFeeTotal || 0;
+          const platFee = bookingData.platformFeeTotal || 0;
+          const taxes = bookingData.taxAmount || 0;
+          descriptionText = `Admin Markup (${symbol}${adminFee.toFixed(decimals)}) + Platform Fee (${symbol}${platFee.toFixed(decimals)}) + Tax (${symbol}${taxes.toFixed(decimals)}) auto-deducted for Pay After Service Booking #${bookingData.bookingId}`;
+        } else {
+          // Fallback legacy calculation
+          const commissionBase = (bookingData.subTotal || 0) + (bookingData.visitingCharge || 0) - (bookingData.discountAmount || 0);
+          const commission = calculateProviderFee(commissionBase, appConfig.providerFeeType, appConfig.providerFeeValue);
+          const platformFeeVal = bookingData.platformFeeTotal || 0;
+          const taxFeeVal = bookingData.taxAmount || 0;
+          totalDeduction = commission + platformFeeVal + taxFeeVal;
+          descriptionText = `Commission (${symbol}${commission.toFixed(decimals)}) + Platform Fee (${symbol}${platformFeeVal.toFixed(decimals)}) + Tax Fee (${symbol}${taxFeeVal.toFixed(decimals)}) auto-deducted for Pay After Service Booking #${bookingData.bookingId}`;
+        }
 
         if (totalDeduction > 0) {
           // Deduct from wallet in MySQL
@@ -545,7 +562,7 @@ export async function updateBookingStatusByProviderAction(
             amount: -totalDeduction,
             type: 'commission_deduction',
             bookingId,
-            description: `Commission (${symbol}${commission.toFixed(decimals)}) + Platform Fee (${symbol}${platformFeeVal.toFixed(decimals)}) + Tax Fee (${symbol}${taxFeeVal.toFixed(decimals)}) auto-deducted for Pay After Service Booking #${bookingData.bookingId}`,
+            description: descriptionText,
             timestamp: Timestamp.now(),
           });
 
@@ -555,49 +572,98 @@ export async function updateBookingStatusByProviderAction(
       }
     }
 
-    // 2. Service completion payload enrichment
+    // 2. Start Work: OTP verification & start timestamp
+    if (newStatus === 'InProgressByProvider') {
+      const provSettings = await getProviderDefaultSettingsAction();
+      const requireOtp = provSettings?.requireOtpForJobStartComplete !== false;
+
+      if (requireOtp && !isAdminOverride) {
+        if (bookingData.startOtp) {
+          if (!enteredOtp || enteredOtp.trim() !== String(bookingData.startOtp).trim()) {
+            throw new Error("Invalid Start OTP. Please ask the customer for their 4-digit Start OTP to begin work.");
+          }
+        }
+      }
+
+      updateData.workStartedAt = Timestamp.now();
+    }
+
+    // 3. Complete Work: OTP verification, duration calculation, and earnings credit
     if (newStatus === "Completed") {
+      const provSettings = await getProviderDefaultSettingsAction();
+      const requireOtp = provSettings?.requireOtpForJobStartComplete !== false;
+
+      if (requireOtp && !isAdminOverride) {
+        if (bookingData.completeOtp) {
+          if (!enteredOtp || enteredOtp.trim() !== String(bookingData.completeOtp).trim()) {
+            throw new Error("Invalid Complete OTP. Please ask the customer for their 4-digit Complete OTP to finish work.");
+          }
+        }
+      }
+
+      const completedAt = Timestamp.now();
+      updateData.workCompletedAt = completedAt;
+
+      // Calculate worked duration
+      const startedAt = bookingData.workStartedAt || updateData.workStartedAt;
+      if (startedAt) {
+        const startMs = getTimestampMillis(startedAt) || (typeof startedAt === 'object' && startedAt.toMillis ? startedAt.toMillis() : Date.parse(startedAt));
+        const endMs = completedAt.toMillis ? completedAt.toMillis() : Date.now();
+        if (startMs && endMs && endMs > startMs) {
+          const diffMinutes = Math.floor((endMs - startMs) / 60000);
+          const hours = Math.floor(diffMinutes / 60);
+          const mins = diffMinutes % 60;
+          updateData.workedDuration = `${hours}h ${mins}m`;
+        } else {
+          updateData.workedDuration = "1h 0m";
+        }
+      }
+
       if (currentStatus !== "Completed") {
         updateData.isReviewedByCustomer = false;
       }
-      if (additionalCharges && additionalCharges.length > 0) {
-        updateData.additionalCharges = additionalCharges;
-        updateData.additionalChargesPaymentMethod = 'Pay After Service';
-        const totalCharges = additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
-        updateData.totalAmount = (bookingData.totalAmount || 0) + totalCharges;
 
-        // Calculate and deduct commission for additional charges
-        const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
-        const appConfig = configSnap.exists() ? configSnap.data() as any : {};
-        const extraCommission = appConfig.providerFeeType === 'percentage' 
-          ? calculateProviderFee(totalCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
-          : (totalCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
-
-        if (extraCommission > 0) {
-          const currentWalletBalance = providerData.providerWalletBalance || 0;
-          await updateDoc(providerUserRef, { 
-            providerWalletBalance: currentWalletBalance - extraCommission 
-          });
-
-          await addDoc(collection(db, 'providerWalletTransactions'), {
-            providerId,
-            amount: -extraCommission,
-            type: 'commission_deduction',
-            bookingId,
-            description: `Commission auto-deducted for extra work/charges on booking (ID: ${bookingData.bookingId || bookingId})`,
-            timestamp: Timestamp.now(),
-          });
-        }
-      }
-      // Core booking remains 'Online' if verified online proof exists
-      if (hasOnlineProof) {
+      // Daily Labour has fixed daily rates — no additional charges popup/logic.
+      // Online payment completion:
+      if (hasOnlineProof || bookingData.paymentMethod === 'Online') {
         updateData.paymentMethod = 'Online';
+        // Credit 100% of provider's set earnings to provider's withdrawable balance (Zero Commission)
+        const providerEarnings = typeof bookingData.providerTotalEarnings === 'number' && bookingData.providerTotalEarnings > 0
+          ? bookingData.providerTotalEarnings
+          : (bookingData.subTotal || bookingData.totalAmount || 0);
+
+        const currentWithdrawableBalance = providerData.withdrawableBalance || 0;
+        await updateDoc(providerUserRef, {
+          withdrawableBalance: currentWithdrawableBalance + providerEarnings,
+          totalEarnings: (providerData.totalEarnings || 0) + providerEarnings,
+        });
+
+        await addDoc(collection(db, 'providerWalletTransactions'), {
+          providerId,
+          amount: providerEarnings,
+          type: 'job_payment',
+          bookingId,
+          description: `Direct Daily Labour Earnings for Online Booking #${bookingData.bookingId} (100% withdrawable, 0% commission)`,
+          timestamp: Timestamp.now(),
+        });
       } else {
         updateData.paymentMethod = finalizedPaymentMethod || bookingData.paymentMethod || 'Pay After Service';
       }
     }
 
     await updateDoc(bookingDocRef, updateData);
+
+    revalidatePath('/provider');
+    revalidatePath(`/provider/booking/${bookingId}`);
+    revalidatePath('/provider/my-jobs');
+    revalidatePath('/provider/earnings');
+    revalidatePath('/my-bookings');
+    revalidatePath('/admin/bookings');
+    try {
+      await triggerRefresh('bookings');
+      await triggerRefresh('global-cache');
+    } catch (e) {}
+
     return { success: true };
   } catch (error: any) {
     console.error("Error in updateBookingStatusByProviderAction:", error);

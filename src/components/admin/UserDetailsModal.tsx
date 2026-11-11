@@ -491,7 +491,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
 
                   {/* Cart Total Summary */}
                   <div className="flex items-center justify-between p-3.5 rounded-2xl bg-primary/5 border border-primary/20">
-                    <span className="font-bold text-xs sm:text-sm text-foreground">Estimated Cart Total:</span>
+                    <span className="font-bold text-xs sm:text-sm text-foreground">Cart Total:</span>
                     <span className="font-black text-base sm:text-lg text-primary">
                       {symbol}{cartTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>

@@ -52,7 +52,7 @@ export async function GET() {
   services.forEach(service => {
     if (!service.slug) return;
 
-    const serviceUrl = `${baseUrl}/service/${service.slug}`;
+    const serviceUrl = `${baseUrl}/provider/${service.slug}`;
     const rawImage = service.imageUrl || '/android-chrome-512x512.png';
     const imageUrl = rawImage.startsWith('http') ? rawImage : `${baseUrl}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`;
     

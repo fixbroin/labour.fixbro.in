@@ -36,7 +36,7 @@ export const API_ENDPOINTS = {
 
   // Content Management APIs
   ADMIN_CATEGORIES: '/api/admin/categories',
-  ADMIN_SERVICES: '/api/admin/services',
+  ADMIN_SERVICES: '/api/admin/daily-providers',
   ADMIN_REVIEWS: '/api/admin/reviews',
   ADMIN_BLOG: '/api/admin/blog',
   ADMIN_FAQ: '/api/admin/faq',

@@ -86,14 +86,14 @@ const bulkMarketingEmailFlow = ai.defineFlow(
 
       // Popular Content
       const popularServicesSnap = await db.collection("adminServices").where("isActive", "==", true).orderBy("rating", "desc").limit(5).get();
-      const popularServicesHtml = `<ul style="${listStyle}">${popularServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/service/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
+      const popularServicesHtml = `<ul style="${listStyle}">${popularServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/provider/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       const popularCategoriesSnap = await db.collection("adminCategories").orderBy("order", "asc").limit(5).get();
       const popularCategoriesHtml = `<ul style="${listStyle}">${popularCategoriesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/category/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       // All Content
       const allServicesSnap = await db.collection("adminServices").where("isActive", "==", true).orderBy("name", "asc").get();
-      const allServicesHtml = `<ul style="${listStyle}">${allServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/service/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
+      const allServicesHtml = `<ul style="${listStyle}">${allServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/provider/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       const allCategoriesSnap = await db.collection("adminCategories").orderBy("order", "asc").get();
       const allCategoriesHtml = `<ul style="${listStyle}">${allCategoriesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/category/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
@@ -105,7 +105,7 @@ const bulkMarketingEmailFlow = ai.defineFlow(
         const subCatIds = subCatsSnap.docs.map(doc => doc.id);
         if (subCatIds.length > 0) {
             const categoryServicesSnap = await db.collection("adminServices").where("subCategoryId", "in", subCatIds).where("isActive", "==", true).orderBy("name", "asc").get();
-            categoryServicesHtml = `<ul style="${listStyle}">${categoryServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/service/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
+            categoryServicesHtml = `<ul style="${listStyle}">${categoryServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/provider/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
         }
       }
 

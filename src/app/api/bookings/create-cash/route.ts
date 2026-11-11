@@ -169,11 +169,45 @@ export async function POST(req: NextRequest) {
     const nextBookingNumber = await assignNewBookingNumber();
     const newBookingId = generateBookingId();
 
-    // 4. Construct Authoritative Booking Record
+    // 4. Generate Distinct Dual OTPs (Start OTP & Complete OTP)
+    const startOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    let completeOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    while (completeOtp === startOtp) {
+      completeOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+
+    // 5. Calculate Provider Direct Earnings vs Admin Markup
+    let providerDailyRate: number | undefined;
+    let providerTotalEarnings = 0;
+    let adminMarkupFeeTotal = 0;
+    let matchedProviderId: string | undefined;
+
+    for (const s of pricing.services) {
+      if (typeof s.baseDailyRate === 'number') {
+        providerDailyRate = s.baseDailyRate;
+        const qty = s.quantity || 1;
+        providerTotalEarnings += (s.baseDailyRate * qty);
+        adminMarkupFeeTotal += ((s.adminMarkupFee || 0) * qty);
+        if (!matchedProviderId && (s.providerUserId || s.providerId)) {
+          matchedProviderId = s.providerUserId || s.providerId;
+        }
+      }
+    }
+
+    // 6. Construct Authoritative Booking Record
     const newBookingData = {
       bookingId: newBookingId,
       bookingNumber: nextBookingNumber,
       ...(resolvedUserId && { userId: resolvedUserId }),
+      ...(matchedProviderId && { providerId: matchedProviderId }),
+      startOtp,
+      completeOtp,
+      ...(providerDailyRate !== undefined && { providerDailyRate }),
+      providerTotalEarnings: providerTotalEarnings > 0 ? providerTotalEarnings : pricing.subTotal,
+      adminMarkupFeeTotal: adminMarkupFeeTotal > 0 ? adminMarkupFeeTotal : 0,
+      workStartedAt: null,
+      workCompletedAt: null,
+      workedDuration: null,
       customerName: customerInfo.fullName || customerInfo.name || 'Guest User',
       customerEmail: customerInfo.email || '',
       customerPhone: customerInfo.phone || 'N/A',

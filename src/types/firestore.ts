@@ -16,6 +16,13 @@ export interface FaqItem {
   answer: string;
 }
 
+export interface CategorySeniorityRate {
+  skillLevelId: string;
+  skillLevelLabel: string;
+  minRate: number;
+  maxRate: number;
+}
+
 export interface FirestoreCategory {
   id: string; // Firestore document ID
   name: string;
@@ -40,6 +47,9 @@ export interface FirestoreCategory {
   visitingChargeAmount?: number;
   minimumBookingAmount?: number;
   minimumBookingPolicyDescription?: string;
+  workingHours?: { start: string; end: string };
+  lunchBreak?: { start: string; end: string };
+  seniorityRates?: CategorySeniorityRate[];
 }
 
 export interface FirestoreSubCategory {
@@ -76,6 +86,8 @@ export interface FirestoreService {
   id: string; // Firestore document ID
   subCategoryId: string; // ID of the parent FirestoreSubCategory
   parentCategoryId?: string; // Optional denormalized parent category ID
+  parentCategoryName?: string; // Optional denormalized parent category name
+  parentCategorySlug?: string; // Optional denormalized parent category slug
   name: string;
   slug: string;
   order?: number; // New field for service ordering
@@ -93,6 +105,22 @@ export interface FirestoreService {
   hasMinQuantity?: boolean; // New field to enable/disable min quantity
   maxQuantity?: number | null; // Maximum quantity a user can book
   imageUrl?: string; // Main image for the service detail page
+
+  // Daily Labour / Provider fields
+  isProvider?: boolean;
+  seniorityLevel?: string;
+  age?: number;
+  experienceYears?: number;
+  experienceLevelLabel?: string;
+  workAreaAddress?: string;
+  workAreaRadiusKm?: number;
+  workAreaCenter?: { latitude: number; longitude: number } | null;
+  distanceKm?: number;
+  workingHours?: { start: string; end: string };
+  lunchBreak?: { start: string; end: string };
+  languagesSpokenLabels?: string[];
+  totalWorkingHours?: number;
+  providerData?: any;
   imageHint?: string; // AI hint for the main image
   isActive: boolean;
   shortDescription?: string | null; // Could be same as description or a slightly longer version
@@ -246,6 +274,16 @@ export interface FirestoreBooking {
   isProviderNotified?: boolean;
   workCategoryId?: string;
   autoDispatchBypassed?: boolean;
+
+  // Daily Labour Job Lifecycle & OTP Fields
+  startOtp?: string;
+  completeOtp?: string;
+  workStartedAt?: any;
+  workCompletedAt?: any;
+  workedDuration?: string;
+  providerDailyRate?: number;
+  providerTotalEarnings?: number;
+  adminMarkupFeeTotal?: number;
 }
 
 export interface Address {
@@ -503,6 +541,8 @@ export interface FirestoreReview {
   id: string; // Firestore document ID
   serviceId: string;
   serviceName: string; // Denormalized
+  providerId?: string; // Daily Labour Worker / Provider ID
+  providerName?: string; // Daily Labour Worker / Provider Name
   userId?: string; // Optional, if it's from a logged-in user
   userName: string; // Reviewer's name (can be 'Admin' or actual user name)
   userAvatarUrl?: string; // Optional
@@ -1477,6 +1517,7 @@ export interface ProviderApplication {
   kycUpdateRequest?: boolean;
   kycUpdateNotes?: string;
   locationChangeRequest?: LocationChangeRequest;
+  rateAndSkillChangeRequest?: RateAndSkillChangeRequest;
   submittedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
@@ -1485,6 +1526,19 @@ export interface ProviderApplication {
   withdrawableBalance?: number;
   totalEarnings?: number;
   totalDeductions?: number;
+
+  // Daily Labour Fields
+  slug?: string;
+  dailyRate?: number;
+  seniorityLevel?: string;
+  experienceYears?: number;
+  workingHours?: { start: string; end: string };
+  lunchBreak?: { start: string; end: string };
+  overallRating?: number;
+  reviewCount?: number;
+  isActive?: boolean;
+  order?: number;
+  password?: string;
 
   // Provider ID Card Generation, Purchase & Download Tracking
   idCardNumber?: string;
@@ -1521,6 +1575,19 @@ export interface LocationChangeRequest {
   newAddress: string;
   newCenter: { latitude: number; longitude: number };
   newRadiusKm: number;
+  rejectionReason?: string;
+}
+
+export interface RateAndSkillChangeRequest {
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requestedAt: Timestamp | any;
+  resolvedAt?: Timestamp | any;
+  previousSeniorityLevel?: string;
+  previousSkillLevelLabel?: string;
+  previousDailyRate?: number;
+  newSeniorityLevel: string;
+  newSkillLevelLabel?: string;
+  newDailyRate: number;
   rejectionReason?: string;
 }
 

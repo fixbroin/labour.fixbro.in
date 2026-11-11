@@ -9,6 +9,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Info, AlertCircle } from "lucide-react";
 import type { ProviderApplication, ProviderControlOptions } from '@/types/firestore';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2, ChevronRight, Check } from "lucide-react";
@@ -19,6 +22,7 @@ const step1CategorySkillsSchema = z.object({
   workCategoryId: z.string({ required_error: "Please select your primary work category." }),
   experienceLevelId: z.string({ required_error: "Please select your experience level." }),
   skillLevelId: z.string({ required_error: "Please select your skill level." }),
+  dailyRate: z.coerce.number().min(1, "Please enter your desired daily rate."),
   bio: z.string().max(500, "Bio cannot exceed 500 characters.").optional().or(z.literal('')),
 });
 
@@ -53,6 +57,7 @@ export default function Step1CategorySkills({
       workCategoryId: initialData.workCategoryId || undefined,
       experienceLevelId: initialData.experienceLevelId || undefined,
       skillLevelId: initialData.skillLevelId || undefined,
+      dailyRate: (initialData.dailyRate as any) || "",
       bio: initialData.bio || "",
     },
   });
@@ -83,6 +88,7 @@ export default function Step1CategorySkills({
       workCategoryId: initialData.workCategoryId || undefined,
       experienceLevelId: initialData.experienceLevelId || undefined,
       skillLevelId: initialData.skillLevelId || undefined,
+      dailyRate: (initialData.dailyRate as any) || "",
       bio: initialData.bio || "",
     });
     lastGeneratedBioRef.current = initialData.bio || "";
@@ -135,6 +141,34 @@ export default function Step1CategorySkills({
     const experienceLevel = controlOptions?.experienceLevels.find(e => e.id === data.experienceLevelId);
     const skillLevel = controlOptions?.skillLevels.find(s => s.id === data.skillLevelId);
 
+    const rawRates = category?.seniorityRates;
+    const rates = Array.isArray(rawRates)
+      ? rawRates
+      : (typeof rawRates === 'string' ? JSON.parse(rawRates || '[]') : []);
+
+    const rateRule = rates.find(
+      (r: any) => r.skillLevelId === data.skillLevelId || 
+           (r.skillLevelLabel && skillLevel?.label && r.skillLevelLabel.trim().toLowerCase() === skillLevel.label.trim().toLowerCase())
+    );
+
+    const min = rateRule?.minRate ?? 500;
+    const max = rateRule?.maxRate ?? 2500;
+
+    if (data.dailyRate < min) {
+      form.setError('dailyRate', {
+        type: 'manual',
+        message: `Daily rate cannot be less than ₹${min}. Please enter at least ₹${min}.`
+      });
+      return;
+    }
+    if (data.dailyRate > max) {
+      form.setError('dailyRate', {
+        type: 'manual',
+        message: `Daily rate cannot exceed ₹${max}. Please enter at most ₹${max}.`
+      });
+      return;
+    }
+
     const applicationData: Partial<ProviderApplication> = {
       workCategoryId: data.workCategoryId,
       workCategoryName: category?.name,
@@ -142,6 +176,8 @@ export default function Step1CategorySkills({
       experienceLevelLabel: experienceLevel?.label,
       skillLevelId: data.skillLevelId,
       skillLevelLabel: skillLevel?.label,
+      seniorityLevel: skillLevel?.label || 'Senior',
+      dailyRate: Number(data.dailyRate),
       bio: data.bio && data.bio.trim() !== "" ? data.bio : undefined,
     };
     onNext(applicationData);
@@ -330,6 +366,83 @@ export default function Step1CategorySkills({
               </FormItem>
             )}
           />
+
+          {/* Desired Daily Rate (₹) with Category Dynamic Limits */}
+          {(() => {
+            const chosenCat = controlOptions.categories.find(c => c.id === form.watch('workCategoryId'));
+            const chosenSkill = controlOptions.skillLevels.find(s => s.id === form.watch('skillLevelId'));
+            const rawRates = chosenCat?.seniorityRates;
+            const rates = Array.isArray(rawRates)
+              ? rawRates
+              : (typeof rawRates === 'string' ? JSON.parse(rawRates || '[]') : []);
+
+            const activeRateRule = rates.find(
+              (r: any) => r.skillLevelId === chosenSkill?.id || 
+                   (r.skillLevelLabel && chosenSkill?.label && r.skillLevelLabel.trim().toLowerCase() === chosenSkill.label.trim().toLowerCase())
+            );
+
+            const minRate = activeRateRule?.minRate ?? 500;
+            const maxRate = activeRateRule?.maxRate ?? 2500;
+
+            const watchedVal = form.watch('dailyRate');
+            const numVal = watchedVal !== undefined && watchedVal !== null && String(watchedVal).trim() !== '' ? Number(watchedVal) : null;
+            let realTimeError: string | null = null;
+            if (numVal !== null && !isNaN(numVal)) {
+              if (numVal < minRate) {
+                realTimeError = `Daily rate cannot be less than ₹${minRate}. Please enter at least ₹${minRate}.`;
+              } else if (numVal > maxRate) {
+                realTimeError = `Daily rate cannot exceed ₹${maxRate}. Please enter at most ₹${maxRate}.`;
+              }
+            }
+
+            return (
+              <FormField
+                control={form.control}
+                name="dailyRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Desired Daily Rate (₹ / Day) *</FormLabel>
+                      <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold">
+                        Allowed: ₹{minRate} - ₹{maxRate}
+                      </Badge>
+                    </div>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder={activeRateRule ? `e.g., ${activeRateRule.minRate}` : 'e.g., 1000'}
+                        {...field}
+                        disabled={isSaving}
+                        className={cn(
+                          "h-11 text-base font-semibold",
+                          realTimeError && "border-destructive focus-visible:ring-destructive"
+                        )}
+                        min={minRate}
+                        max={maxRate}
+                      />
+                    </FormControl>
+
+                    {/* Guidance / Instruction Message */}
+                    <FormDescription className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                      <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span>
+                        Allowed rate is between ₹{minRate} and ₹{maxRate} for {chosenSkill?.label || 'this level'} in {chosenCat?.name || 'this category'}. Please set your desired amount within this range.
+                      </span>
+                    </FormDescription>
+
+                    {/* Real-time Error Message */}
+                    {realTimeError && (
+                      <p className="text-xs font-semibold text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        {realTimeError}
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            );
+          })()}
 
           <FormField
             control={form.control}

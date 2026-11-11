@@ -468,9 +468,10 @@ export async function POST(request: Request) {
                     stats.extraCharges = (stats.extraCharges || 0) + extraCharges;
                 }
             } else {
-                // Customer prepaid online for base service
-                const onlineGross = baseGross;
-                const onlineCommission = calculateProviderFee(onlineGross, appConfig.providerFeeType, appConfig.providerFeeValue);
+                // Customer prepaid online for base service (Daily Labour: Zero Commission, full provider rate credited)
+                const isDailyLabour = typeof booking.providerTotalEarnings === 'number' && booking.providerTotalEarnings > 0;
+                const onlineGross = isDailyLabour ? booking.providerTotalEarnings : baseGross;
+                const onlineCommission = isDailyLabour ? 0 : calculateProviderFee(onlineGross, appConfig.providerFeeType, appConfig.providerFeeValue);
                 const onlineNet = onlineGross - onlineCommission;
 
                 const extraCommission = extraCharges > 0 

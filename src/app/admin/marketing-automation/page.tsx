@@ -189,14 +189,14 @@ export default function MarketingAutomationPage() {
         const baseUrl = getBaseUrl();
         const popularServicesQuery = query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("rating", "desc"), limit(5));
         const popularServicesSnap = await getDocs(popularServicesQuery);
-        const popularServicesHtml = `<ul>${popularServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+        const popularServicesHtml = `<ul>${popularServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/provider/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
         
         const popularCategoriesQuery = query(collection(db, "adminCategories"), orderBy('order', 'asc'), limit(5));
         const popularCategoriesSnap = await getDocs(popularCategoriesQuery);
         const popularCategoriesHtml = `<ul>${popularCategoriesSnap.docs.map(doc => `<li><a href="${baseUrl}/category/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
         const allServicesSnap = await getDocs(query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("name", "asc")));
-        const allServicesHtml = `<ul>${allServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+        const allServicesHtml = `<ul>${allServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/provider/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
         
         const allCategoriesSnap = await getDocs(query(collection(db, "adminCategories"), orderBy("order", "asc")));
         const allCategoriesHtml = `<ul>${allCategoriesSnap.docs.map(doc => `<li><a href="${baseUrl}/category/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
@@ -212,7 +212,7 @@ export default function MarketingAutomationPage() {
             if (subCatIds.length > 0) {
                 const categoryServicesSnap = await getDocs(query(collection(db, "adminServices"), where("subCategoryId", "in", subCatIds), where("isActive", "==", true), orderBy("name", "asc")));
                 if (!categoryServicesSnap.empty) {
-                    categoryServicesHtml = `<ul>${categoryServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+                    categoryServicesHtml = `<ul>${categoryServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/provider/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
                 }
             }
         }

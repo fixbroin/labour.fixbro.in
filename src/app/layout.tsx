@@ -31,9 +31,9 @@ const roboto = Roboto({
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const siteName = seoSettings.siteName || 'Fixbro';
-  const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
-  const defaultDescription = seoSettings.defaultMetaDescription || 'Book home services easily with Fixbro.';
+  const siteName = seoSettings.siteName || 'Fixbro Daily Labour';
+  const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` | ${siteName}`;
+  const defaultDescription = seoSettings.defaultMetaDescription || 'Hire verified daily labour, carpenters, electricians, and painters easily with Fixbro Daily Labour.';
   const defaultKeywords = (seoSettings.defaultMetaKeywords || '').split(',').map(k => k.trim()).filter(k => k);
   const defaultOgImage = `/default-image.png`;
   const ogImage = seoSettings.structuredDataImage || defaultOgImage;
@@ -128,7 +128,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={`${roboto.variable}`} suppressHydrationWarning>
-      <body className="font-body antialiased no-select">
+      <head>
         <style 
           id="fixbro-dynamic-theme-styles" 
           precedence="high"
@@ -140,29 +140,21 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const theme = (function() { 
-                  try {
-                    const storedTheme = localStorage.getItem('fixbro-theme');
-                    if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
-                    return 'light';
-                  } catch (e) { return 'light'; }
-                })();
-                if (theme === 'dark') {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
                 try {
-                    if (localStorage.getItem('fixbro-theme') !== theme) {
-                        localStorage.setItem('fixbro-theme', theme);
-                    }
-                } catch (e) { }
+                  const storedTheme = localStorage.getItem('fixbro-theme');
+                  if (storedTheme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                  if (!storedTheme) {
+                    localStorage.setItem('fixbro-theme', 'light');
+                  }
+                } catch (e) {}
               })();
             `,
           }}
         />
-        
-
         <script
           id="fixbro-pwa-early-capture"
           dangerouslySetInnerHTML={{
@@ -181,6 +173,8 @@ export default async function RootLayout({
             `,
           }}
         />
+      </head>
+      <body className="font-body antialiased no-select">
         <ThemeInjector />
         <AuthProvider>
           <LoadingProvider>

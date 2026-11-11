@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import QuantitySelector from '@/components/shared/QuantitySelector';
-import { Trash2, ShoppingCart, ArrowRight, Home, Loader2,Percent, Info } from 'lucide-react';
+import { Trash2, ShoppingCart, ArrowRight, Home, Loader2, Percent, Info, CalendarDays } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { FirestoreService, UserCart, PriceVariant } from '@/types/firestore';
@@ -29,6 +29,8 @@ import { useAuth as useAuthHook } from '@/hooks/useAuth';
 import { getGuestId } from '@/lib/guestIdManager'; 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Badge } from '@/components/ui/badge';
+import { useProviderDefaultSettings } from '@/hooks/useProviderDefaultSettings';
+import CartBookingRulesModal from '@/components/cart/CartBookingRulesModal';
 export interface CartItem extends FirestoreService {
   quantity: number;
   categoryId?: string;
@@ -123,6 +125,73 @@ const getPriceDisplayInfo = (service: CartItem, quantity: number, symbol: string
 };
 // --- END: CORRECTED TIERED PRICING LOGIC ---
 
+const renderProvidersDaysSummary = (items: CartItem[]) => {
+  if (!items || items.length === 0) return <span>0 providers</span>;
+  const providerCount = items.length;
+  const providerLabel = `${providerCount} ${providerCount === 1 ? 'provider' : 'providers'}`;
+
+  // Group by duration (days)
+  const qtyMap = new Map<number, number>();
+  for (const item of items) {
+    const q = item.quantity || 1;
+    qtyMap.set(q, (qtyMap.get(q) || 0) + 1);
+  }
+
+  // All providers have the exact same duration
+  if (qtyMap.size === 1) {
+    const [days] = qtyMap.keys();
+    return (
+      <span className="whitespace-nowrap font-medium text-muted-foreground text-xs sm:text-sm">
+        {providerLabel} · {days} {days === 1 ? 'day' : 'days'}
+      </span>
+    );
+  }
+
+  // Mixed durations: e.g. 1 person 2 days, 1 person 1 day
+  const parts: string[] = [];
+  const sortedDays = Array.from(qtyMap.keys()).sort((a, b) => b - a);
+  for (const days of sortedDays) {
+    const count = qtyMap.get(days)!;
+    parts.push(`${count} ${count === 1 ? 'person' : 'people'} ${days} ${days === 1 ? 'day' : 'days'}`);
+  }
+
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className="font-semibold text-foreground text-xs sm:text-sm">
+        {providerLabel}
+      </span>
+      <span className="text-[11px] sm:text-xs text-muted-foreground font-normal break-words">
+        ({parts.join(', ')})
+      </span>
+    </div>
+  );
+};
+
+const formatProvidersDaysSummary = (items: CartItem[]): string => {
+  if (!items || items.length === 0) return '0 providers';
+  const providerCount = items.length;
+  const providerLabel = `${providerCount} ${providerCount === 1 ? 'provider' : 'providers'}`;
+
+  const qtyMap = new Map<number, number>();
+  for (const item of items) {
+    const q = item.quantity || 1;
+    qtyMap.set(q, (qtyMap.get(q) || 0) + 1);
+  }
+
+  if (qtyMap.size === 1) {
+    const [days] = qtyMap.keys();
+    return `${providerLabel} · ${days} ${days === 1 ? 'day' : 'days'}`;
+  }
+
+  const parts: string[] = [];
+  const sortedDays = Array.from(qtyMap.keys()).sort((a, b) => b - a);
+  for (const days of sortedDays) {
+    const count = qtyMap.get(days)!;
+    parts.push(`${count} ${count === 1 ? 'person' : 'people'} ${days} ${days === 1 ? 'day' : 'days'}`);
+  }
+
+  return `${providerLabel} (${parts.join(', ')})`;
+};
 
 function CartPageContent() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -135,6 +204,8 @@ function CartPageContent() {
   const currentPathname = usePathname();
 
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const { settings: providerSettings } = useProviderDefaultSettings();
+  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
   const { showLoading } = useLoading();
   const router = useRouter();
@@ -157,14 +228,20 @@ function CartPageContent() {
     const subCatCache: Record<string, any> = {};
     const catCache: Record<string, any> = {};
 
+    const markupFee = typeof providerSettings?.adminMarkupFee === 'number' ? providerSettings.adminMarkupFee : 200;
+
     try {
       const loadedCartItemsPromises = entries.map(async (entry) => {
         const serviceDocRef = doc(db, "adminServices", entry.serviceId);
         const serviceSnap = await getDoc(serviceDocRef);
         if (serviceSnap.exists()) {
           const serviceData = serviceSnap.data() as FirestoreService;
-          const price = typeof serviceData.price === 'number' ? serviceData.price : 0;
-          const discountedPrice = typeof serviceData.discountedPrice === 'number' ? serviceData.discountedPrice : undefined;
+          let price = typeof serviceData.price === 'number' ? serviceData.price : 0;
+          let discountedPrice = typeof serviceData.discountedPrice === 'number' ? serviceData.discountedPrice : undefined;
+          if (serviceData.isProvider) {
+            price += markupFee;
+            if (discountedPrice !== undefined) discountedPrice += markupFee;
+          }
           
           let categoryId = serviceData.parentCategoryId || 'unknown';
           let categoryName = 'Other Services';
@@ -199,6 +276,18 @@ function CartPageContent() {
               }
           }
 
+          let seniority = (serviceData as any).seniorityLevel || (serviceData as any).skillLevelLabel;
+          if (!seniority) {
+            try {
+              const pRef = doc(db, "providerApplications", entry.serviceId);
+              const pSnap = await getDoc(pRef);
+              if (pSnap.exists()) {
+                const pd = pSnap.data() as any;
+                seniority = pd.seniorityLevel || pd.skillLevelLabel;
+              }
+            } catch (e) {}
+          }
+
           return {
             ...serviceData,
             id: serviceSnap.id,
@@ -213,11 +302,45 @@ function CartPageContent() {
             priceVariants: serviceData.priceVariants || [],
             hasMinQuantity: serviceData.hasMinQuantity === true,
             minQuantity: serviceData.minQuantity ?? 0,
+            seniorityLevel: seniority || (serviceData.isProvider ? 'Senior' : undefined),
             visitingChargeAmount: categoryId !== 'unknown' ? catCache[categoryId]?.visitingChargeAmount : undefined,
             minimumBookingAmount: categoryId !== 'unknown' ? catCache[categoryId]?.minimumBookingAmount : undefined,
             minimumBookingPolicyDescription: categoryId !== 'unknown' ? catCache[categoryId]?.minimumBookingPolicyDescription : undefined,
           } as CartItem;
         }
+        // Fallback: Check if item is a Daily Labour Provider
+        const provDocRef = doc(db, "providerApplications", entry.serviceId);
+        const provSnap = await getDoc(provDocRef);
+        if (provSnap.exists()) {
+          const pData = provSnap.data() as any;
+          const baseDailyRate = typeof pData.dailyRate === 'number' ? pData.dailyRate : 1200;
+          const dailyRate = baseDailyRate + markupFee;
+          const categoryId = pData.workCategoryId || 'daily-labour';
+          const categoryName = pData.workCategoryName || 'Daily Labour';
+          return {
+            id: provSnap.id,
+            name: pData.fullName || 'Daily Labour Provider',
+            description: pData.bio || 'Daily Labour Provider',
+            price: dailyRate,
+            discountedPrice: dailyRate,
+            imageUrl: pData.profilePhotoUrl || '/default-image.png',
+            quantity: entry.quantity,
+            categoryId,
+            categoryName,
+            subCategoryId: `providers-${categoryId}`,
+            rating: Number(pData.overallRating) || 0,
+            isActive: true,
+            isTaxInclusive: true,
+            hasPriceVariants: false,
+            priceVariants: [],
+            hasMinQuantity: false,
+            minQuantity: 1,
+            isProvider: true,
+            seniorityLevel: pData.seniorityLevel || pData.skillLevelLabel || 'Senior',
+            slug: pData.slug || provSnap.id,
+          } as CartItem;
+        }
+
         console.warn(`Service with ID ${entry.serviceId} not found. Removing from cart.`);
         return null;
       });
@@ -480,16 +603,22 @@ function CartPageContent() {
     return Object.values(groups);
   }, [cartItems, appConfig]);
 
-  const handleProceedToSchedule = (categoryId: string, categoryName: string, items: CartItem[]) => {
+  const [isCheckingOutAll, setIsCheckingOutAll] = useState(false);
+
+  const executeProceedCheckout = () => {
+    if (cartItems.length === 0) return;
     showLoading();
-    setIsCheckingOutCategory(categoryId);
-    localStorage.setItem('fixbroActiveCheckoutCategory', categoryId);
-    localStorage.setItem('fixbroActiveCheckoutCategoryName', categoryName);
-    
-    // Save only these items for the checkout flow
-    saveActiveCheckoutEntries(items.map(i => ({ serviceId: i.id, quantity: i.quantity })));
-    
-    // Clear any previous checkout-specific data
+    setIsCheckingOutAll(true);
+
+    // Save all items for checkout flow
+    saveActiveCheckoutEntries(cartItems.map(i => ({ serviceId: i.id, quantity: i.quantity })));
+
+    const firstCat = cartItems[0]?.categoryId || 'daily-labour';
+    const firstCatName = cartItems[0]?.categoryName || 'Daily Labour';
+    localStorage.setItem('fixbroActiveCheckoutCategory', firstCat);
+    localStorage.setItem('fixbroActiveCheckoutCategoryName', firstCatName);
+
+    // Clear previous checkout flow data
     localStorage.removeItem('fixbroScheduledDate');
     localStorage.removeItem('fixbroScheduledTimeSlot');
     localStorage.removeItem('fixbroEstimatedEndTime');
@@ -500,13 +629,65 @@ function CartPageContent() {
     localStorage.removeItem('fixbroAppliedPromoCodeId');
 
     logUserActivity(
-        'checkoutStep',
-        { checkoutStepName: 'cart_proceed_to_schedule', pageUrl: currentPathname, categoryId, categoryName },
-        user?.uid,
-        !user ? getGuestId() : null
-      );
+      'checkoutStep',
+      { checkoutStepName: 'cart_proceed_to_unified_checkout', pageUrl: currentPathname, itemCount: cartItems.length },
+      user?.uid,
+      !user ? getGuestId() : null
+    );
+
     router.push('/checkout');
   };
+
+  const handleProceedToUnifiedCheckout = () => {
+    if (cartItems.length === 0) return;
+    if (providerSettings?.enableCartBookingRules !== false) {
+      setIsRulesModalOpen(true);
+      return;
+    }
+    executeProceedCheckout();
+  };
+
+  const overallSummary = useMemo(() => {
+    let itemsTotal = 0;
+    let totalTax = 0;
+    let totalDays = 0;
+
+    cartItems.forEach(item => {
+      const price = calculateIncrementalTotalPrice(item);
+      itemsTotal += price;
+      totalDays += item.quantity;
+      const taxRate = item.taxPercent || 0;
+      const basePrice = getBasePrice(price, item.isTaxInclusive, taxRate);
+      totalTax += basePrice * (taxRate / 100);
+    });
+
+    let platformFeeTotal = 0;
+    const rawPlatformFees = appConfig?.platformFees;
+    const platformFeesList: any[] = Array.isArray(rawPlatformFees)
+      ? rawPlatformFees
+      : (rawPlatformFees && typeof rawPlatformFees === 'object' ? Object.values(rawPlatformFees) : []);
+
+    const isPlatformFeeEnabled = (appConfig as any)?.enablePlatformFee !== false;
+    if (isPlatformFeeEnabled && platformFeesList.length > 0 && itemsTotal > 0) {
+      platformFeesList.forEach(fee => {
+        if (fee && fee.isActive !== false) {
+          const feeAmt = fee.type === 'percentage' ? (itemsTotal * (Number(fee.value) || 0)) / 100 : (Number(fee.value) || 0);
+          const feeTax = (feeAmt * (Number(fee.feeTaxRatePercent) || 0)) / 100;
+          platformFeeTotal += (feeAmt + feeTax);
+        }
+      });
+    }
+
+    const grandTotal = itemsTotal + platformFeeTotal + totalTax;
+
+    return {
+      itemsTotal,
+      totalDays,
+      platformFeeTotal,
+      totalTax,
+      grandTotal,
+    };
+  }, [cartItems, appConfig]);
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -538,22 +719,13 @@ function CartPageContent() {
         <div className="text-center py-12">
           <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h2 className="text-xl sm:text-2xl font-semibold mb-2">Your cart is empty</h2>
-          <p className="text-muted-foreground mb-6 text-sm sm:text-base">Looks like you haven't added any services yet.</p>
+          <p className="text-muted-foreground mb-6 text-sm sm:text-base">Looks like you haven't added any providers yet.</p>
           <Link href="/categories" passHref>
-            <Button>Browse Services</Button>
+            <Button>Browse Categories</Button>
           </Link>
         </div>
       ) : (
-        <div className="space-y-8">
-          {groupedCart.length > 1 && (
-            <Alert className="bg-primary/10 border-primary/30">
-              <Info className="h-5 w-5 text-primary" />
-              <AlertDescription className="text-primary/90 font-medium">
-                You have services from different categories. For the best service experience, please checkout one category at a time.
-              </AlertDescription>
-            </Alert>
-          )}
-
+        <div className="space-y-6">
           {groupedCart.map((group) => (
             <Card key={group.categoryId} className="shadow-md border-t-4 border-t-primary overflow-hidden">
               <CardHeader className="bg-secondary/20 pb-4">
@@ -565,10 +737,10 @@ function CartPageContent() {
               <CardContent className="p-0 sm:p-4">
                 <div className="divide-y divide-border/50">
                   {group.items.map(item => {
-                    const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(item, item.quantity, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode);
-                    const escapedSymbol = (appConfig?.currencySymbol || "₹").replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                    const nonPriceRegex = new RegExp(`[^\\d${escapedSymbol}.,]`, 'g');
-                    const priceRegex = new RegExp(`[\\d${escapedSymbol}.,]`, 'g');
+                    const itemUnitPrice = item.price;
+                    const itemTotalPrice = itemUnitPrice * item.quantity;
+                    const skillBadgeText = item.seniorityLevel || 'Senior';
+
                     return (
                       <div key={item.id} className="p-3 sm:p-4 hover:bg-accent/5 transition-colors">
                         
@@ -576,69 +748,90 @@ function CartPageContent() {
                         <div className="flex flex-col md:hidden w-full gap-3">
                           <div className="flex flex-row w-full gap-3">
                             <div className="flex-1 flex flex-col">
-                              <Link href={`/service/${item.slug}`} className="hover:text-primary transition-colors">
-                                <h3 className="font-bold text-base leading-tight">{item.name}</h3>
+                              <Link href={`/provider/${item.slug}`} className="hover:text-primary transition-colors">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h3 className="font-bold text-base leading-tight">{item.name}</h3>
+                                  <Badge variant="outline" className="text-[10px] font-semibold bg-primary/10 text-primary border-primary/25 px-1.5 py-0.5">
+                                    {skillBadgeText}
+                                  </Badge>
+                                  <Badge variant="secondary" className="text-[10px] font-bold bg-primary/15 text-primary border-primary/30 px-1.5 py-0.5">
+                                    {item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}
+                                  </Badge>
+                                </div>
                                 <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
                               </Link>
-                              <div className="flex items-baseline gap-2 mt-2">
-                                <p className="text-lg font-bold">{mainPrice}</p>
-                                {priceSuffix && (
-                                  <p className="text-sm text-muted-foreground">
-                                    <span className="line-through">{priceSuffix.replace(nonPriceRegex, "")}</span>{" "}{priceSuffix.replace(priceRegex, "")}
+                              <div className="flex flex-col gap-1 mt-2">
+                                <div className="flex items-baseline gap-2">
+                                  <p className="text-lg font-bold text-foreground">
+                                    {formatCurrency(itemTotalPrice, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}
                                   </p>
-                                )}
-                              </div>
-                              {promoText && (
-                                <Badge className="bg-green-600 text-white text-[10px] font-semibold px-2 py-1 rounded mt-1 flex items-center gap-1 w-fit">
-                                  {!item.hasPriceVariants && <Percent className="w-3 h-3" strokeWidth={2.75} />} {promoText}
-                                </Badge>
-                              )}
-                              {item.hasMinQuantity && item.minQuantity && item.minQuantity > 1 && (
-                                <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 w-fit">
-                                  Min. {item.minQuantity} units required
+                                  <span className="text-xs text-muted-foreground font-medium">
+                                    ({formatCurrency(itemUnitPrice, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)} / day)
+                                  </span>
                                 </div>
-                              )}
+                                <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded w-fit">
+                                  <CalendarDays className="h-3 w-3 text-primary" />
+                                  Booked for {item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}
+                                </div>
+                              </div>
                             </div>
-                            <Link href={`/service/${item.slug}`} className="flex-shrink-0 w-24 h-24 relative">
+                            <Link href={`/provider/${item.slug}`} className="flex-shrink-0 w-24 h-24 relative aspect-square">
                               <AppImage src={item.imageUrl || "/default-image.png"} alt={item.name} fill className="rounded-lg object-cover" />
                             </Link>
                           </div>
-                          <div className="flex items-center justify-between w-full gap-3">
-                            <Button variant="ghost" size="sm" className="text-destructive bg-destructive/10 hover:bg-destructive hover:text-white active:bg-destructive/90 text-xs" onClick={() => handleRemoveItem(item.id)}>
-                              <Trash2 className="mr-1 h-4 w-4" /> Remove
+                          <div className="flex items-center justify-between w-full gap-2 pt-1 border-t border-border/40">
+                            <Button variant="ghost" size="sm" className="text-destructive bg-destructive/10 hover:bg-destructive hover:text-white active:bg-destructive/90 text-xs h-8 px-2.5" onClick={() => handleRemoveItem(item.id)}>
+                              <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
                             </Button>
-                            <QuantitySelector initialQuantity={item.quantity} onQuantityChange={(newQuantity) => handleQuantityChange(item.id, newQuantity)} minQuantity={0} enforcedMinQuantity={item.hasMinQuantity ? item.minQuantity : 0} maxQuantity={item.maxQuantity} />
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-primary px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20">
+                                {item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}
+                              </span>
+                              <QuantitySelector initialQuantity={item.quantity} onQuantityChange={(newQuantity) => handleQuantityChange(item.id, newQuantity)} minQuantity={0} enforcedMinQuantity={1} maxQuantity={item.maxQuantity} />
+                            </div>
                           </div>
                         </div>
 
                         {/* DESKTOP LAYOUT */}
                         <div className="hidden md:flex flex-row items-center w-full gap-4">
-                          <Link href={`/service/${item.slug}`} className="relative w-24 h-24 flex-shrink-0">
+                          <Link href={`/provider/${item.slug}`} className="relative w-24 h-24 flex-shrink-0 aspect-square">
                             <AppImage src={item.imageUrl || "/default-image.png"} alt={item.name} fill className="object-cover rounded-lg shadow-sm" />
                           </Link>
                           <div className="flex-1 flex flex-col pr-4">
-                            <Link href={`/service/${item.slug}`} className="hover:text-primary transition-colors">
-                              <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">{item.name}</h3>
+                            <Link href={`/provider/${item.slug}`} className="hover:text-primary transition-colors">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">{item.name}</h3>
+                                <Badge variant="outline" className="text-xs font-semibold bg-primary/10 text-primary border-primary/25 px-2 py-0.5">
+                                  {skillBadgeText}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs font-bold bg-primary/15 text-primary border-primary/30 px-2 py-0.5">
+                                  {item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}
+                                </Badge>
+                              </div>
                               <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{item.description}</p>
                             </Link>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <p className="text-lg font-bold">{mainPrice}</p>
-                              {priceSuffix && (
-                                <p className="text-sm text-muted-foreground">
-                                  <span className="line-through">{priceSuffix.replace(nonPriceRegex, "")}</span>{" "}{priceSuffix.replace(priceRegex, "")}
+                            <div className="mt-2 flex flex-col gap-1">
+                              <div className="flex items-baseline gap-2">
+                                <p className="text-lg font-bold text-foreground">
+                                  {formatCurrency(itemTotalPrice, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}
                                 </p>
-                              )}
-                              {promoText && (
-                                <Badge className="bg-green-600 text-white text-xs font-semibold px-2 py-0.5 rounded ml-2">
-                                  {!item.hasPriceVariants && <Percent className="w-3 h-3 mr-1 inline" strokeWidth={2.75} />}{promoText}
-                                </Badge>
-                              )}
+                                <span className="text-sm text-muted-foreground font-medium">
+                                  ({formatCurrency(itemUnitPrice, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)} / day)
+                                </span>
+                              </div>
+                              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded w-fit">
+                                <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                                Booked for {item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-3 flex-shrink-0 w-32">
-                            <QuantitySelector initialQuantity={item.quantity} onQuantityChange={(newQuantity) => handleQuantityChange(item.id, newQuantity)} minQuantity={0} enforcedMinQuantity={item.hasMinQuantity ? item.minQuantity : 0} maxQuantity={item.maxQuantity} />
-                            <Button variant="ghost" size="sm" className="text-destructive bg-destructive/10 hover:bg-destructive hover:text-white h-8 px-3" onClick={() => handleRemoveItem(item.id)}>
-                              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+                          <div className="flex flex-col items-end gap-2.5 flex-shrink-0 w-36">
+                            <span className="text-xs font-bold text-primary px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20">
+                              {item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}
+                            </span>
+                            <QuantitySelector initialQuantity={item.quantity} onQuantityChange={(newQuantity) => handleQuantityChange(item.id, newQuantity)} minQuantity={0} enforcedMinQuantity={1} maxQuantity={item.maxQuantity} />
+                            <Button variant="ghost" size="sm" className="text-destructive bg-destructive/10 hover:bg-destructive hover:text-white h-7 px-2.5 text-xs" onClick={() => handleRemoveItem(item.id)}>
+                              <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
                             </Button>
                           </div>
                         </div>
@@ -648,145 +841,108 @@ function CartPageContent() {
                   })}
                 </div>
               </CardContent>
-              <CardFooter className="bg-muted/30 p-4 sm:p-3 flex flex-col items-stretch gap-4 border-t">
-                
-                {/* Summary Table inside Card */}
-                <div className="space-y-2 sm:space-y-3 text-sm sm:text-base border-b pb-4">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Items Total:</span>
-                    <span>{formatCurrency(group.itemsTotal, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                  </div>
-                  
-                  {group.visitingCharge > 0 && (
-                    <div className="flex justify-between items-center text-primary">
-                      <div className="flex items-center gap-1">
-                        <span className="font-medium">Visiting Charge:</span>
-                        <Dialog 
-                          open={openTaxBreakdownCategoryId === group.categoryId + '_vc'} 
-                          onOpenChange={(open) => setOpenTaxBreakdownCategoryId(open ? group.categoryId + '_vc' : null)}
-                        >
-                          <DialogTrigger asChild>
-                            <button className="focus:outline-none transition-colors hover:text-primary/80">
-                              <Info className="h-3.5 w-3.5"/>
-                            </button>
-                          </DialogTrigger>
-                          <DialogContent className="w-[90vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Charge Details - {group.categoryName}</DialogTitle>
-                            </DialogHeader>
-                            <div className="py-4 space-y-4">
-                                <Alert className="bg-primary/5 border-primary/20">
-                                    <Info className="h-4 w-4 text-primary" />
-                                    <AlertDescription className="text-sm">
-                                        {group.policyMessage}
-                                    </AlertDescription>
-                                </Alert>
-                                <Separator />
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium">Visiting Charge Breakdown:</p>
-                                    <div className="flex justify-between text-sm">
-                                        <span>Base Charge</span>
-                                        <span>{formatCurrency(group.visitingChargeBreakdown?.baseAmount, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                                    </div>
-                                    {group.visitingChargeBreakdown?.taxAmount > 0 && (
-                                        <div className="flex justify-between text-sm">
-                                            <span>Tax ({group.visitingChargeBreakdown?.taxPercent}%)</span>
-                                            <span>+ {formatCurrency(group.visitingChargeBreakdown?.taxAmount, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between font-bold border-t pt-2">
-                                        <span>Total Charge</span>
-                                        <span>{formatCurrency(group.visitingChargeBreakdown?.amount, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <DialogClose asChild>
-                              <Button variant="outline" className="w-full">Close</Button>
-                            </DialogClose>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <span className="font-medium">+ {formatCurrency(group.visitingChargeBreakdown?.amount || 0, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                    </div>
-                  )}
-
-                  {group.estimatedTax > 0 && (
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center text-muted-foreground">
-                        {group.effectiveTaxRateDisplay}
-                        <Dialog 
-                          open={openTaxBreakdownCategoryId === group.categoryId} 
-                          onOpenChange={(open) => setOpenTaxBreakdownCategoryId(open ? group.categoryId : null)}
-                        >
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 ml-1 p-0">
-                              <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-primary"/>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="w-[90vw] sm:max-w-2xl md:max-w-3xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Tax Breakdown - {group.categoryName}</DialogTitle>
-                            </DialogHeader>
-                            <TaxBreakdownDisplay
-                              items={group.taxBreakdownItems}
-                              visitingCharge={group.visitingChargeBreakdown}
-                              subTotalBeforeDiscount={group.subTotal} 
-                              totalDiscount={0} 
-                              totalTax={group.estimatedTax}
-                              grandTotal={group.total}
-                              defaultTaxRatePercent={appConfig.visitingChargeTaxPercent || 0}
-                            />
-                            <DialogClose asChild className="mt-2">
-                              <Button variant="outline" className="w-full">Close</Button>
-                            </DialogClose>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <span>+ {formatCurrency(group.estimatedTax, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                    </div>
-                  )}
-
-                  <Separator />
-                  <div className="flex justify-between font-bold text-lg sm:text-xl">
-                    <span>Subtotal:</span>
-                    <span className="text-primary">{formatCurrency(group.total, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
-                  </div>
+              <CardFooter className="bg-muted/20 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 border-t text-sm">
+                <div className="flex-1 min-w-0 pr-2">
+                  {renderProvidersDaysSummary(group.items)}
                 </div>
-
-                {/* Policy Alert & Button */}
-                <div className="flex flex-col lg:flex-row justify-between items-center gap-4 mt-2">
-                  <div className="w-full lg:flex-1">
-                    {group.policyMessage && (
-                      <Alert variant="default" className="bg-amber-50 border-amber-200 py-3 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <Info className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                          <AlertDescription className="text-amber-800 font-medium text-sm leading-snug">
-                            {group.policyMessage}
-                          </AlertDescription>
-                        </div>
-                      </Alert>
-                    )}
-                  </div>
-                  
-                  <div className="w-full lg:w-auto">
-                    <Button 
-                      size="lg" 
-                      className="w-full lg:px-10 py-7 text-xl font-bold shadow-xl hover:shadow-primary/30 transition-all group relative overflow-hidden" 
-                      onClick={() => handleProceedToSchedule(group.categoryId, group.categoryName, group.items)}
-                      isLoading={isCheckingOutCategory === group.categoryId}
-                      disabled={isCheckingOutCategory !== null}
-                    >
-                      <span className="relative z-10 flex items-center gap-2">
-                        Checkout {group.categoryName} <ArrowRight className="h-6 w-6 transition-transform group-hover:translate-x-1" />
-                      </span>
-                    </Button>
-                  </div>
+                <div className="font-bold text-foreground text-sm sm:text-base shrink-0 whitespace-nowrap text-right">
+                  Category Total: {formatCurrency(group.itemsTotal, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}
                 </div>
               </CardFooter>
             </Card>
           ))}
+
+          {/* UNIFIED ORDER SUMMARY & CHECKOUT CARD */}
+          <Card className="shadow-lg border-2 border-primary/20 bg-card overflow-hidden mt-6">
+            <CardHeader className="bg-primary/5 p-4 sm:p-5 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
+                <CardTitle className="text-xl font-headline font-bold text-foreground whitespace-nowrap">
+                  Order Summary
+                </CardTitle>
+                <div className="text-xs sm:text-sm font-normal text-muted-foreground text-left sm:text-right">
+                  {renderProvidersDaysSummary(cartItems)}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 space-y-3">
+              <div className="flex justify-between text-base">
+                <span className="text-muted-foreground">Items Total:</span>
+                <span className="font-medium">{formatCurrency(overallSummary.itemsTotal, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
+              </div>
+
+              {overallSummary.platformFeeTotal > 0 && (
+                <div className="flex justify-between text-base items-center text-foreground">
+                  <span className="text-muted-foreground">Platform Fee:</span>
+                  <span className="font-medium">+ {formatCurrency(overallSummary.platformFeeTotal, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
+                </div>
+              )}
+
+              {overallSummary.totalTax > 0 && (
+                <div className="flex justify-between text-base items-center text-foreground">
+                  <span className="text-muted-foreground">Tax:</span>
+                  <span className="font-medium">+ {formatCurrency(overallSummary.totalTax, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}</span>
+                </div>
+              )}
+
+              {cartItems.length > 1 && (
+                <div className="bg-muted/30 rounded-xl p-3 border border-border/50 text-xs space-y-1.5 my-2">
+                  <p className="font-bold text-foreground flex items-center gap-1.5 mb-1 text-[11px] uppercase tracking-wider">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                    Provider Duration Details
+                  </p>
+                  {cartItems.map(item => (
+                    <div key={item.id} className="flex justify-between items-center text-muted-foreground">
+                      <span className="font-medium text-foreground truncate max-w-[220px]">{item.name}</span>
+                      <span className="font-semibold text-primary">{item.quantity} {item.quantity === 1 ? 'Day' : 'Days'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Separator className="my-2" />
+
+              <div className="flex justify-between items-baseline pt-1">
+                <div>
+                  <span className="text-lg sm:text-xl font-bold text-foreground">Grand Total:</span>
+                  <p className="text-xs text-muted-foreground">Full Day Labour Booking</p>
+                </div>
+                <span className="text-2xl sm:text-3xl font-extrabold text-primary">
+                  {formatCurrency(overallSummary.grandTotal, appConfig.currencySymbol, appConfig.currencyDecimalPoints, appConfig.currencyCode)}
+                </span>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-muted/10 p-4 sm:p-6 pt-0">
+              <Button
+                size="lg"
+                className="w-full py-7 text-xl font-bold shadow-xl hover:shadow-primary/30 transition-all group relative overflow-hidden"
+                onClick={handleProceedToUnifiedCheckout}
+                disabled={isCheckingOutAll || cartItems.length === 0}
+              >
+                {isCheckingOutAll ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Proceeding...
+                  </span>
+                ) : (
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Proceed to Checkout <ArrowRight className="h-6 w-6 transition-transform group-hover:translate-x-1" />
+                  </span>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       )}
+
+      {/* Daily Labour Booking Rules & Terms Modal */}
+      <CartBookingRulesModal
+        isOpen={isRulesModalOpen}
+        onClose={() => setIsRulesModalOpen(false)}
+        onConfirm={() => {
+          setIsRulesModalOpen(false);
+          executeProceedCheckout();
+        }}
+        settings={providerSettings}
+      />
     </div>
   );
 }

@@ -289,7 +289,7 @@ async function getFullData(): Promise<{
       id: s.id,
       name: s.name,
       slug: s.slug,
-      url: `${baseUrl}/service/${s.slug}`,
+      url: `${baseUrl}/provider/${s.slug}`,
       subCategoryId: s.subCategoryId,
       parentCategoryId: pCatId,
       categoryName: cat?.name || '',
@@ -397,7 +397,7 @@ function buildSystemPrompt(params: {
 
   const catalogSummary = categories.map(c => {
     const catServices = flatServices.filter(s => s.parentCategoryId === c.id);
-    const serviceList = catServices.map(s => `• ${s.name} (${baseUrl}/service/${s.slug})`).join('\n');
+    const serviceList = catServices.map(s => `• ${s.name} (${baseUrl}/provider/${s.slug})`).join('\n');
     return `### Category: ${c.name}\n${serviceList || '• Inquire directly'}`;
   }).join('\n\n');
 
@@ -426,7 +426,7 @@ COMPANY POLICIES:
    Direct link to cancel: [My Bookings](${baseUrl}/my-bookings). Full policy: [Cancellation Policy](${baseUrl}/cancellation-policy).
 3. CUSTOM SERVICE: If a user asks for a service that is NOT present in our service catalog below, apologize and say:
    "We don't currently offer that specific service in our catalog, but you can submit a custom request here: [Custom Service](${baseUrl}/custom-service) and our team will get back to you with a quote!"
-4. DIRECT LINKS: Always format links cleanly in markdown: [Link Title](${baseUrl}/service/slug) or [My Bookings](${baseUrl}/my-bookings).
+4. DIRECT LINKS: Always format links cleanly in markdown: [Link Title](${baseUrl}/provider/slug) or [My Bookings](${baseUrl}/my-bookings).
 5. HUMAN ESCALATION: If the customer asks for a human, calls, complaints, or if you cannot resolve their issue, say:
    "I am connecting you to our human support team right now. Our support staff has been notified via email and alert, and an agent will be with you shortly."
 6. TRUST & LEGITIMACY: If the customer asks if the company is fake, a scam, fraud, or spam, firmly and professionally reassure them that ${websiteName} is a 100% verified, legally registered company with background-verified technicians, secure encrypted payments, and post-service warranty.

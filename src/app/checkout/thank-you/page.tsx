@@ -26,7 +26,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
 import { sendWhatsAppFlow } from '@/ai/flows/sendWhatsAppFlow';
 import { triggerPushNotification } from '@/lib/fcmUtils';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatEndTimeDisplay } from '@/lib/utils';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import { getHaversineDistance } from '@/lib/locationUtils';
@@ -793,17 +793,13 @@ export default function ThankYouPage() {
                 <SummaryItem icon={Clock} label="Time Slot" value={bookingDetailsForDisplay.scheduledTimeSlot} />
                 <Separator className="opacity-40" />
 
-                {bookingDetailsForDisplay.estimatedEndTime && (
-                  <>
-                    <SummaryItem 
-                        icon={Activity} 
-                        label="Estimated Completion" 
-                        valueClassName="text-emerald-600"
-                        value={`${formatDateInTimezone(new Date(bookingDetailsForDisplay.estimatedEndTime), 'Asia/Kolkata')} ${formatTimeInTimezone(new Date(bookingDetailsForDisplay.estimatedEndTime), 'Asia/Kolkata')}`} 
-                    />
-                    <Separator className="opacity-40" />
-                  </>
-                )}
+                <SummaryItem 
+                    icon={Clock} 
+                    label="End Time" 
+                    valueClassName="text-emerald-600 font-bold"
+                    value={formatEndTimeDisplay(bookingDetailsForDisplay.estimatedEndTime, bookingDetailsForDisplay.scheduledTimeSlot)} 
+                />
+                <Separator className="opacity-40" />
 
                 {bookingDetailsForDisplay.dailyTimeline && bookingDetailsForDisplay.dailyTimeline.length > 1 && (
                   <>

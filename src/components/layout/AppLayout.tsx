@@ -31,6 +31,25 @@ interface AppLayoutProps {
   initialSiloData?: SiloData;
 }
 
+const isProviderDashboardPath = (path: string): boolean => {
+  if (path === '/provider') return true;
+  const subPaths = [
+    '/provider/booking',
+    '/provider/earnings',
+    '/provider/id-card',
+    '/provider/leaves',
+    '/provider/my-jobs',
+    '/provider/notifications',
+    '/provider/profile',
+    '/provider/quotation-invoice',
+    '/provider/reviews',
+    '/provider/service-area',
+    '/provider/wallet',
+    '/provider/withdrawal'
+  ];
+  return subPaths.some(p => path.startsWith(p));
+};
+
 const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, initialAppConfig, initialSiloData }) => {
   const pathname = usePathname();
   const [isClientMounted, setIsClientMounted] = useState(false);
@@ -41,11 +60,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     '/rent-home',
     '/marketplace',
     '/admin',
-    '/provider',
     '/auth/',
     '/checkout',
   ];
-  const isHiddenRoute = hideFooterPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const isHiddenRoute = hideFooterPrefixes.some((prefix) => pathname.startsWith(prefix)) || isProviderDashboardPath(pathname);
   const [showFooter, setShowFooter] = useState(!isHiddenRoute);
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -264,7 +282,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   useEffect(() => {
     if (isClientMounted) { 
       const currentIsAdminRoute = pathname.startsWith('/admin');
-      const currentIsProviderRoute = pathname.startsWith('/provider'); 
+      const currentIsProviderRoute = isProviderDashboardPath(pathname); 
       const currentIsAuthRoute = pathname.startsWith('/auth/');
       const currentIsCheckoutRoute = pathname.startsWith('/checkout');
       
@@ -329,7 +347,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     if (isClientMounted && user && !authIsLoading) {
         const isAuthPage = pathname.startsWith('/auth/');
         const isAdminPage = pathname.startsWith('/admin/');
-        const isProviderPage = pathname.startsWith('/provider/');
+        const isProviderPage = isProviderDashboardPath(pathname);
         if (!isAuthPage && !isAdminPage && !isProviderPage) { 
             fetchPendingReview();
         }
@@ -347,9 +365,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   }, [fetchPendingReview]);
 
   const isMarketplaceRoute = pathname.startsWith('/furniture') || pathname.startsWith('/rent-home') || pathname.startsWith('/marketplace');
-  const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/') && !isMarketplaceRoute;
-  const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
-  const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
+  const isProviderDashboard = isProviderDashboardPath(pathname);
+  const shouldShowHeader = !pathname.startsWith('/admin') && !isProviderDashboard && !pathname.startsWith('/auth/') && !isMarketplaceRoute;
+  const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !isProviderDashboard && !isMarketplaceRoute;
+  const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !isProviderDashboard && !isMarketplaceRoute;
   const shouldShowPwaInstallButton = isClientMounted && !isWebView() && !pathname.startsWith('/category/') && !pathname.includes('/category/') && !isMarketplaceRoute;
 
   const bottomNavActivePaths = ['/', '/chat', '/notifications', '/my-bookings', '/profile', '/referral','/checkout/schedule', '/custom-service',

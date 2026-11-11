@@ -8,9 +8,9 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet, Ban } from 'lucide-react'; 
+import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet, Ban, KeyRound, ShieldCheck } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
-import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
+import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone, isCashPayment, hasOnlinePaymentProof, formatEndTimeDisplay } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, Timestamp } from '@/lib/mysqlDb';
@@ -241,10 +241,39 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
             <div><strong>Status:</strong> <Badge variant={booking.status === "Completed" ? "default" : booking.status === "Confirmed" ? "default" : "outline"} className={ booking.status === "Confirmed" ? "bg-green-500 text-white hover:bg-green-600" : booking.status === "Completed" ? "bg-blue-500 text-white hover:bg-blue-600" : booking.status === "Cancelled" ? "bg-red-500 text-white hover:bg-red-600" : ""}>{booking.status}</Badge></div>
             <p><strong>Scheduled Date:</strong> {formatScheduledDate(booking.scheduledDate)}</p>
             <p><strong>Scheduled Time:</strong> {booking.scheduledTimeSlot}</p>
-            {booking.estimatedEndTime && (
-              <p className="text-green-600 font-bold">
-                <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
-              </p>
+            <p className="text-emerald-600 font-bold">
+              <strong>End Time:</strong> {formatEndTimeDisplay(booking.estimatedEndTime, booking.scheduledTimeSlot)}
+            </p>
+
+            {/* OTP Verification Info */}
+            <div className="col-span-1 sm:col-span-2 p-3 bg-muted/40 rounded-xl border flex flex-wrap items-center gap-4 my-1">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-emerald-600" />
+                <span className="text-xs font-semibold">Start OTP:</span>
+                <Badge variant="outline" className="font-mono text-xs font-bold bg-emerald-50 text-emerald-700 border-emerald-300">
+                  {booking.startOtp || "Not Set"}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-blue-600" />
+                <span className="text-xs font-semibold">Complete OTP:</span>
+                <Badge variant="outline" className="font-mono text-xs font-bold bg-blue-50 text-blue-700 border-blue-300">
+                  {booking.completeOtp || "Not Set"}
+                </Badge>
+              </div>
+              {booking.workedDuration && (
+                <div className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  <span>Duration: <strong className="text-foreground">{booking.workedDuration}</strong></span>
+                </div>
+              )}
+            </div>
+
+            {booking.workStartedAt && (
+              <p><strong>Work Started:</strong> {formatDetailTimestamp(booking.workStartedAt)}</p>
+            )}
+            {booking.workCompletedAt && (
+              <p><strong>Work Completed:</strong> {formatDetailTimestamp(booking.workCompletedAt)}</p>
             )}
             <div className="flex items-center gap-2">
                 <strong>Payment Method:</strong> 
