@@ -34,17 +34,17 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
   },
   booking_confirmation_customer: {
     title: "Booking Confirmation (Customer)",
-    description: "Sent to the customer when a new booking is confirmed.",
+    description: "Sent to the customer when a provider booking is confirmed.",
     subject: "Your {siteName} Booking Confirmed! (ID: {bookingId})",
     body: `<p>Hi {customerName},</p>
-<p>Thank you for booking with {siteName}! Your service has been scheduled successfully.</p>
+<p>Thank you for booking with {siteName}! Your daily labour provider has been booked successfully.</p>
 <div class="summary-box">
   <div class="section-title">Booking Details</div>
   <p style="margin: 5px 0;"><strong>Booking ID:</strong> {bookingId}</p>
   <p style="margin: 5px 0;"><strong>Scheduled:</strong> {scheduledDate} | {scheduledTimeSlot}</p>
-  <p style="margin: 5px 0;"><strong>Address:</strong> {customerAddress}</p>
+  <p style="margin: 5px 0;"><strong>Work Location:</strong> {customerAddress}</p>
   
-  <div class="section-title" style="margin-top: 25px;">Services</div>
+  <div class="section-title" style="margin-top: 25px;">Provider Booked / Requested</div>
   {servicesList}
   
   <div class="section-title" style="margin-top: 25px;">Payment Summary</div>
@@ -58,9 +58,9 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
   },
   booking_confirmation_admin: {
     title: "New Booking Alert (Admin)",
-    description: "Sent to the admin when a new booking is placed.",
-    subject: "New Booking Received (ID: {bookingId})",
-    body: `<p>A new booking has been made on {siteName}. Here are the full details:</p>
+    description: "Sent to the admin when a new provider is booked.",
+    subject: "New Provider Booked (ID: {bookingId})",
+    body: `<p>A new daily labour provider has been booked on {siteName}. Here are the full details:</p>
 <div class="summary-box">
   <div class="section-title">Customer & Schedule</div>
   <ul style="list-style: none; padding: 0; margin: 0; font-size: 14px;">
@@ -75,7 +75,7 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     {assignedProviderBlock}
   </ul>
   
-  <div class="section-title" style="margin-top: 25px;">Services Requested</div>
+  <div class="section-title" style="margin-top: 25px;">Provider / Labour Requested</div>
   {servicesList}
   
   <div class="section-title" style="margin-top: 25px;">Payment Details</div>
@@ -94,7 +94,7 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     body: `<p>Dear {customerName},</p>
 <p>We regret to inform you that your booking #{bookingId} has been cancelled.</p>
 {cancellationReasonBlock}
-<p>If you did not request this cancellation, please note that it may have been cancelled by our system or service provider due to technician unavailability or service coverage limitations in your area. We sincerely apologize for the inconvenience and will try our best to serve you again soon.</p>
+<p>If you did not request this cancellation, please note that it may have been cancelled by our system or service team due to provider unavailability or coverage limitations in your area. We sincerely apologize for the inconvenience and will try our best to serve you again soon.</p>
 <p>If you have paid online, your refund will be processed within 7 working days.</p>`,
     isEnabled: true,
     placeholders: ["customerName", "bookingId", "cancellationReasonBlock"]
@@ -108,13 +108,13 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     placeholders: ["bookingId", "customerName"]
   },
   booking_assigned_customer: {
-    title: "Technician Assigned (Customer)",
-    description: "Sent to the customer when a technician is assigned to their booking.",
-    subject: "Technician Assigned to your Booking (ID: {bookingId})",
+    title: "Provider Assigned / Booked (Customer)",
+    description: "Sent to the customer when a daily labour provider is assigned to their booking.",
+    subject: "Provider Assigned to your Booking (ID: {bookingId})",
     body: `<p>Hi {customerName},</p>
-<p>We have successfully assigned a service professional to your booking (ID: <strong>{bookingId}</strong>).</p>
+<p>We have successfully assigned a verified daily labour provider to your booking (ID: <strong>{bookingId}</strong>).</p>
 <div class="summary-box">
-  <div class="section-title">Technician Details</div>
+  <div class="section-title">Provider Details</div>
   <p style="margin: 5px 0;"><strong>Name:</strong> {providerName}</p>
   <p style="margin: 5px 0; margin-top: 15px;"><strong>Scheduled Time:</strong> {scheduledDate} at {scheduledTimeSlot}</p>
 </div>
@@ -140,7 +140,7 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     description: "Sent to the customer when their booking status changes.",
     subject: "Update on your {siteName} booking (ID: {bookingId})",
     body: `<p>Hi {customerName},</p>
-<p>The status of your service booking (ID: <strong>{bookingId}</strong>) has been updated to: <strong>{status}</strong>.</p>
+<p>The status of your daily labour booking (ID: <strong>{bookingId}</strong>) has been updated to: <strong>{status}</strong>.</p>
 <p style="text-align: center; margin-top: 30px;">
   <a href="{myBookingsUrl}" class="button" style="color: #ffffff !important;">View Booking Status</a>
 </p>`,
@@ -156,23 +156,23 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     placeholders: ["bookingId", "status"]
   },
   provider_assignment: {
-    title: "New Job Assigned (Provider)",
-    description: "Sent to a provider when a job is assigned to them.",
+    title: "New Job Assigned / Provider Booked (Provider)",
+    description: "Sent to a provider when a job is assigned or booked with them.",
     subject: "New Job Assigned - #{bookingId}",
     body: `<p>Hi {providerName},</p>
-<p>A new job has been successfully assigned to you on {siteName}. Here are the service details:</p>
+<p>A new daily labour booking has been assigned to you on {siteName}. Here are the work details:</p>
 <div class="summary-box">
   <div class="section-title">Schedule & Details</div>
   <p style="margin: 5px 0;"><strong>Booking ID:</strong> {bookingId}</p>
   <p style="margin: 5px 0;"><strong>Scheduled Date:</strong> {scheduledDate}</p>
   <p style="margin: 5px 0;"><strong>Scheduled Time:</strong> {scheduledTimeSlot}</p>
   
-  <div class="section-title" style="margin-top: 20px;">Customer Contact & Address</div>
+  <div class="section-title" style="margin-top: 20px;">Customer Contact & Work Location</div>
   <p style="margin: 5px 0;"><strong>Name:</strong> {customerName}</p>
   <p style="margin: 5px 0;"><strong>Phone:</strong> {customerPhone}</p>
   <p style="margin: 5px 0;"><strong>Address:</strong> {customerAddress}</p>
   
-  <div class="section-title" style="margin-top: 20px;">Service Requested</div>
+  <div class="section-title" style="margin-top: 20px;">Provider Booked / Requested</div>
   <p style="margin: 5px 0;">{serviceName}</p>
 </div>
 <p style="text-align: center; margin-top: 30px;">
@@ -222,7 +222,7 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     subject: "Custom Service Request Received",
     body: `<p>Hi {userName},</p>
 <p>Thank you for reaching out to {siteName}!</p>
-<p>We have successfully received your custom service request details for <strong>{serviceName}</strong>. Our support team is currently reviewing your request and will contact you shortly with technician details and price quotations.</p>
+<p>We have successfully received your custom daily labour request details for <strong>{serviceName}</strong>. Our support team is currently reviewing your request and will contact you shortly with provider details and wage rate estimates.</p>
 <div class="summary-box">
   <div class="section-title">Request Summary</div>
   <p style="margin: 5px 0;"><strong>Category/Service:</strong> {serviceName}</p>

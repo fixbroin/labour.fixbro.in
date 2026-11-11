@@ -406,7 +406,7 @@ export default function ProviderBookingDetailsPage() {
           </section>
           <Separator />
           <section>
-            <h3 className="text-lg font-semibold mb-2 flex items-center"><MapPin className="mr-2 text-primary"/>Service Address</h3>
+            <h3 className="text-lg font-semibold mb-2 flex items-center"><MapPin className="mr-2 text-primary"/>Work / Job Location</h3>
             <div className="text-sm space-y-0.5">
               {isJobCompleted ? (
                 <p className="text-muted-foreground italic">[Hidden for Privacy]</p>
@@ -496,7 +496,7 @@ export default function ProviderBookingDetailsPage() {
           </section>
           <Separator />
           <section>
-            <h3 className="text-lg font-semibold mb-2 flex items-center"><ListOrdered className="mr-2 text-primary"/>Services Booked</h3>
+            <h3 className="text-lg font-semibold mb-2 flex items-center"><ListOrdered className="mr-2 text-primary"/>Daily Labour / Provider Booked</h3>
             <ul className="space-y-1 text-sm list-disc list-inside">
               {booking.services.map(service => (
                 <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - {symbol}{service.pricePerUnit.toFixed(decimals)} each</li>

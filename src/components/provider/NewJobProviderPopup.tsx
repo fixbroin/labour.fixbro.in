@@ -53,10 +53,10 @@ export default function NewJobProviderPopup({
             <Bell className="h-8 w-8 text-rose-500 animate-bounce" />
           </div>
           <DialogTitle className="text-center text-xl font-bold font-headline text-slate-900">
-            New Booking Received
+            New Daily Labour Booking Received
           </DialogTitle>
           <DialogDescription className="text-center text-sm sm:text-base text-slate-500 pt-2 px-2 leading-relaxed">
-            You have received a new booking. Check your bookings page for details.
+            A customer has requested your daily labour service. Tap View to review schedule and booking details.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-center gap-3 mt-6">

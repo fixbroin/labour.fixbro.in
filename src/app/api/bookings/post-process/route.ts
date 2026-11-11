@@ -582,7 +582,7 @@ export async function POST(request: Request) {
 
                   if (isCompleted) {
                       adminTitle = "Job Completed!";
-                      adminMessage = `Booking #${booking.bookingId} for ${booking.customerName} has been completed by ${providerName || 'technician'}. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
+                      adminMessage = `Booking #${booking.bookingId} for ${booking.customerName} has been completed by ${providerName || 'provider'}. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
                       notificationType = 'info';
                   } else if (isCancelled) {
                       adminTitle = "Booking Cancelled";
@@ -601,20 +601,20 @@ export async function POST(request: Request) {
                       }
                       notificationType = 'admin_alert';
                   } else if (currentStatus === 'AssignedToProvider') {
-                      adminTitle = "Technician Assigned";
-                      adminMessage = `Booking #${booking.bookingId} assigned to technician ${providerName || 'Provider'}.`;
+                      adminTitle = "Provider Assigned";
+                      adminMessage = `Booking #${booking.bookingId} assigned to provider ${providerName || 'Provider'}.`;
                       notificationType = 'info';
                   } else if (currentStatus === 'ProviderAccepted') {
-                      adminTitle = "Technician Accepted Job";
-                      adminMessage = `Technician ${providerName || 'Provider'} has accepted booking #${booking.bookingId} for ${booking.customerName}.`;
+                      adminTitle = "Provider Accepted Job";
+                      adminMessage = `Provider ${providerName || 'Provider'} has accepted booking #${booking.bookingId} for ${booking.customerName}.`;
                       notificationType = 'info';
                   } else if (currentStatus === 'ProviderRejected') {
-                      adminTitle = "Technician Rejected Booking!";
-                      adminMessage = `Technician ${providerName || 'Provider'} rejected booking #${booking.bookingId}. Action required: please reassign.`;
+                      adminTitle = "Provider Rejected Booking!";
+                      adminMessage = `Provider ${providerName || 'Provider'} rejected booking #${booking.bookingId}. Action required: please reassign.`;
                       notificationType = 'admin_alert';
                   } else if (currentStatus === 'InProgressByProvider') {
-                      adminTitle = "Service In Progress";
-                      adminMessage = `Technician ${providerName || 'Provider'} started work on booking #${booking.bookingId} for ${booking.customerName}.`;
+                      adminTitle = "Work In Progress";
+                      adminMessage = `Provider ${providerName || 'Provider'} started work on booking #${booking.bookingId} for ${booking.customerName}.`;
                       notificationType = 'info';
                   }
 
@@ -667,13 +667,13 @@ export async function POST(request: Request) {
             }
 
             let customerTitle = "Booking Confirmed!";
-            let customerMessage = `Your booking #${booking.bookingId} has been successfully placed. We're assigning a technician shortly.`;
+            let customerMessage = `Your booking #${booking.bookingId} has been successfully placed. We're assigning a provider shortly.`;
             let customerType = 'booking_created';
             let notificationType: 'info' | 'success' | 'warning' | 'destructive' = 'success';
 
             if (isCompleted) {
-                customerTitle = "Service Completed!";
-                customerMessage = `Your service #${booking.bookingId} has been successfully completed. Thank you for choosing ${seoSettings?.websiteName || 'Fixbro'}!`;
+                customerTitle = "Work Completed!";
+                customerMessage = `Your booking #${booking.bookingId} has been successfully completed. Thank you for choosing ${seoSettings?.websiteName || 'Fixbro'}!`;
                 customerType = 'booking_completed';
                 notificationType = 'success';
             } else if (isCancelled) {
@@ -687,23 +687,23 @@ export async function POST(request: Request) {
                 customerType = 'other';
                 notificationType = 'info';
             } else if (currentStatus === 'AssignedToProvider') {
-                customerTitle = "Technician Assigned!";
-                customerMessage = `Technician ${providerName || 'a verified professional'} has been assigned to your booking #${booking.bookingId}.`;
+                customerTitle = "Provider Assigned!";
+                customerMessage = `Provider ${providerName || 'a verified provider'} has been assigned to your booking #${booking.bookingId}.`;
                 customerType = 'provider_assigned';
                 notificationType = 'info';
             } else if (currentStatus === 'ProviderAccepted') {
-                customerTitle = "Technician Confirmed!";
-                customerMessage = `Technician ${providerName || 'Your technician'} has confirmed your booking #${booking.bookingId} and is scheduled to arrive.`;
+                customerTitle = "Provider Confirmed!";
+                customerMessage = `Provider ${providerName || 'Your provider'} has confirmed your booking #${booking.bookingId} and is scheduled to arrive.`;
                 customerType = 'provider_accepted';
                 notificationType = 'success';
             } else if (currentStatus === 'InProgressByProvider') {
-                customerTitle = "Service In Progress";
-                customerMessage = `Technician ${providerName || 'Your technician'} has started working on your service #${booking.bookingId}.`;
+                customerTitle = "Work In Progress";
+                customerMessage = `Provider ${providerName || 'Your provider'} has started working on your booking #${booking.bookingId}.`;
                 customerType = 'other';
                 notificationType = 'info';
             } else if (currentStatus === 'ProviderRejected') {
-                customerTitle = "Finding Another Technician";
-                customerMessage = `We are reassigning another qualified technician to your booking #${booking.bookingId}.`;
+                customerTitle = "Finding Another Provider";
+                customerMessage = `We are reassigning another qualified provider to your booking #${booking.bookingId}.`;
                 customerType = 'other';
                 notificationType = 'warning';
             }

@@ -140,7 +140,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
         </Card>
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Service Address</CardTitle>
+            <CardTitle className="text-lg">Work / Job Location</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p>{booking.addressLine1}</p>
@@ -182,7 +182,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <UserCheck className="h-5 w-5 text-primary" />
-            Assigned Service Provider
+            Assigned Daily Labour Provider
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -379,13 +379,13 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Services Booked</CardTitle>
+          <CardTitle className="text-lg">Provider Booked / Requested</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Service Name</TableHead>
+                <TableHead>Provider / Labour Trade</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
                 <TableHead className="text-right">Unit Price ({symbol})</TableHead>
                 <TableHead className="text-right">Total ({symbol})</TableHead>

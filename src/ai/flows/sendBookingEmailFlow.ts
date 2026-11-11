@@ -319,7 +319,7 @@ const bookingEmailFlow = ai.defineFlow(
           if (sendCustomer) {
             const variables = { customerName: bookingDetails.customerName, bookingId: bookingDetails.bookingId, providerName: providerName || 'N/A', scheduledDate: formatScheduledDate(bookingDetails.scheduledDate), scheduledTimeSlot: bookingDetails.scheduledTimeSlot, myBookingsUrl: `${getBaseUrl()}/my-bookings` };
             customerEmailSubject = replacePlaceholders(custTemplate.subject, variables);
-            customerEmailBody = createHtmlTemplate('Technician Assigned', replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
+            customerEmailBody = createHtmlTemplate('Provider Assigned', replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
           }
 
           if (sendAdmin) {
@@ -387,7 +387,7 @@ const bookingEmailFlow = ai.defineFlow(
             addressBlock, 
             paymentMethod: bookingDetails.paymentMethod, 
             status: bookingDetails.status, 
-            assignedProviderBlock: providerName ? `<li style="margin-bottom: 5px; margin-top: 10px; color: #0B5ED7;"><strong>Auto-Assigned Provider:</strong> ${providerName}</li>` : '', 
+            assignedProviderBlock: providerName ? `<li style="margin-bottom: 5px; margin-top: 10px; color: #0B5ED7;"><strong>Assigned Provider:</strong> ${providerName}</li>` : '', 
             servicesList: servicesHtml, 
             paymentSummary: paymentSummaryHtml, 
             adminBookingsUrl: `${getBaseUrl()}/admin/bookings` 

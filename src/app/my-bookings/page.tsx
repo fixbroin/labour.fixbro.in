@@ -26,6 +26,7 @@ import AppImage from "@/components/ui/AppImage";
 import { triggerPushNotification } from "@/lib/fcmUtils";
 import { ADMIN_EMAIL } from "@/contexts/AuthContext";
 import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatCurrency, formatEndTimeDisplay } from "@/lib/utils";
+import BookingRulesView from "@/components/shared/BookingRulesView";
 
 
 // Enriched booking type to include provider details
@@ -141,6 +142,7 @@ export default function MyBookingsPage() {
   const [showCancellationDialog, setShowCancellationDialog] = useState(false);
   const [cancellationDialogContent, setCancellationDialogContent] = useState<{ title: string; description: React.ReactNode; actionText?: string; onAction?: () => void; showPayButton?: boolean; feeAmount?: number, feeType?: 'fixed' | 'percentage' } | null>(null);
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState<FirestoreBooking | null>(null);
+  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
 
   useEffect(() => {
@@ -613,7 +615,7 @@ export default function MyBookingsPage() {
             <h2 className="text-2xl font-semibold mb-2">No Bookings Yet</h2>
             <p className="text-muted-foreground mb-6">You haven't made any bookings with Fixbro.</p>
             <Link href="/categories" passHref>
-              <Button>Book a Service</Button>
+              <Button>Book Daily Labour</Button>
             </Link>
           </div>
         ) : (
@@ -808,38 +810,130 @@ export default function MyBookingsPage() {
 
                   {booking.providerDetails && shouldShowProviderDetails(booking.status) && (
                     <div className="sm:col-span-2 md:col-span-3 pt-4 border-t">
-                      <h4 className="text-md font-semibold mb-2 text-foreground">Your Provider</h4>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-12 w-12">
+                      <h4 className="text-md font-semibold mb-2.5 text-foreground">Your Provider</h4>
+                      
+                      {/* Mobile View Layout (Line 1: Name + Badges, Line 2: Languages, Line 3: Call Button) */}
+                      <div className="sm:hidden space-y-2.5">
+                        {/* Line 1: Avatar + Name (Full Width) & Badges */}
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-12 w-12 shrink-0 border shadow-2xs">
                             <AvatarImage src={booking.providerDetails.profilePhotoUrl || undefined} alt={booking.providerDetails.fullName} />
                             <AvatarFallback><UserCircle className="h-6 w-6" /></AvatarFallback>
-                            </Avatar>
-                            <div>
-                            <p className="font-semibold">{booking.providerDetails.fullName}</p>
-                            {booking.providerDetails.languagesSpokenLabels && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1"><Languages className="h-3 w-3"/> {booking.providerDetails.languagesSpokenLabels.join(', ')}</p>
-                            )}
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-base text-foreground leading-tight">{booking.providerDetails.fullName}</p>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              {booking.providerDetails.workCategoryName && (
+                                <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                  {booking.providerDetails.workCategoryName}
+                                </Badge>
+                              )}
+                              {(booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel) && (
+                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel}
+                                </Badge>
+                              )}
+                              {(booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience) && (
+                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                  {booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience}
+                                </Badge>
+                              )}
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Line 2: Languages */}
+                        {booking.providerDetails.languagesSpokenLabels && booking.providerDetails.languagesSpokenLabels.length > 0 && (
+                          <div className="pt-0.5">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
+                              <span>{booking.providerDetails.languagesSpokenLabels.join(', ')}</span>
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Line 3: Call Button (Full Width on mobile) */}
+                        {booking.providerDetails.mobileNumber && (
+                          <div className="pt-1">
+                            {booking.status === 'AssignedToProvider' ? (
+                              <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2" disabled title="Awaiting provider acceptance">
+                                <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
+                              </Button>
+                            ) : (
+                              <a href={`tel:${booking.providerDetails.mobileNumber}`} className="block w-full">
+                                <Button variant="outline" size="sm" className="w-full text-xs font-semibold py-2">
+                                  <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call Provider
+                                </Button>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Desktop View Layout */}
+                      <div className="hidden sm:flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                          <Avatar className="h-14 w-14 shrink-0 border shadow-2xs">
+                            <AvatarImage src={booking.providerDetails.profilePhotoUrl || undefined} alt={booking.providerDetails.fullName} />
+                            <AvatarFallback><UserCircle className="h-7 w-7" /></AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-base text-foreground">{booking.providerDetails.fullName}</p>
+                              {booking.providerDetails.workCategoryName && (
+                                <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                  {booking.providerDetails.workCategoryName}
+                                </Badge>
+                              )}
+                              {(booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel) && (
+                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {booking.providerDetails.skillLevelLabel || (booking.providerDetails as any).seniorityLevel}
+                                </Badge>
+                              )}
+                              {(booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience) && (
+                                <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                  {booking.providerDetails.experienceLevelLabel || (booking.providerDetails as any).experienceYearsLabel || (booking.providerDetails as any).experience}
+                                </Badge>
+                              )}
+                            </div>
+                            {booking.providerDetails.languagesSpokenLabels && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                                <Languages className="h-3.5 w-3.5 text-primary shrink-0"/> 
+                                <span>{booking.providerDetails.languagesSpokenLabels.join(', ')}</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
                         {booking.providerDetails.mobileNumber && (
-                           booking.status === 'AssignedToProvider' ? (
-                             <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
-                               <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
-                             </Button>
-                           ) : (
-                             <a href={`tel:${booking.providerDetails.mobileNumber}`}>
+                          <div className="shrink-0">
+                            {booking.status === 'AssignedToProvider' ? (
+                              <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
+                                <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
+                              </Button>
+                            ) : (
+                              <a href={`tel:${booking.providerDetails.mobileNumber}`}>
                                 <Button variant="outline" size="sm">
-                                    <Phone className="mr-2 h-4 w-4" /> Call
+                                  <Phone className="mr-2 h-4 w-4 text-emerald-600" /> Call
                                 </Button>
-                             </a>
-                           )
-                         )}
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
                   </CardContent>
                   <CardFooter className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-2 pb-6">
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto text-xs font-semibold gap-1.5"
+                    onClick={() => setIsRulesModalOpen(true)}
+                  >
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    Booking Rules
+                  </Button>
 
                   {booking.status === "Completed" && (
                     <Button
@@ -895,6 +989,13 @@ export default function MyBookingsPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Booking Guidelines & Rules Modal */}
+      <BookingRulesView
+        mode="modal"
+        isOpen={isRulesModalOpen}
+        onClose={() => setIsRulesModalOpen(false)}
+      />
     </ProtectedRoute>
   );
 }

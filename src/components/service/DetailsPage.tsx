@@ -29,6 +29,7 @@ import { getCache, setCache } from '@/lib/client-cache';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, getTimestampMillis, formatCurrency } from '@/lib/utils';
+import BookingRulesView from '@/components/shared/BookingRulesView';
 import { LazySection } from '@/components/shared/LazySection';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import RecommendedServicesSection from '@/components/service/RecommendedServicesSection';
@@ -535,7 +536,7 @@ export default function DetailsPage({
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-24">
       {breadcrumbItems.length > 0 && <div className="mb-3"><Breadcrumbs items={breadcrumbItems} /></div>}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
+      <div className="hidden sm:flex items-center justify-between mb-4 sm:mb-6">
         <Button variant="outline" size="sm" onClick={() => router.back()} className="flex items-center text-xs sm:text-sm">
           <ArrowLeft className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Back
         </Button>
@@ -815,13 +816,15 @@ export default function DetailsPage({
                   </ul>
                 </div>
               )}
-
-              
-
             </CardContent>
           </div>
         </div>
       </Card>
+
+      {/* DAILY LABOUR BOOKING GUIDELINES & RULES FULL-WIDTH SECTION */}
+      <section className="mb-6 sm:mb-10 w-full">
+        <BookingRulesView mode="inline" />
+      </section>
 
       {/* RECOMMENDED SERVICES (SAME CATEGORY & SUBCATEGORY) */}
       <LazySection>

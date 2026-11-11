@@ -8,6 +8,7 @@ import { generateBookingId } from '@/lib/bookingUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
 import { verifyRequest } from '@/lib/dbSecurity';
 import { getPool, getDocsInternal } from '@/lib/mysql';
+import { getBaseUrl } from '@/lib/config';
 
 export async function POST(req: NextRequest) {
   try {
@@ -252,30 +253,50 @@ export async function POST(req: NextRequest) {
     const docRef = await adminDb.collection('bookings').add(newBookingData);
 
     // 5. Trigger Server-Side Post Processing (Notifications, Dispatch, WhatsApp)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
+    const appUrl = getBaseUrl();
     fetch(`${appUrl}/api/bookings/post-process`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-internal-token': process.env.INTERNAL_API_SECRET || ''
+      },
       body: JSON.stringify({ 
         bookingDocId: docRef.id, 
         triggerSource: finalPaymentMethod === 'Online' ? 'online_checkout' : 'cash_checkout' 
       }),
     }).catch((err) => console.error('Error triggering post-process for booking:', err));
 
-    // Send in-app notification if online booking placed by logged in user
-    if (finalPaymentMethod === 'Online' && resolvedUserId) {
+    // Send in-app notification to Customer
+    if (resolvedUserId) {
       try {
         await adminDb.collection('userNotifications').add({
           userId: resolvedUserId,
-          title: 'Booking Confirmed!',
-          message: `Your booking ${newBookingId} has been successfully placed. We'll assign a provider shortly.`,
+          title: 'Daily Labour Booked!',
+          message: `Your booking #${newBookingId} has been successfully placed. We're assigning a provider shortly.`,
           type: 'success',
           href: '/my-bookings',
           read: false,
           createdAt: Timestamp.now(),
         });
       } catch (notifyErr) {
-        console.error('Error sending in-app notification for online booking:', notifyErr);
+        console.error('Error sending in-app notification for booking:', notifyErr);
+      }
+    }
+
+    // Direct real-time in-app notification for matched provider
+    if (matchedProviderId) {
+      try {
+        await adminDb.collection('userNotifications').add({
+          userId: matchedProviderId,
+          title: "New Booking Received!",
+          message: `New booking #${newBookingId} assigned for ${customerInfo.fullName || 'Customer'}. Tap to view details.`,
+          type: 'info',
+          href: `/provider/booking/${docRef.id}`,
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      } catch (pNotifyErr) {
+        console.error('Error sending provider notification in create-cash:', pNotifyErr);
       }
     }
 

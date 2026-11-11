@@ -1020,9 +1020,9 @@ export default function AdminBookingsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-4 space-y-3 text-sm">
-          {/* Services Included */}
+          {/* Provider Booked / Requested */}
           <div className="border-b pb-2 mb-2">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Services Included:</p>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Provider Booked / Requested:</p>
             <ul className="list-disc pl-4 text-xs space-y-0.5">
               {booking.services.map((service, idx) => (
                 <li key={idx}>
@@ -1061,7 +1061,7 @@ export default function AdminBookingsPage() {
               <div className="flex items-center justify-between text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-300 dark:border-amber-900">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span>🚨 No Provider Assigned Yet</span>
+                  <span>🚨 Provider Requested (Unassigned)</span>
                 </div>
               </div>
             )}

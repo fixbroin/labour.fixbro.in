@@ -256,7 +256,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
       </CardHeader>
       <CardContent className="text-sm space-y-1">
         <div className="border-b pb-2 mb-2">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Services Included:</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Provider Booked / Requested:</p>
           <ul className="list-disc pl-4 text-xs space-y-1">
             {job.services.map((service, idx) => (
               <li key={idx}>

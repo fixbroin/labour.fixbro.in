@@ -4,6 +4,7 @@ import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
+import { getBaseUrl } from '@/lib/config';
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
             cancellationPaymentId: razorpay_payment_id,
           };
 
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
+          const appUrl = getBaseUrl();
           fetch(`${appUrl}/api/bookings/post-process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
           };
 
           // Trigger Server Post-Processing (Auto dispatch, notification, WhatsApp)
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3008';
+          const appUrl = getBaseUrl();
           fetch(`${appUrl}/api/bookings/post-process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
