@@ -341,9 +341,9 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
           isActive: false
         });
         await insert('seo', null, {
-          title: "Fixbro | Premium Home Services on Demand",
-          description: "Book certified professionals for cleaning, plumbing, electrical, and other premium home services.",
-          keywords: "home services, cleaning service, plumber, electrician, fixbro",
+          title: "Fixbro Daily Labour | Verified Daily Wage Workers in Bangalore",
+          description: "Hire verified daily wage trade workers and helpers in Bangalore on fixed daily rates with OTP verification.",
+          keywords: "daily labour, carpenter daily wage, electrician daily labour, painter daily labour, fixbro daily labour",
           ogImage: "/android-chrome-512x512.png"
         });
         await insert('loginSettings', null, {
@@ -364,7 +364,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'contentPages':
-        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About Fixbro</h1><p>Fixbro is India\'s premium on-demand home services platform...</p>', isActive: true });
+        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About Fixbro Daily Labour</h1><p>Fixbro Daily Labour is India\'s premium daily wage labour platform connecting customers with verified tradesmen...</p>', isActive: true });
         await insert('terms-and-conditions', null, { slug: 'terms-and-conditions', title: 'Terms & Conditions', content: '<h1>Terms & Conditions</h1><p>Please read these terms carefully before booking...</p>', isActive: true });
         await insert('privacy-policy', null, { slug: 'privacy-policy', title: 'Privacy Policy', content: '<h1>Privacy Policy</h1><p>We respect your privacy and protect your data...</p>', isActive: true });
         break;

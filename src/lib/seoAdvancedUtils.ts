@@ -167,18 +167,18 @@ export function replaceAndCleanPlaceholders(
 }
 
 /**
- * Generates a list of LSI (Latent Semantic Indexing) keywords for home services.
+ * Generates a list of LSI (Latent Semantic Indexing) keywords for daily labour.
  */
 export function getLSIKeywords(category: string, city: string = 'Bangalore'): string[] {
-  const common = ['best', 'professional', 'top-rated', 'trusted', 'expert', 'near me', 'affordable', 'reliable'];
-  const localized = [`in ${city}`, `${city} experts`, `booking ${city}`];
+  const common = ['verified', 'skilled', 'experienced', 'full-day', 'daily wage', 'near me', 'honest', 'reliable'];
+  const localized = [`in ${city}`, `${city} workers`, `daily wage ${city}`];
   
   return [
-    `${category} ${city}`,
-    `best ${category} ${city}`,
-    `professional ${category} services`,
-    `${category} near me`,
-    ...common.map(c => `${c} ${category}`),
+    `${category} daily labour ${city}`,
+    `best ${category} daily wage in ${city}`,
+    `verified ${category} daily labour`,
+    `${category} daily labour near me`,
+    ...common.map(c => `${c} ${category} daily labour`),
   ];
 }
 

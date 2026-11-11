@@ -802,8 +802,8 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
 
   const displayHeroCarousel = isLoadingAppSettings ? true : (appConfig.enableHeroCarousel ?? true);
   const finalH1 = pageH1 || initialH1Title || (citySlug || areaSlug 
-    ? `Professional Home Services in ${areaSlug || citySlug}`.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-    : "Discover Our Services");
+    ? `Daily Labour in ${areaSlug || citySlug}`.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    : "Hire Verified Daily Labour in Bangalore");
   
   const renderAdsByPlacement = (placement: AdPlacement) => {
     const adsForPlacement = activeAds.filter(ad => ad.placement === placement);
@@ -1006,14 +1006,14 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                 <div className="container mx-auto px-4">
                     <div className="max-w-4xl mx-auto text-center">
                         <h2 className="text-2xl md:text-3xl font-headline font-semibold mb-6 text-foreground">
-                            Home Services in Bangalore
+                            Daily Labour in Bangalore
                         </h2>
                         <div className="prose prose-sm md:prose-base max-w-none text-muted-foreground">
                             <p>
-                                Fixbro is your one-stop solution for all <strong>home services in Bangalore</strong>. Whether you are looking for a <strong>carpenter near me</strong>, a professional <strong>plumber in Bangalore</strong>, or an <strong>electrician in Whitefield</strong>, we have you covered. Our platform connects you with verified, background-checked experts for over 50+ services including AC repair, house cleaning, painting, and appliance maintenance.
+                                Fixbro Daily Labour is your trusted platform for verified <strong>daily wage workers in Bangalore</strong>. Whether you need a skilled <strong>carpenter daily labour near me</strong>, an experienced <strong>painter daily wage worker</strong>, a licensed <strong>electrician daily labour</strong>, or construction and tiling helpers, we connect you directly with background-checked tradesmen. All workers operate on a dedicated full-day shift (09:30 AM to 05:30 PM) on fixed, transparent daily rates with OTP verification.
                             </p>
                             <p>
-                                We currently serve all major localities in Bangalore, including <strong>Whitefield, HSR Layout, Koramangala, Indiranagar, Electronic City, and Jayanagar</strong>. With upfront pricing, same-day service availability, and a 99.9% satisfaction guarantee, Fixbro is Bangalore's most trusted home maintenance partner.
+                                We serve all major localities in Bangalore, including <strong>Whitefield, HSR Layout, Koramangala, Indiranagar, Electronic City, Sarjapur Road, and Jayanagar</strong>. With transparent pricing, verified government IDs, and direct worker deployment, Fixbro Daily Labour is Bangalore&apos;s premier daily wage hiring platform.
                             </p>
                         </div>
                     </div>

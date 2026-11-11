@@ -130,7 +130,7 @@ export default function MarketplaceNavHeader({
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary transition-colors"
               >
                 <Wrench className="h-3.5 w-3.5" />
-                <span>Home Services</span>
+                <span>Daily Labour</span>
               </Link>
               <Link
                 href="/furniture"
@@ -308,7 +308,7 @@ export default function MarketplaceNavHeader({
             className="flex items-center justify-center gap-1 py-1 px-1 rounded-lg shrink-0 text-gray-700 dark:text-gray-300 hover:text-primary transition-all truncate"
           >
             <Wrench className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="truncate">Home Services</span>
+            <span className="truncate">Daily Labour</span>
           </Link>
           <Link
             href="/furniture"

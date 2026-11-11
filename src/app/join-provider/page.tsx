@@ -109,11 +109,11 @@ export default async function JoinProviderPage() {
   const categoryJobPostings = categories.map((cat) => ({
     "@type": "JobPosting",
     "@id": `${appBaseUrl}/join-provider#job-${cat.slug || cat.id}`,
-    "title": `${cat.name} Jobs Near Me - Fixbro Service Partner`,
-    "description": `Looking for ${cat.name.toLowerCase()} jobs near me or ${cat.name.toLowerCase()} service work? Join Fixbro in Bangalore & India. Receive verified customer bookings dispatched to your local radius, flexible online/offline toggle, and earnings withdrawal in 3 days.`,
+    "title": `${cat.name} Daily Labour Jobs Near Me - Fixbro Daily Labour Partner`,
+    "description": `Looking for ${cat.name.toLowerCase()} daily labour work near me? Register as a verified daily wage worker on Fixbro Daily Labour in Bangalore. Direct full-day shifts (09:30 AM - 05:30 PM), fixed daily wages, and transparent OTP sign-off.`,
     "identifier": {
       "@type": "PropertyValue",
-      "name": "Fixbro",
+      "name": "Fixbro Daily Labour",
       "value": `FIXBRO-JOB-${(cat.slug || cat.id).toUpperCase()}`,
     },
     "datePosted": "2026-01-01",
@@ -122,7 +122,7 @@ export default async function JoinProviderPage() {
     "directApply": true,
     "hiringOrganization": {
       "@type": "Organization",
-      "name": "Fixbro",
+      "name": "Fixbro Daily Labour",
       "sameAs": appBaseUrl,
       "logo": `${appBaseUrl}/android-chrome-512x512.png`,
     },

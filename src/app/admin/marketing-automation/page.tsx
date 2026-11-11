@@ -74,7 +74,7 @@ const defaultMarketingAutomationSettings: Omit<MarketingAutomationSettings, 'upd
 
     recurringEngagementEnabled: false,
     recurringEngagementDelay: { days: 15, hours: 0, minutes: 0 },
-    recurringEngagementTemplate: "Hi {{name}},\n\nJust a friendly check-in from Fixbro! We're always here for your home service needs. Check out our popular services in {{city}}:\n\n{{popular_services}}\n\nHave a great week!",
+    recurringEngagementTemplate: "Hi {{name}},\n\nJust a friendly check-in from Fixbro Daily Labour! We're always here for your daily labour and trade worker needs. Check out our verified providers in {{city}}:\n\n{{popular_services}}\n\nHave a great week!",
     recurringEngagementCategoryId: "none",
 };
 

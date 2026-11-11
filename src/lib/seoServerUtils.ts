@@ -199,8 +199,8 @@ export const getLocalSiloData = cache(async (): Promise<SiloData> => {
           };
         });
 
-        // Prioritize top categories
-        const priorityCatSlugs = ['tv-installation', 'carpentry', 'plumber', 'electrician', 'washing-machine', 'painting', 'ac', 'water-purifier', 'geyser', 'chimney', 'home-cleaning', 'pest-control'];
+        // Prioritize top daily labour categories
+        const priorityCatSlugs = ['carpentry', 'painting', 'electrician', 'plumber', 'masonry', 'welder', 'construction-helper', 'general-labour', 'tiling'];
         const priorityCats = allCats.filter(c => priorityCatSlugs.includes((c.slug || '').toLowerCase()));
         const otherCats = allCats.filter(c => !priorityCats.some(p => p.id === c.id));
         const categories = [...priorityCats, ...otherCats].slice(0, 12);
@@ -209,7 +209,7 @@ export const getLocalSiloData = cache(async (): Promise<SiloData> => {
         const { getCategorySearchTerm } = await import('./seoAdvancedUtils');
         const siloLinks: SiloLinkItem[] = topAreas.map((area, index) => {
           const category = categories[index % categories.length];
-          const searchTerm = getCategorySearchTerm(category ? category.name : 'Home Services');
+          const searchTerm = getCategorySearchTerm(category ? category.name : 'Daily Labour');
           return {
             url: `/${city.slug}/${area.slug}/${category ? category.slug : ''}`,
             label: `${searchTerm} in ${area.name}`,

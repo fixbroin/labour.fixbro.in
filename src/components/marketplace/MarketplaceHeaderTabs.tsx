@@ -32,7 +32,7 @@ export default function MarketplaceHeaderTabs() {
           }`}
         >
           <Wrench className={`h-3.5 w-3.5 shrink-0 ${isServices ? 'text-white' : 'text-primary'}`} />
-          <span className="truncate">Home Services</span>
+          <span className="truncate">Daily Labour</span>
         </Link>
 
         <Link
@@ -73,7 +73,7 @@ export default function MarketplaceHeaderTabs() {
               }`}
             >
               <Wrench className="h-3.5 w-3.5 text-primary" />
-              <span>Home Services</span>
+              <span>Daily Labour</span>
             </Link>
 
             <Link

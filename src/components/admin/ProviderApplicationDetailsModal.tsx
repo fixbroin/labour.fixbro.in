@@ -183,7 +183,7 @@ export default function ProviderApplicationDetailsModal({
   const [verifyingDocType, setVerifyingDocType] = useState<string | null>(null);
   const router = useRouter();
 
-  const [allAdminCategories, setAllAdminCategories] = useState<{ id: string; name: string }[]>([]);
+  const [allAdminCategories, setAllAdminCategories] = useState<{ id: string; name: string; seniorityRates?: any[] }[]>([]);
   const [allAdminServices, setAllAdminServices] = useState<{ id: string; name: string; categoryId?: string; categoryName?: string }[]>([]);
   
   const [additionalCats, setAdditionalCats] = useState<{ id: string; name: string }[]>([]);
@@ -253,7 +253,7 @@ export default function ProviderApplicationDetailsModal({
           const categoriesList = catsSnap.docs.map(d => {
             const name = d.data().name || d.id;
             catMap[d.id] = name;
-            return { id: d.id, name };
+            return { id: d.id, name, seniorityRates: d.data().seniorityRates };
           });
           setAllAdminCategories(categoriesList);
 
@@ -620,8 +620,83 @@ export default function ProviderApplicationDetailsModal({
                   </div>
                 </div>
 
-                <DetailRow label="Experience" value={application.experienceLevelLabel || 'N/A'} />
-                <DetailRow label="Skill Level" value={application.skillLevelLabel || 'N/A'} />
+                {/* Dynamic Category Rate Limits Resolution */}
+                {(() => {
+                  const primaryCategory = allAdminCategories.find(
+                    c => c.id === application.workCategoryId || c.name === application.workCategoryName
+                  );
+                  const rawRates = primaryCategory?.seniorityRates;
+                  const rates: any[] = Array.isArray(rawRates)
+                    ? rawRates
+                    : (typeof rawRates === 'string' ? JSON.parse(rawRates || '[]') : []);
+
+                  const targetLabel = (application.skillLevelLabel || application.seniorityLevel || '').trim().toLowerCase();
+                  const targetId = (application.skillLevelId || '').trim().toLowerCase();
+
+                  const activeRateRule = rates.find((r: any) => {
+                    const rLabel = (r.skillLevelLabel || '').trim().toLowerCase();
+                    const rId = (r.skillLevelId || '').trim().toLowerCase();
+                    return (rLabel && targetLabel && rLabel === targetLabel) ||
+                           (rId && targetId && rId === targetId) ||
+                           (rId && targetLabel && rId === targetLabel);
+                  });
+
+                  const minAllowedRate = activeRateRule?.minRate;
+                  const maxAllowedRate = activeRateRule?.maxRate;
+
+                  return (
+                    <>
+                      <DetailRow label="Experience" value={application.experienceLevelLabel || 'N/A'} />
+                      <DetailRow 
+                        label="Skill Level" 
+                        value={
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-semibold px-2 py-0.5 text-xs bg-primary/5 text-primary border-primary/20">
+                              {application.skillLevelLabel || application.seniorityLevel || 'N/A'}
+                            </Badge>
+                          </div>
+                        } 
+                      />
+                      <DetailRow
+                        label="Desired Daily Rate"
+                        value={
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                              ₹{(Number(application.dailyRate) || 0).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ full day</span>
+                            </span>
+                            {typeof minAllowedRate === 'number' && typeof maxAllowedRate === 'number' && (
+                              <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold w-fit">
+                                Category Range: ₹{minAllowedRate.toLocaleString()} - ₹{maxAllowedRate.toLocaleString()}
+                              </Badge>
+                            )}
+                          </div>
+                        }
+                      />
+                      <DetailRow
+                        label="Category Allowed Range"
+                        value={
+                          typeof minAllowedRate === 'number' && typeof maxAllowedRate === 'number' ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-primary text-primary-foreground font-bold text-xs">
+                                  ₹{minAllowedRate.toLocaleString()} - ₹{maxAllowedRate.toLocaleString()}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  (Min: ₹{minAllowedRate.toLocaleString()} &bull; Max: ₹{maxAllowedRate.toLocaleString()})
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Admin configured minimum &amp; maximum rate for {application.skillLevelLabel || application.seniorityLevel || 'this level'} in {application.workCategoryName || 'this category'}.
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">No category rate bounds configured.</span>
+                          )
+                        }
+                      />
+                    </>
+                  );
+                })()}
                 <div className="pt-4">
                   <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Bio / About Me</Label>
                   <p className="text-muted-foreground whitespace-pre-wrap mt-1.5 border p-4 rounded-xl bg-muted/10 text-sm leading-relaxed border-border/40">

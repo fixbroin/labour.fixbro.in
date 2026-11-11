@@ -119,7 +119,7 @@ export async function generateMetadata(
   const description = replacePlaceholders(
     seoOverride?.meta_description || seoSettings.cityCategoryPageDescriptionPattern || categoryData.metaDescription || categoryData.seo_description, 
     placeholderData
-  ) || `Hire top-rated ${searchTerm} experts in ${cityData.name} for ${serviceNamesText || 'repair and installation'}. Verified professionals, transparent pricing, and quality home services near you.`;
+  ) || `Hire verified ${searchTerm} daily labour in ${cityData.name} for ${serviceNamesText || 'daily wage work'}. Background-checked workers, fixed daily rates, and professional daily labour near you.`;
 
   const keywords = (replacePlaceholders(
     seoOverride?.meta_keywords || seoSettings.cityCategoryPageKeywordsPattern || categoryData.metaKeywords || categoryData.seo_keywords, 

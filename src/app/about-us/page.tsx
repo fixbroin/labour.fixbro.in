@@ -25,8 +25,8 @@ export async function generateMetadata(
 
   if (!pageData) return { title: `About Us | Fixbro` };
 
-  const title = pageData.metaTitle || `About Us | ${seoSettings.siteName || 'Fixbro'}`;
-  const description = pageData.metaDescription || pageData.excerpt || "Learn more about Fixbro - Bangalore's most trusted home services provider.";
+  const title = pageData.metaTitle || `About Us | ${seoSettings.siteName || 'Fixbro Daily Labour'}`;
+  const description = pageData.metaDescription || pageData.excerpt || "Learn more about Fixbro Daily Labour - Bangalore's most trusted platform for verified daily wage workers and skilled trades.";
 
   return {
     title: title,
@@ -74,10 +74,10 @@ export default async function AboutUsPage() {
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Fixbro",
+    "name": "Fixbro Daily Labour",
     "url": appBaseUrl,
     "logo": `${appBaseUrl}/android-chrome-512x512.png`,
-    "description": pageData.metaDescription || "Fixbro is Bangalore's leading home services provider, offering professional carpentry, electrical, plumbing, and more.",
+    "description": pageData.metaDescription || "Fixbro Daily Labour is Bangalore's leading platform for verified daily wage workers, offering skilled carpentry, electrical, painting, masonry, and trade labour on fixed daily rates.",
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+91-7353113455",

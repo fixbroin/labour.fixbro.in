@@ -16,8 +16,8 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const appBaseUrl = getBaseUrl();
   return {
-    title: 'Top-Rated Home Service Categories in Bangalore',
-    description: 'Explore all professional home service categories in Bangalore. Find expert carpenters, plumbers, electricians, painters, and appliance technicians near you.',
+    title: 'Top-Rated Daily Labour Categories in Bangalore | Fixbro Daily Labour',
+    description: 'Explore all verified daily labour categories in Bangalore. Hire skilled daily wage carpenters, painters, electricians, plumbers, and helpers on fixed daily rates.',
     robots: {
       index: true,
       follow: true,
@@ -26,10 +26,10 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: `${appBaseUrl}/categories`,
     },
     openGraph: {
-      title: 'Top-Rated Home Service Categories in Bangalore',
-      description: 'Explore all professional home service categories in Bangalore. Find expert carpenters, plumbers, electricians, painters, and appliance technicians near you.',
+      title: 'Top-Rated Daily Labour Categories in Bangalore | Fixbro Daily Labour',
+      description: 'Explore all verified daily labour categories in Bangalore. Hire skilled daily wage carpenters, painters, electricians, plumbers, and helpers on fixed daily rates.',
       url: '/categories',
-      images: [{ url: `${appBaseUrl}/android-chrome-512x512.png`, width: 512, height: 512, alt: 'Fixbro Categories' }],
+      images: [{ url: `${appBaseUrl}/android-chrome-512x512.png`, width: 512, height: 512, alt: 'Fixbro Daily Labour Categories' }],
       type: 'website',
     },
   };
@@ -66,10 +66,10 @@ export default async function AllCategoriesPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div className="max-w-2xl">
             <h1 className="text-4xl md:text-5xl font-headline font-bold text-foreground mb-4">
-              Service Categories
+              Daily Labour Categories
             </h1>
             <p className="text-lg text-muted-foreground">
-              Find the perfect professional for your home needs from our specialized service categories.
+              Find verified daily wage trade workers and helpers across our specialized daily labour categories.
             </p>
           </div>
           <Link href="/" passHref>
@@ -83,7 +83,7 @@ export default async function AllCategoriesPage() {
           <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
             <PackageSearch className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
             <h2 className="text-2xl font-headline font-bold mb-2 text-foreground/80">No Categories Found</h2>
-            <p className="text-muted-foreground">We are currently updating our services. Please check back soon!</p>
+            <p className="text-muted-foreground">We are currently updating our daily labour categories. Please check back soon!</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6 md:gap-6">

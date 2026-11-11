@@ -12,8 +12,8 @@ import { cache } from 'react';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Sitemap - Fixbro Home Services',
-  description: 'Explore all pages, cities, categories, and services offered by Fixbro. Your complete guide to our home service platform.',
+  title: 'Sitemap - Fixbro Daily Labour',
+  description: 'Explore all pages, cities, categories, and verified daily labour providers offered by Fixbro Daily Labour. Your complete directory for hiring daily wage workers in Bangalore.',
   robots: {
     index: true,
     follow: true,

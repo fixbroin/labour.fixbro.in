@@ -62,26 +62,26 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = {
     cityName: cityData.name,
-    categoryNames: 'Carpenter, TV Installation, Interior, Electrician, Plumber',
-    topCategories: 'Carpenter, TV Installation, Interior',
-    homeServices: 'Home Services'
+    categoryNames: 'Carpenter, Electrician, Painter, Plumber, Mason, Construction Helper',
+    topCategories: 'Carpenter, Electrician, Painter',
+    homeServices: 'Daily Labour'
   };
 
   const title = replacePlaceholders(
     cityData.seo_title || cityData.metaTitle || seoSettings.cityPageTitlePattern, 
     placeholderData,
     true
-  ) || `Home Services in ${cityData.name} | Carpenter, TV Installation Near Me`;
+  ) || `Daily Labour in ${cityData.name} | Verified Daily Wage Workers Near Me`;
 
   const description = replacePlaceholders(
     cityData.seo_description || cityData.metaDescription || seoSettings.cityPageDescriptionPattern, 
     placeholderData
-  ) || `Book trusted carpenter, TV installation, interior, and home services near you in ${cityData.name}. Verified professionals, upfront pricing, and same-day service.`;
+  ) || `Hire verified daily wage trade workers and helpers in ${cityData.name}. Carpenters, electricians, painters, plumbers, and general daily labour on fixed daily rates.`;
 
   const keywords = (replacePlaceholders(
     cityData.seo_keywords || cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, 
     placeholderData
-  ) || `home services ${cityData.name}, carpenter ${cityData.name}, tv installation ${cityData.name}, interior designers ${cityData.name}, electrician ${cityData.name}, home services near me`).split(',').map(k => k.trim()).filter(k => k);
+  ) || `daily labour ${cityData.name}, daily wage workers ${cityData.name}, carpenter daily labour ${cityData.name}, painter daily wage ${cityData.name}, electrician daily labour ${cityData.name}, daily labour near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = cityData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
@@ -140,7 +140,7 @@ export default async function CityHomePage({ params }: CityPageProps) {
     { name: cityData.name, url: `${appBaseUrl}/${citySlug}` }
   ]);
   const placeholderData = { cityName: cityData.name };
-  const h1Title = replacePlaceholders(cityData.h1_title || seoSettings.cityPageH1Pattern, placeholderData) || `Best Professional Home Services in ${cityData.name}`;
+  const h1Title = replacePlaceholders(cityData.h1_title || seoSettings.cityPageH1Pattern, placeholderData) || `Daily Labour in ${cityData.name} | Verified Daily Wage Workers`;
 
   const rawSchemaImage = cityData.imageUrl || seoSettings.structuredDataImage || `/android-chrome-512x512.png`;
   const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
@@ -151,9 +151,9 @@ export default async function CityHomePage({ params }: CityPageProps) {
   const citySchema = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
-    "name": `Fixbro ${cityData.name}`,
+    "name": `Fixbro Daily Labour ${cityData.name}`,
     "url": `${appBaseUrl}/${citySlug}`,
-    "description": cityData.seo_description || cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by Fixbro.`,
+    "description": cityData.seo_description || cityData.metaDescription || `Verified daily wage labour and skilled trades in ${cityData.name} with Fixbro Daily Labour.`,
     "telephone": seoSettings.structuredDataTelephone,
     "image": schemaImage,
     "priceRange": `${symbol}${symbol}`,

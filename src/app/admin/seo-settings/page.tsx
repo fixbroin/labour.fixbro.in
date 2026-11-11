@@ -302,16 +302,16 @@ export default function SEOSettingsPage() {
               <Card>
                 <CardHeader><CardTitle>Global Defaults & Homepage SEO</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
-                  {renderSEOField("siteName", "Site Name (for OG & Structured Data)", "e.g., Fixbro Services", undefined, false, Settings2)}
-                  {renderSEOField("defaultMetaTitleSuffix", "Default Meta Title Suffix", "e.g., | Fixbro", "Appended to most page titles.")}
-                  {renderSEOField("defaultMetaDescription", "Default Meta Description", "e.g., Quality home services at your doorstep.", "Fallback description if a specific one isn't set.", true)}
-                  {renderSEOField("defaultMetaKeywords", "Default Meta Keywords (comma-separated)", "e.g., home repair, plumbing, electrician")}
+                  {renderSEOField("siteName", "Site Name (for OG & Structured Data)", "e.g., Fixbro Daily Labour", undefined, false, Settings2)}
+                  {renderSEOField("defaultMetaTitleSuffix", "Default Meta Title Suffix", "e.g., | Fixbro Daily Labour", "Appended to most page titles.")}
+                  {renderSEOField("defaultMetaDescription", "Default Meta Description", "e.g., Hire verified daily labour and skilled daily wage workers in Bangalore.", "Fallback description if a specific one isn't set.", true)}
+                  {renderSEOField("defaultMetaKeywords", "Default Meta Keywords (comma-separated)", "e.g., daily labour, carpenter daily wage, electrician daily labour, painter daily labour")}
                   <hr className="my-6"/>
                   <h4 className="text-md font-semibold">Homepage Specific SEO:</h4>
-                  {renderSEOField("homepageH1", "Homepage H1 Title", "e.g., Reliable Home Services", undefined, false, Type)}
-                  {renderSEOField("homepageMetaTitle", "Homepage Meta Title", "e.g., Fixbro - Trusted Home Services", undefined, false, Type)}
-                  {renderSEOField("homepageMetaDescription", "Homepage Meta Description", "e.g., Book expert home services online.", undefined, true, FileText)}
-                  {renderSEOField("homepageMetaKeywords", "Homepage Meta Keywords (comma-separated)", "e.g., fixbro, home services, repair", undefined, false, Target)}
+                  {renderSEOField("homepageH1", "Homepage H1 Title", "e.g., Hire Verified Daily Labour in Bangalore", undefined, false, Type)}
+                  {renderSEOField("homepageMetaTitle", "Homepage Meta Title", "e.g., Fixbro Daily Labour - Hire Verified Daily Wage Workers in Bangalore", undefined, false, Type)}
+                  {renderSEOField("homepageMetaDescription", "Homepage Meta Description", "e.g., Hire verified daily wage carpenters, painters, electricians, and helpers in Bangalore on fixed daily rates.", undefined, true, FileText)}
+                  {renderSEOField("homepageMetaKeywords", "Homepage Meta Keywords (comma-separated)", "e.g., fixbro daily labour, daily labour near me, daily wage workers bangalore", undefined, false, Target)}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -323,30 +323,30 @@ export default function SEOSettingsPage() {
                   <div>
                     <h4 className="text-md font-semibold mb-3">Default Category Pages (e.g., /category/slug):</h4>
                     <div className="space-y-4">
-                      {renderSEOField("categoryPageH1Pattern", "H1 Title Pattern", "e.g., {{categoryName}} Services", undefined, false, Pilcrow)}
-                      {renderSEOField("categoryPageTitlePattern", "Meta Title Pattern", "e.g., {{categoryName}} | Fixbro", undefined, false, Type)}
-                      {renderSEOField("categoryPageDescriptionPattern", "Meta Description Pattern", "e.g., Best {{categoryName}} services.", undefined, true, FileText)}
-                      {renderSEOField("categoryPageKeywordsPattern", "Meta Keywords Pattern", "e.g., {{categoryName}}, book {{categoryName}}", undefined, false, Target)}
+                      {renderSEOField("categoryPageH1Pattern", "H1 Title Pattern", "e.g., {{categoryName}} Daily Labour Near Me", undefined, false, Pilcrow)}
+                      {renderSEOField("categoryPageTitlePattern", "Meta Title Pattern", "e.g., {{categoryName}} Daily Labour Near Me | Fixbro Daily Labour", undefined, false, Type)}
+                      {renderSEOField("categoryPageDescriptionPattern", "Meta Description Pattern", "e.g., Hire verified {{categoryName}} daily labour. Full 7-hour active shift, fixed daily wage, OTP verification.", undefined, true, FileText)}
+                      {renderSEOField("categoryPageKeywordsPattern", "Meta Keywords Pattern", "e.g., {{categoryName}} daily labour, {{categoryName}} daily wage near me", undefined, false, Target)}
                     </div>
                   </div>
                   <hr/>
                    <div>
                     <h4 className="text-md font-semibold mb-3 flex items-center"><Map className="mr-2 h-5 w-5 text-muted-foreground"/>City-Specific Category Pages (e.g., /city/category):</h4>
                     <div className="space-y-4 mt-3">
-                      {renderSEOField("cityCategoryPageH1Pattern", "H1 Title Pattern", "e.g., {{categoryName}} in {{cityName}}", undefined, false, Pilcrow)}
-                      {renderSEOField("cityCategoryPageTitlePattern", "Meta Title Pattern", "e.g., {{categoryName}} Services in {{cityName}} | Fixbro", undefined, false, Type)}
-                      {renderSEOField("cityCategoryPageDescriptionPattern", "Meta Description Pattern", "e.g., Find {{categoryName}} experts in {{cityName}}.", undefined, true, FileText)}
-                      {renderSEOField("cityCategoryPageKeywordsPattern", "Meta Keywords Pattern", "e.g., {{categoryName}} {{cityName}}, {{categoryName}} services", undefined, false, Target)}
+                      {renderSEOField("cityCategoryPageH1Pattern", "H1 Title Pattern", "e.g., {{categoryName}} Daily Labour in {{cityName}}", undefined, false, Pilcrow)}
+                      {renderSEOField("cityCategoryPageTitlePattern", "Meta Title Pattern", "e.g., {{categoryName}} Daily Labour in {{cityName}} | Fixbro Daily Labour", undefined, false, Type)}
+                      {renderSEOField("cityCategoryPageDescriptionPattern", "Meta Description Pattern", "e.g., Hire verified {{categoryName}} daily labour in {{cityName}}. Full-day shift, fixed daily rates.", undefined, true, FileText)}
+                      {renderSEOField("cityCategoryPageKeywordsPattern", "Meta Keywords Pattern", "e.g., {{categoryName}} daily labour {{cityName}}, {{categoryName}} daily wage", undefined, false, Target)}
                     </div>
                   </div>
                   <hr/>
                   <div>
                     <h4 className="text-md font-semibold mb-3 flex items-center"><Layers className="mr-2 h-5 w-5 text-muted-foreground"/>Area-Specific Category Pages (e.g., /city/area/category):</h4>
                     <div className="space-y-4 mt-3">
-                      {renderSEOField("areaCategoryPageH1Pattern", "H1 Title Pattern", "e.g., {{categoryName}} in {{areaName}}, {{cityName}}", undefined, false, Pilcrow)}
-                      {renderSEOField("areaCategoryPageTitlePattern", "Meta Title Pattern", "e.g., {{categoryName}} - {{areaName}}, {{cityName}} | Fixbro", undefined, false, Type)}
-                      {renderSEOField("areaCategoryPageDescriptionPattern", "Meta Description Pattern", "e.g., Best {{categoryName}} in {{areaName}}, {{cityName}}.", undefined, true, FileText)}
-                      {renderSEOField("areaCategoryPageKeywordsPattern", "Meta Keywords Pattern", "e.g., {{categoryName}} {{areaName}}, {{areaName}} {{cityName}} services", undefined, false, Target)}
+                      {renderSEOField("areaCategoryPageH1Pattern", "H1 Title Pattern", "e.g., {{categoryName}} Daily Labour in {{areaName}}, {{cityName}}", undefined, false, Pilcrow)}
+                      {renderSEOField("areaCategoryPageTitlePattern", "Meta Title Pattern", "e.g., {{categoryName}} Daily Labour in {{areaName}}, {{cityName}} | Fixbro Daily Labour", undefined, false, Type)}
+                      {renderSEOField("areaCategoryPageDescriptionPattern", "Meta Description Pattern", "e.g., Hire verified {{categoryName}} daily wage workers in {{areaName}}, {{cityName}}. Fixed daily rates with OTP verification.", undefined, true, FileText)}
+                      {renderSEOField("areaCategoryPageKeywordsPattern", "Meta Keywords Pattern", "e.g., {{categoryName}} daily labour {{areaName}}, {{categoryName}} daily wage {{cityName}}", undefined, false, Target)}
                     </div>
                   </div>
                 </CardContent>
@@ -397,7 +397,7 @@ export default function SEOSettingsPage() {
                 <CardHeader><CardTitle>Structured Data Defaults (LocalBusiness)</CardTitle><CardDescription>Helps search engines understand your business.</CardDescription></CardHeader>
                 <CardContent className="space-y-6">
                   {renderSEOField("structuredDataType", "Schema Type", "e.g., LocalBusiness, Organization")}
-                  {renderSEOField("structuredDataName", "Business Name", "e.g., Fixbro")}
+                  {renderSEOField("structuredDataName", "Business Name", "e.g., Fixbro Daily Labour")}
                   {renderSEOField("structuredDataStreetAddress", "Street Address", "e.g., 123 Main St")}
                   {renderSEOField("structuredDataLocality", "City / Locality", "e.g., Bangalore")}
                   {renderSEOField("structuredDataRegion", "State / Region", "e.g., KA")}

@@ -568,16 +568,16 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
             </div>
             <p className="text-xs text-muted-foreground">Leave blank to use global SEO patterns defined in SEO Settings.</p>
             <FormField control={form.control} name="h1_title" render={({ field }) => (
-                <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Best Services in Whitefield, Bangalore" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Daily Labour in Whitefield, Bangalore" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="seo_title" render={({ field }) => (
-                <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Whitefield Services | Fixbro" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Daily Labour in Whitefield, Bangalore | Fixbro Daily Labour" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="seo_description" render={({ field }) => (
-                <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Find all home services in Whitefield, Bangalore." {...field} rows={3} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Hire verified daily labour in Whitefield, Bangalore. Experienced carpenters, painters, electricians, and helpers on fixed daily rates." {...field} rows={3} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="seo_keywords" render={({ field }) => (
-                <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., whitefield services, bangalore repair" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., daily labour whitefield, daily wage workers whitefield, carpenter daily wage" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
             )}/>
         </div>
         

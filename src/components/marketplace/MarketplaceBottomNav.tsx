@@ -111,13 +111,13 @@ export default function MarketplaceBottomNav({
             <span className="text-[10px]">My Posts</span>
           </button>
 
-          {/* Home Services */}
+          {/* Daily Labour */}
           <Link
             href="/"
             className="flex flex-col items-center justify-center flex-1 py-1 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900"
           >
             <Wrench className="h-5 w-5 mb-0.5" />
-            <span className="text-[10px]">Services</span>
+            <span className="text-[10px]">Daily Labour</span>
           </Link>
         </div>
       </div>

@@ -45,9 +45,9 @@ export async function GET() {
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += '<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n';
   xml += '  <channel>\n';
-  xml += '    <title>Fixbro Home Services Feed</title>\n';
+  xml += '    <title>Fixbro Daily Labour Feed</title>\n';
   xml += `    <link>${baseUrl}</link>\n`;
-  xml += '    <description>Verified carpenter, plumber, electrician, and home repair services in Bangalore</description>\n';
+  xml += '    <description>Verified carpenter, painter, electrician, plumber, and skilled daily wage labour in Bangalore</description>\n';
 
   services.forEach(service => {
     if (!service.slug) return;

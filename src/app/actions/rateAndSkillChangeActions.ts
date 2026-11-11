@@ -12,6 +12,8 @@ export interface PendingRateAndSkillChangeItem {
   providerId: string;
   providerName: string;
   providerPhone?: string;
+  photoUrl?: string;
+  workCategoryId?: string;
   workCategoryName?: string;
   request: RateAndSkillChangeRequest;
 }
@@ -42,6 +44,49 @@ export async function requestRateAndSkillChangeAction(params: {
     const previousSkillLevelLabel = appData.skillLevelLabel || appData.seniorityLevel || 'Fresher';
     const previousDailyRate = Number(appData.dailyRate) || 1200;
     const providerName = appData.fullName || 'Provider';
+
+    // Validate rate bounds against category's configured seniorityRates
+    if (appData.workCategoryId || appData.workCategoryName) {
+      let catData: any = null;
+      if (appData.workCategoryId) {
+        const catSnap = await adminDb.collection('adminCategories').doc(appData.workCategoryId).get();
+        if (catSnap.exists) {
+          catData = catSnap.data();
+        }
+      }
+      if (!catData && appData.workCategoryName) {
+        const catQuery = await adminDb.collection('adminCategories').where('name', '==', appData.workCategoryName).limit(1).get();
+        if (!catQuery.empty) {
+          catData = catQuery.docs[0].data();
+        }
+      }
+
+      if (catData) {
+        const rawRates = catData.seniorityRates;
+        const rates: any[] = Array.isArray(rawRates)
+          ? rawRates
+          : (typeof rawRates === 'string' ? JSON.parse(rawRates || '[]') : []);
+
+        const targetLabel = (newSkillLevelLabel || newSeniorityLevel || '').trim().toLowerCase();
+        const targetId = (newSeniorityLevel || '').trim().toLowerCase();
+
+        const rateRule = rates.find((r: any) => {
+          const ruleLabel = (r.skillLevelLabel || '').trim().toLowerCase();
+          const ruleId = (r.skillLevelId || '').trim().toLowerCase();
+          return (ruleLabel && targetLabel && ruleLabel === targetLabel) ||
+                 (ruleId && targetId && ruleId === targetId) ||
+                 (ruleId && targetLabel && ruleId === targetLabel);
+        });
+
+        if (rateRule) {
+          const minRate = typeof rateRule.minRate === 'number' ? rateRule.minRate : 500;
+          const maxRate = typeof rateRule.maxRate === 'number' ? rateRule.maxRate : 2500;
+          if (newDailyRate < minRate || newDailyRate > maxRate) {
+            throw new Error(`Requested daily rate ₹${newDailyRate} is outside the allowed range of ₹${minRate} - ₹${maxRate} for ${newSkillLevelLabel || newSeniorityLevel} in ${catData.name || 'this category'}.`);
+          }
+        }
+      }
+    }
 
     const rateAndSkillChangeRequest: RateAndSkillChangeRequest = {
       status: 'pending',
@@ -229,9 +274,11 @@ export async function approveRateAndSkillChangeAction(providerId: string): Promi
 
     revalidatePath('/provider/profile');
     revalidatePath('/admin/daily-providers');
+    revalidatePath('/admin/provider-applications');
     revalidatePath('/');
     triggerRefresh('/provider/profile');
     triggerRefresh('/admin/daily-providers');
+    triggerRefresh('/admin/provider-applications');
     triggerRefresh('global-cache');
 
     return { success: true, message: `Approved! Provider rate is now ₹${req.newDailyRate}/day (${req.newSeniorityLevel}).` };
@@ -305,8 +352,10 @@ export async function rejectRateAndSkillChangeAction(
 
     revalidatePath('/provider/profile');
     revalidatePath('/admin/daily-providers');
+    revalidatePath('/admin/provider-applications');
     triggerRefresh('/provider/profile');
     triggerRefresh('/admin/daily-providers');
+    triggerRefresh('/admin/provider-applications');
 
     return { success: true, message: "Request rejected." };
   } catch (error: any) {
@@ -328,17 +377,35 @@ export async function getPendingRateAndSkillChangesAction(): Promise<PendingRate
     snap.forEach((d) => {
       const data = d.data() as ProviderApplication;
       if (data.rateAndSkillChangeRequest && data.rateAndSkillChangeRequest.status === 'pending') {
+        const req = data.rateAndSkillChangeRequest;
+        let reqTimeMillis = Date.now();
+        if (req.requestedAt) {
+          const sec = typeof (req.requestedAt as any)._seconds === 'number'
+            ? (req.requestedAt as any)._seconds
+            : (typeof (req.requestedAt as any).seconds === 'number' ? (req.requestedAt as any).seconds : null);
+          if (sec) {
+            reqTimeMillis = sec * 1000;
+          } else if (typeof (req.requestedAt as any).toDate === 'function') {
+            reqTimeMillis = (req.requestedAt as any).toDate().getTime();
+          }
+        }
+
         items.push({
           providerId: d.id,
           providerName: data.fullName || 'Provider',
           providerPhone: data.mobileNumber || data.alternateMobile,
+          photoUrl: data.profilePhotoUrl,
+          workCategoryId: data.workCategoryId,
           workCategoryName: data.workCategoryName,
-          request: data.rateAndSkillChangeRequest,
+          request: {
+            ...req,
+            requestedAt: { seconds: Math.floor(reqTimeMillis / 1000), nanoseconds: 0 } as any,
+          },
         });
       }
     });
 
-    return items;
+    return JSON.parse(JSON.stringify(items));
   } catch (error) {
     console.error("Error fetching pending rate changes:", error);
     return [];

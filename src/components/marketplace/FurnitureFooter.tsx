@@ -161,7 +161,7 @@ export default function FurnitureFooter() {
               </li>
               <li>
                 <Link href="/" className="hover:text-primary transition-colors">
-                  Home Services & Repairs
+                  Daily Labour & Trades
                 </Link>
               </li>
               <li>

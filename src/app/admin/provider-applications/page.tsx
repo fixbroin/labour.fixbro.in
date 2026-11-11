@@ -4,13 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProviderLocationChangesTab from '@/components/admin/ProviderLocationChangesTab';
+import ProviderRateAndSkillChangesTab from '@/components/admin/ProviderRateAndSkillChangesTab';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Users2, MapPin, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown } from "lucide-react";
+import { Users2, MapPin, TrendingUp, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown } from "lucide-react";
 import type { ProviderApplication, ProviderApplicationStatus, FirestoreNotification } from '@/types/firestore';
 import { db, storage } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -50,10 +51,20 @@ export default function AdminProviderApplicationsPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'location_changes' ? 'location_changes' : 'applications');
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === 'location_changes' 
+      ? 'location_changes' 
+      : searchParams.get('tab') === 'rate_skill_changes' 
+        ? 'rate_skill_changes' 
+        : 'applications'
+  );
 
   const pendingLocationChangesCount = useMemo(() => {
     return applications.filter(a => a.locationChangeRequest?.status === 'pending').length;
+  }, [applications]);
+
+  const pendingRateSkillChangesCount = useMemo(() => {
+    return applications.filter(a => a.rateAndSkillChangeRequest?.status === 'pending').length;
   }, [applications]);
 
   const [selectedApplication, setSelectedApplication] = useState<ProviderApplication | null>(null);
@@ -444,6 +455,15 @@ export default function AdminProviderApplicationsPage() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="rate_skill_changes" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Skill &amp; Rate Requests
+            {pendingRateSkillChangesCount > 0 && (
+              <Badge className="ml-1.5 h-5 px-1.5 bg-amber-500 text-white font-bold text-[10px] rounded-full">
+                {pendingRateSkillChangesCount}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="applications" className="space-y-6 mt-0">
@@ -688,6 +708,23 @@ export default function AdminProviderApplicationsPage() {
             </CardHeader>
             <CardContent>
               <ProviderLocationChangesTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rate_skill_changes" className="space-y-6 mt-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Skill Level &amp; Daily Wage Rate Change Requests
+              </CardTitle>
+              <CardDescription>
+                Review before and after requested skill tier and daily wage updates submitted by active service providers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProviderRateAndSkillChangesTab onUpdated={fetchApplications} />
             </CardContent>
           </Card>
         </TabsContent>

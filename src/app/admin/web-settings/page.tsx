@@ -188,11 +188,11 @@ export default function WebSettingsPage() {
         { id: '3', title: 'Verified Services', iconName: 'ShieldCheck', description: 'Quality assurance for all services provided.' },
         { id: '4', title: 'Transparent Pricing', iconName: 'Star', description: 'No hidden costs, clear and upfront pricing.' },
       ],
-      footerCompanyBio: "Your trusted partner for professional home services. We bring skilled experts directly to your doorstep, ensuring quality, reliability, and peace of mind.",
+      footerCompanyBio: "Your trusted partner for verified daily wage workers and skilled daily labour in Bangalore. We connect you directly with experienced carpenters, painters, electricians, plumbers, and helpers on fixed daily rates.",
       footerCTA: {
         title: "Ready to get started?",
-        subtitle: "Book your service now and experience the best home maintenance.",
-        buttonText: "Book a Service",
+        subtitle: "Hire verified daily wage trade workers today with transparent fixed daily rates.",
+        buttonText: "Hire Daily Labour",
         buttonLink: "/categories",
       }
     }
@@ -1033,7 +1033,7 @@ export default function WebSettingsPage() {
                           <FormLabel>Company Introduction (Footer Left)</FormLabel>
                           <FormControl>
                             <Textarea 
-                              placeholder="Fixbro is Bangalore's leading home services platform..." 
+                              placeholder="Fixbro Daily Labour is Bangalore's leading daily wage workers platform..." 
                               {...field} 
                               rows={4} 
                             />

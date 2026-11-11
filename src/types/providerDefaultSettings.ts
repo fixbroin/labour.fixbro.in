@@ -130,7 +130,7 @@ export const DEFAULT_GUIDELINE_RULES: ServiceGuidelineRule[] = [
 export const DEFAULT_SENIORITY_TAXES: SeniorityTaxConfig[] = [
   {
     id: 'beginner',
-    label: 'Beginner / Fresher',
+    label: 'Beginner',
     taxType: 'inclusive',
     taxId: 'no-tax',
     taxName: 'No Tax',
@@ -139,22 +139,6 @@ export const DEFAULT_SENIORITY_TAXES: SeniorityTaxConfig[] = [
   {
     id: 'intermediate',
     label: 'Intermediate',
-    taxType: 'inclusive',
-    taxId: 'no-tax',
-    taxName: 'No Tax',
-    taxPercent: 0,
-  },
-  {
-    id: 'advanced',
-    label: 'Advanced',
-    taxType: 'inclusive',
-    taxId: 'no-tax',
-    taxName: 'No Tax',
-    taxPercent: 0,
-  },
-  {
-    id: 'senior',
-    label: 'Senior',
     taxType: 'inclusive',
     taxId: 'no-tax',
     taxName: 'No Tax',

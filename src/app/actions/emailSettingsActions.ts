@@ -24,9 +24,9 @@ const DEFAULT_TEMPLATES: Record<string, Omit<EmailTemplate, 'id'>> = {
     subject: "Welcome to {siteName}, {userName}!",
     body: `<p>Hi {userName},</p>
 <p>Welcome to {siteName}! We are thrilled to have you join our community.</p>
-<p>You can now browse our wide range of home services, book appointments with trusted professionals, and manage everything from your personal dashboard.</p>
-<p>To get started, why not explore our popular services?</p>
-<p><a href="{categoriesUrl}" class="button" style="color: #ffffff !important;">Explore Services</a></p>
+<p>You can now browse our wide range of daily labour trades, book verified daily wage workers, and manage everything from your personal dashboard.</p>
+<p>To get started, why not explore our daily labour categories?</p>
+<p><a href="{categoriesUrl}" class="button" style="color: #ffffff !important;">Explore Daily Labour</a></p>
 <p>If you have any questions, feel free to contact our support team.</p>
 <p>Thanks,<br>The {siteName} Team</p>`,
     isEnabled: true,

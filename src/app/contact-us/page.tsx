@@ -28,8 +28,8 @@ export async function generateMetadata(
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
 
-  const title = pageData?.metaTitle || `Contact Us | ${seoSettings.siteName || 'Fixbro'}`;
-  const description = pageData?.metaDescription || "Contact Fixbro for any queries, support, or feedback regarding our home services in Bangalore.";
+  const title = pageData?.metaTitle || `Contact Us | ${seoSettings.siteName || 'Fixbro Daily Labour'}`;
+  const description = pageData?.metaDescription || "Contact Fixbro Daily Labour for any queries, support, or hiring assistance regarding daily wage workers in Bangalore.";
 
   return {
     title: title,
@@ -116,12 +116,12 @@ export default async function ContactUsPage() {
   const contactSchema = {
     "@context": "https://schema.org",
     "@type": "ContactPage",
-    "name": "Contact Fixbro",
-    "description": "Contact Fixbro for professional home services in Bangalore. Reach us via phone, email, or visit our office.",
+    "name": "Contact Fixbro Daily Labour",
+    "description": "Contact Fixbro Daily Labour for verified daily wage workers and trade labour in Bangalore. Reach us via phone, email, or visit our office.",
     "url": `${appBaseUrl}/contact-us`,
     "mainEntity": {
       "@type": "LocalBusiness",
-      "name": "Fixbro",
+      "name": "Fixbro Daily Labour",
       "image": `${appBaseUrl}/android-chrome-512x512.png`,
       "telephone": "+91-7353113455",
       "email": "support@fixbro.in",

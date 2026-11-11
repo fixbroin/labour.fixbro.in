@@ -471,16 +471,16 @@ export default function CityForm({ onSubmit: onSubmitProp, initialData, onCancel
             </div>
             <p className="text-xs text-muted-foreground">Leave blank to use global SEO patterns defined in SEO Settings.</p>
             <FormField control={form.control} name="h1_title" render={({ field }) => (
-                <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Best Home Services in New Delhi" {...field} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Daily Labour in Bangalore | Verified Daily Wage Workers" {...field} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="seo_title" render={({ field }) => (
-                <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., New Delhi Home Services | Fixbro" {...field} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Daily Labour in Bangalore | Fixbro Daily Labour" {...field} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="seo_description" render={({ field }) => (
-                <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Find top home services in New Delhi. Fixbro offers quality and convenience." {...field} rows={3} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Hire verified daily labour in Bangalore. Reliable carpenters, painters, electricians, and helpers on fixed daily wages." {...field} rows={3} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="seo_keywords" render={({ field }) => (
-                <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., new delhi services, home repair delhi" {...field} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., daily labour bangalore, daily wage workers bangalore, carpenter daily wage" {...field} disabled={isSubmitting || isGeneratingSeo} /></FormControl><FormMessage /></FormItem>
             )}/>
         </div>
         

@@ -112,7 +112,7 @@ export default function SignupPage() {
               websiteName={globalSettings?.websiteName}
             />
             <CardTitle className="text-2xl font-headline">Create Your Account</CardTitle>
-            <CardDescription>Join Fixbro to easily book home services.</CardDescription>
+            <CardDescription>Join Fixbro Daily Labour to easily hire verified daily wage workers.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {config.enableGoogleLogin && (

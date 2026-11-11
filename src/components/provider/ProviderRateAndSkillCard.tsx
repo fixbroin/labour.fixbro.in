@@ -28,29 +28,21 @@ import {
   ShieldCheck, 
   AlertCircle, 
   Loader2, 
-  CheckCircle2, 
   XCircle, 
-  ArrowRight,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  Info
 } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from '@/lib/mysqlDb';
-import type { ProviderApplication, RateAndSkillChangeRequest } from '@/types/firestore';
+import { doc, onSnapshot, getDoc, collection, query, where, getDocs } from '@/lib/mysqlDb';
+import type { ProviderApplication, RateAndSkillChangeRequest, FirestoreCategory } from '@/types/firestore';
 import { 
   requestRateAndSkillChangeAction, 
   cancelRateAndSkillChangeAction 
 } from '@/app/actions/rateAndSkillChangeActions';
-
-const SENIORITY_LEVEL_OPTIONS = [
-  { id: 'Fresher', label: 'Fresher / Helper' },
-  { id: 'Intermediate', label: 'Intermediate' },
-  { id: 'Advanced', label: 'Advanced' },
-  { id: 'Senior', label: 'Senior' },
-  { id: 'Expert', label: 'Expert' },
-];
+import { cn } from "@/lib/utils";
 
 export default function ProviderRateAndSkillCard() {
   const { user: providerUser } = useAuth();
@@ -60,6 +52,10 @@ export default function ProviderRateAndSkillCard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [providerApp, setProviderApp] = useState<ProviderApplication | null>(null);
+
+  // Dynamic category and skill options from backend/admin setup
+  const [categoryData, setCategoryData] = useState<FirestoreCategory | null>(null);
+  const [skillOptions, setSkillOptions] = useState<{ id: string; label: string; minRate?: number; maxRate?: number }[]>([]);
 
   // Form State
   const [selectedLevel, setSelectedLevel] = useState<string>('Intermediate');
@@ -90,15 +86,129 @@ export default function ProviderRateAndSkillCard() {
     return () => unsubscribe();
   }, [providerUser?.uid]);
 
-  const currentLevel = providerApp?.seniorityLevel || providerApp?.skillLevelLabel || 'Fresher';
+  // Load category and dynamic seniority rate rules
+  useEffect(() => {
+    if (!providerApp) return;
+
+    let isMounted = true;
+    async function loadCategoryAndSkills() {
+      try {
+        let cat: FirestoreCategory | null = null;
+        if (providerApp?.workCategoryId) {
+          const catSnap = await getDoc(doc(db, "adminCategories", providerApp.workCategoryId));
+          if (catSnap.exists()) {
+            cat = { id: catSnap.id, ...(catSnap.data() as any) };
+          }
+        }
+        if (!cat && providerApp?.workCategoryName) {
+          const q = query(collection(db, "adminCategories"), where("name", "==", providerApp.workCategoryName));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            cat = { id: snap.docs[0].id, ...(snap.docs[0].data() as any) };
+          }
+        }
+
+        // Fetch global skill levels from providerControlOptions as fallback/source
+        const skillLevelsSnap = await getDoc(doc(db, "providerControlOptions", "skillLevels"));
+        const globalLevels: { id: string; label: string }[] = skillLevelsSnap.exists()
+          ? (skillLevelsSnap.data().levels || [])
+          : [];
+
+        if (!isMounted) return;
+        setCategoryData(cat);
+
+        // Derive skill options based on category's configured seniorityRates
+        const rawRates = cat?.seniorityRates;
+        const rates: any[] = Array.isArray(rawRates)
+          ? rawRates
+          : (typeof rawRates === 'string' ? JSON.parse(rawRates || '[]') : []);
+
+        let opts: { id: string; label: string; minRate?: number; maxRate?: number }[] = [];
+
+        if (rates && rates.length > 0) {
+          // Exactly the skill levels configured in the category with their respective rate bounds
+          opts = rates.map((r: any) => ({
+            id: r.skillLevelId || r.skillLevelLabel,
+            label: r.skillLevelLabel || r.skillLevelId,
+            minRate: typeof r.minRate === 'number' ? r.minRate : 500,
+            maxRate: typeof r.maxRate === 'number' ? r.maxRate : 2500,
+          }));
+        } else if (globalLevels.length > 0) {
+          opts = globalLevels.map((lvl) => ({
+            id: lvl.id || lvl.label,
+            label: lvl.label,
+            minRate: 500,
+            maxRate: 2500,
+          }));
+        } else {
+          opts = [
+            { id: 'Beginner', label: 'Beginner', minRate: 600, maxRate: 1000 },
+            { id: 'Intermediate', label: 'Intermediate', minRate: 900, maxRate: 1400 },
+            { id: 'Expert', label: 'Expert', minRate: 1200, maxRate: 1800 },
+          ];
+        }
+
+        setSkillOptions(opts);
+      } catch (err) {
+        console.error("Error loading category and skill levels for provider:", err);
+      }
+    }
+
+    loadCategoryAndSkills();
+    return () => {
+      isMounted = false;
+    };
+  }, [providerApp?.workCategoryId, providerApp?.workCategoryName]);
+
+  const currentLevel = providerApp?.seniorityLevel || providerApp?.skillLevelLabel || 'Expert';
   const currentDailyRate = Number(providerApp?.dailyRate) || 1200;
 
   const pendingRequest = providerApp?.rateAndSkillChangeRequest?.status === 'pending'
     ? providerApp.rateAndSkillChangeRequest
     : null;
 
+  // Active rate bounds resolution
+  const chosenSkillOption = skillOptions.find(
+    (o) => o.id === selectedLevel || o.label.toLowerCase() === selectedLevel.toLowerCase()
+  );
+
+  const rawCategoryRates = categoryData?.seniorityRates;
+  const ratesList: any[] = Array.isArray(rawCategoryRates)
+    ? rawCategoryRates
+    : (typeof rawCategoryRates === 'string' ? JSON.parse(rawCategoryRates || '[]') : []);
+
+  const activeRateRule = ratesList.find(
+    (r: any) =>
+      r.skillLevelId === selectedLevel ||
+      (chosenSkillOption && r.skillLevelId === chosenSkillOption.id) ||
+      (chosenSkillOption && r.skillLevelLabel && r.skillLevelLabel.trim().toLowerCase() === chosenSkillOption.label.trim().toLowerCase()) ||
+      (r.skillLevelLabel && r.skillLevelLabel.trim().toLowerCase() === selectedLevel.trim().toLowerCase())
+  );
+
+  const minRate = activeRateRule?.minRate ?? chosenSkillOption?.minRate ?? 500;
+  const maxRate = activeRateRule?.maxRate ?? chosenSkillOption?.maxRate ?? 2500;
+
+  let realTimeError: string | null = null;
+  if (dailyRateInput !== null && !isNaN(dailyRateInput)) {
+    if (dailyRateInput < minRate) {
+      realTimeError = `Daily rate cannot be less than ₹${minRate}. Please enter at least ₹${minRate}.`;
+    } else if (dailyRateInput > maxRate) {
+      realTimeError = `Daily rate cannot exceed ₹${maxRate}. Please enter at most ₹${maxRate}.`;
+    }
+  }
+
   const handleOpenDialog = () => {
-    setSelectedLevel(currentLevel);
+    const cur = providerApp?.skillLevelId || providerApp?.skillLevelLabel || providerApp?.seniorityLevel || 'Expert';
+    const matched = skillOptions.find(
+      (o) =>
+        o.id === cur ||
+        o.label.toLowerCase() === cur.toLowerCase() ||
+        (providerApp?.seniorityLevel && o.label.toLowerCase() === providerApp.seniorityLevel.toLowerCase()) ||
+        (providerApp?.skillLevelLabel && o.label.toLowerCase() === providerApp.skillLevelLabel.toLowerCase())
+    );
+
+    const initialLevel = matched ? matched.id : (skillOptions[0]?.id || cur);
+    setSelectedLevel(initialLevel);
     setDailyRateInput(currentDailyRate);
     setIsDialogOpen(true);
   };
@@ -107,23 +217,40 @@ export default function ProviderRateAndSkillCard() {
     e.preventDefault();
     if (!providerUser?.uid) return;
 
-    if (!dailyRateInput || dailyRateInput < 100) {
+    if (!dailyRateInput || isNaN(dailyRateInput)) {
       toast({
         title: "Invalid Rate",
-        description: "Please enter a valid daily wage rate (minimum ₹100).",
+        description: "Please enter a valid daily wage rate.",
         variant: "destructive",
       });
       return;
     }
 
-    const matchedOption = SENIORITY_LEVEL_OPTIONS.find(o => o.id === selectedLevel);
-    const skillLabel = matchedOption ? matchedOption.label : selectedLevel;
+    if (dailyRateInput < minRate) {
+      toast({
+        title: "Daily Rate Too Low",
+        description: `Daily rate cannot be less than ₹${minRate} for ${chosenSkillOption?.label || selectedLevel}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (dailyRateInput > maxRate) {
+      toast({
+        title: "Daily Rate Too High",
+        description: `Daily rate cannot exceed ₹${maxRate} for ${chosenSkillOption?.label || selectedLevel}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const skillLabel = chosenSkillOption ? chosenSkillOption.label : selectedLevel;
 
     setIsSubmitting(true);
     try {
       const res = await requestRateAndSkillChangeAction({
         providerId: providerUser.uid,
-        newSeniorityLevel: selectedLevel,
+        newSeniorityLevel: skillLabel,
         newSkillLevelLabel: skillLabel,
         newDailyRate: dailyRateInput,
       });
@@ -192,7 +319,7 @@ export default function ProviderRateAndSkillCard() {
                 <Award className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-lg">Skill Level & Daily Wage Rate</CardTitle>
+                <CardTitle className="text-lg">Skill Level &amp; Daily Wage Rate</CardTitle>
                 <CardDescription className="text-xs">
                   Your transparent expertise classification and daily earnings on FixBro.
                 </CardDescription>
@@ -304,12 +431,29 @@ export default function ProviderRateAndSkillCard() {
           <form onSubmit={handleSubmitRequest} className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-xs font-semibold">Choose Seniority / Skill Level</Label>
-              <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+              <Select 
+                value={selectedLevel} 
+                onValueChange={(val) => {
+                  setSelectedLevel(val);
+                  // Adjust dailyRateInput if outside new skill level bounds
+                  const newOpt = skillOptions.find(o => o.id === val || o.label.toLowerCase() === val.toLowerCase());
+                  const newRule = ratesList.find((r: any) =>
+                    r.skillLevelId === val ||
+                    (newOpt && r.skillLevelId === newOpt.id) ||
+                    (newOpt && r.skillLevelLabel && r.skillLevelLabel.trim().toLowerCase() === newOpt.label.trim().toLowerCase()) ||
+                    (r.skillLevelLabel && r.skillLevelLabel.trim().toLowerCase() === val.trim().toLowerCase())
+                  );
+                  const nMin = newRule?.minRate ?? newOpt?.minRate ?? 500;
+                  const nMax = newRule?.maxRate ?? newOpt?.maxRate ?? 2500;
+                  if (dailyRateInput < nMin) setDailyRateInput(nMin);
+                  else if (dailyRateInput > nMax) setDailyRateInput(nMax);
+                }}
+              >
                 <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="Select level" />
                 </SelectTrigger>
                 <SelectContent>
-                  {SENIORITY_LEVEL_OPTIONS.map((opt) => (
+                  {skillOptions.map((opt) => (
                     <SelectItem key={opt.id} value={opt.id}>
                       {opt.label}
                     </SelectItem>
@@ -319,26 +463,48 @@ export default function ProviderRateAndSkillCard() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rateInput" className="text-xs font-semibold">
-                Requested Daily Wage Rate (₹)
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rateInput" className="text-xs font-semibold">
+                  Requested Daily Wage Rate (₹)
+                </Label>
+                <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold">
+                  Allowed: ₹{minRate} - ₹{maxRate}
+                </Badge>
+              </div>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₹</span>
                 <Input
                   id="rateInput"
                   type="number"
-                  min={100}
+                  min={minRate}
+                  max={maxRate}
                   step={50}
                   value={dailyRateInput}
                   onChange={(e) => setDailyRateInput(Number(e.target.value) || 0)}
-                  className="pl-8 rounded-xl font-semibold text-base"
-                  placeholder="1200"
+                  className={cn(
+                    "pl-8 rounded-xl font-semibold text-base",
+                    realTimeError && "border-destructive focus-visible:ring-destructive"
+                  )}
+                  placeholder={activeRateRule ? String(activeRateRule.minRate) : "1200"}
                   required
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Your direct daily take-home earnings per booking shift (excl. platform markup).
+
+              {/* Guidance / Instruction Message */}
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span>
+                  Allowed rate is between ₹{minRate} and ₹{maxRate} for {chosenSkillOption?.label || selectedLevel} in {categoryData?.name || providerApp?.workCategoryName || 'this category'}. Please set your desired amount within this range.
+                </span>
               </p>
+
+              {/* Real-time Error Message */}
+              {realTimeError && (
+                <p className="text-xs font-semibold text-destructive flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {realTimeError}
+                </p>
+              )}
             </div>
 
             <div className="p-3 bg-muted/40 rounded-xl border text-[11px] text-muted-foreground flex items-center gap-2">
@@ -360,7 +526,7 @@ export default function ProviderRateAndSkillCard() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!realTimeError}
                 className="rounded-xl font-bold"
               >
                 {isSubmitting ? (

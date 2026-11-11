@@ -634,8 +634,8 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         // 1. Notify User
         const userNotification: Omit<FirestoreNotification, 'id'> = {
           userId: user.uid,
-          title: "Welcome to Fixbro!",
-          message: `Hi ${details.fullName}, thank you for joining us! We're excited to help you with your home services.`,
+          title: "Welcome to Fixbro Daily Labour!",
+          message: `Hi ${details.fullName}, thank you for joining us! We're excited to help you hire verified daily wage workers and skilled trades.`,
           type: 'success',
           href: '/profile',
           read: false,

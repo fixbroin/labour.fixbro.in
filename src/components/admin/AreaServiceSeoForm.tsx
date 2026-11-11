@@ -257,7 +257,7 @@ export default function AreaServiceSeoForm({
     }
 
     try {
-      let categoryName = "Home Services";
+      let categoryName = "Daily Labour";
       if (selectedServiceObj.parentCategoryId) {
         const catDoc = await getDoc(doc(db, "adminCategories", selectedServiceObj.parentCategoryId));
         if (catDoc.exists()) {

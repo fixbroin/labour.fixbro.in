@@ -340,7 +340,7 @@ export async function executeBulkServiceSeoGenerate(params: {
           continue;
         }
 
-        let categoryName = "Home Services";
+        let categoryName = "Daily Labour";
         if (service.parentCategoryId) {
           const catObj = categories.find((c: any) => String(c.id) === String(service.parentCategoryId));
           if (catObj) {

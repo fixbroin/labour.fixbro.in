@@ -126,7 +126,7 @@ export async function generateMetadata(
   const description = replacePlaceholders(
     seoOverride?.meta_description || seoSettings.areaCategoryPageDescriptionPattern || categoryData.metaDescription || categoryData.seo_description, 
     placeholderData
-  ) || `Hire top-rated ${searchTerm} experts in ${areaData.name}, ${cityData.name} for ${serviceNamesText || 'repair and installation'}. Trusted professionals, transparent pricing, and quality home services near you.`;
+  ) || `Hire verified ${searchTerm} daily labour in ${areaData.name}, ${cityData.name} for ${serviceNamesText || 'daily wage work'}. Trusted daily wage workers, fixed daily rates, and professional daily labour near you.`;
 
   const keywords = (replacePlaceholders(
     seoOverride?.meta_keywords || seoSettings.areaCategoryPageKeywordsPattern || categoryData.metaKeywords || categoryData.seo_keywords, 

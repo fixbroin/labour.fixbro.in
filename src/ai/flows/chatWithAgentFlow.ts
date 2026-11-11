@@ -518,7 +518,7 @@ const chatAgentFlow = ai.defineFlow(
       }
       const timeGreeting = getTimeOfDayGreeting();
       return {
-        response: `${timeGreeting}, ${name}! Welcome to ${websiteName}. How can I assist you with our home services or your bookings today?`
+        response: `${timeGreeting}, ${name}! Welcome to ${websiteName}. How can I assist you with daily labour hiring or your bookings today?`
       };
     }
 
@@ -539,11 +539,11 @@ const chatAgentFlow = ai.defineFlow(
     // 3) Company Legitimacy, Trust, Scam/Spam Concerns
     if (isLegitimacyOrTrustIntent(message)) {
       return {
-        response: `Rest assured, ${name} — **${websiteName} is a 100% legally registered, verified, and trusted home services platform.**\n\n` +
-          `Here is why thousands of homeowners trust us:\n` +
-          `🛡️ **Background-Verified Technicians:** Every professional undergoes strict identity, document, and police-level background verification before entering any customer's home.\n` +
-          `🔒 **100% Safe Payments:** We use RBI-approved, bank-grade encrypted gateways (Razorpay & Stripe). We never store your card or bank credentials, and official tax invoices are issued for every service.\n` +
-          `✨ **Service Warranty:** All services come with our standard post-service warranty so you are always covered.\n` +
+        response: `Rest assured, ${name} — **${websiteName} is a 100% legally registered, verified, and trusted daily labour platform in Bangalore.**\n\n` +
+          `Here is why thousands of clients trust us:\n` +
+          `🛡️ **Background-Verified Daily Workers:** Every daily labourer undergoes strict identity, government ID, and background verification before deployment.\n` +
+          `🔒 **100% Safe Payments:** Transparent fixed daily wage rates without surprise commissions or contractor middlemen cuts.\n` +
+          `⏱️ **Full-Day 09:30 AM - 05:30 PM Shift with OTP:** 7 active hours of dedicated work with two-factor OTP verification at start and completion.\n` +
           `🚫 **Zero Tolerance for Fraud & Spam:** We adhere to strict data privacy policies. We never sell your personal information or spam you.\n` +
           `🏢 **Dedicated Human Operations:** Our operations team and active customer support are always reachable directly via chat or email.\n\n` +
           `Your safety, security, and satisfaction are always our highest priority!`

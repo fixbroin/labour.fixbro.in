@@ -257,6 +257,7 @@ export const generateProviderApplicationPdf = async (
   y = addDetail(doc, "Primary Work Category", application.workCategoryName, y);
   y = addDetail(doc, "Experience Level", application.experienceLevelLabel, y);
   y = addDetail(doc, "Skill Level", application.skillLevelLabel, y);
+  y = addDetail(doc, "Desired Daily Wage Rate", application.dailyRate ? `Rs. ${application.dailyRate} / day` : 'N/A', y);
   if (application.bio) {
     y = checkAndAddPage(doc, y, 15);
     doc.setFont("helvetica", "bold");

@@ -202,10 +202,10 @@ export default function AdminMarketplaceSettingsPage() {
                   />
                   <div>
                     <span className="text-sm font-semibold block text-foreground">
-                      Show Marketplace Entry on Home Services Page
+                      Show Marketplace Entry on Daily Labour Page
                     </span>
                     <span className="text-xs text-muted-foreground block mt-0.5">
-                      Controls visibility of both the top switcher tabs (Home Services | Buy &amp; Sell | Rent a Home) and the bottom navigation bar &quot;Sell&quot; button on the main home services page. When disabled, both sections are hidden.
+                      Controls visibility of both the top switcher tabs (Daily Labour | Buy &amp; Sell | Rent a Home) and the bottom navigation bar &quot;Sell&quot; button on the main daily labour page. When disabled, both sections are hidden.
                     </span>
                   </div>
                 </label>

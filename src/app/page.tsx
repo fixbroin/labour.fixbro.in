@@ -111,27 +111,27 @@ export default async function Page() {
     ],
     "hasOfferCatalog": {
       "@type": "OfferCatalog",
-      "name": "Home Services",
+      "name": "Daily Labour Services",
       "itemListElement": [
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Service",
-            "name": "Professional Carpenter Services"
+            "name": "Carpenter Daily Labour"
           }
         },
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Service",
-            "name": "Plumbing Services"
+            "name": "Painter Daily Labour"
           }
         },
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Service",
-            "name": "Electrician Services"
+            "name": "Electrician Daily Labour"
           }
         }
       ]
@@ -144,18 +144,18 @@ export default async function Page() {
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "Who is the best carpenter in Bangalore for home repairs?",
+        "name": "How to hire carpenter daily labour in Bangalore?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Fixbro provides top-rated, verified professional carpenters in Bangalore for all home furniture repairs, assembly, and custom woodwork with transparent pricing."
+          "text": "Fixbro Daily Labour provides top-rated, background-verified carpenter daily labour in Bangalore for full-day woodwork, furniture crafting, and repairs on transparent daily wage rates."
         }
       },
       {
         "@type": "Question",
-        "name": "How to book home services in Bangalore?",
+        "name": "How to hire daily wage workers in Bangalore?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "You can easily book professional home services in Bangalore through Fixbro. Choose your service, select your locality, and book an expert in under 60 seconds."
+          "text": "You can easily hire verified daily labour in Bangalore through Fixbro Daily Labour. Choose your trade category, select your area, and book a verified worker with two-factor OTP verification."
         }
       }
     ]

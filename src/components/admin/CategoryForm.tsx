@@ -292,24 +292,24 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
 
     try {
         const spinnedContent = getSpinnedLocalContent({
-            cityName: "your city",
-            categoryName: categoryName
+            cityName: "Bangalore",
+            categoryName: `${categoryName} Daily Labour`
         });
 
-        const h1Title = `Professional ${categoryName} Services`;
-        const seoTitle = `Best ${categoryName} Services near me | Fixbro`;
-        const seoDescription = `Book certified and background-verified ${categoryName.toLowerCase()} experts with Fixbro. Quality service, upfront pricing, and trusted professionals.`;
-        const seoKeywords = `${categoryName.toLowerCase()} services, best ${categoryName.toLowerCase()} near me, local ${categoryName.toLowerCase()}`;
-        const imageHint = `${categoryName.toLowerCase()} services`;
+        const h1Title = `${categoryName} Daily Labour in Bangalore`;
+        const seoTitle = `${categoryName} Daily Labour Near Me | Fixbro Daily Labour`;
+        const seoDescription = `Hire verified and background-checked ${categoryName.toLowerCase()} daily wage workers with Fixbro Daily Labour. Full 7-hour active labour, 09:30 AM - 05:30 PM, fixed daily rates, and verified OTP attendance.`;
+        const seoKeywords = `${categoryName.toLowerCase()} daily labour, hire ${categoryName.toLowerCase()} daily labour near me, ${categoryName.toLowerCase()} daily wage workers, ${categoryName.toLowerCase()} daily labour Bangalore, skilled ${categoryName.toLowerCase()} daily wage`;
+        const imageHint = `${categoryName.toLowerCase()} daily labour worker`;
 
         const faqsList = [
           {
-            question: `How do I book ${categoryName.toLowerCase()} services on Fixbro?`,
-            answer: `You can easily book online. Select the required ${categoryName.toLowerCase()} service, choose a convenient date and time slot, and confirm your booking instantly.`
+            question: `What are the working hours for ${categoryName.toLowerCase()} daily labour on Fixbro Daily Labour?`,
+            answer: `Our daily labour shift runs from 09:30 AM to 05:30 PM, providing 7 active hours of dedicated trade work with a 1-hour lunch break (01:00 PM to 02:00 PM).`
           },
           {
-            question: `Are your ${categoryName.toLowerCase()} professionals certified?`,
-            answer: `Yes, all ${categoryName.toLowerCase()} technicians on our platform are background-checked, vetted, and highly experienced.`
+            question: `Are your ${categoryName.toLowerCase()} daily wage workers background verified?`,
+            answer: `Yes, 100% of our daily labour workers undergo government ID checks, police background verification, and trade skill assessment before deployment.`
           }
         ];
 
@@ -791,16 +791,16 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
             </div>
           <p className="text-xs text-muted-foreground">Leave blank to use global SEO patterns defined in SEO Settings. Use <code>{"{{categoryName}}"}</code> in global patterns.</p>
           <FormField control={form.control} name="h1_title" render={({ field }) => (
-            <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Expert Home Repair Services" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Carpenter Daily Labour in Bangalore" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="seo_title" render={({ field }) => (
-            <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Home Repair Services | Fixbro" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Carpenter Daily Labour Near Me | Fixbro Daily Labour" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="seo_description" render={({ field }) => (
-            <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Get reliable home repair services for plumbing, electrical, and more." {...field} rows={3} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Hire verified carpenter daily labour in Bangalore. Full-day skilled workers on transparent daily wages." {...field} rows={3} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="seo_keywords" render={({ field }) => (
-            <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., home repair, plumbing, electrical services" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., carpenter daily labour, daily wage workers, carpenter daily labour near me" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="seo_content" render={({ field }) => (
             <FormItem><FormLabel>SEO Bio / Page Content (HTML)</FormLabel><FormControl><Textarea placeholder="Long-form content for the bottom of the page..." {...field} value={field.value || ""} rows={8} disabled={effectiveIsSubmitting} /></FormControl><FormDescription>Detailed description for search engines. Use HTML tags for formatting.</FormDescription><FormMessage /></FormItem>

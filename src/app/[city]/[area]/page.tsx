@@ -81,26 +81,26 @@ export async function generateMetadata(
   const placeholderData = {
     areaName: areaData.name,
     cityName: areaData.parentCityData?.name,
-    categoryNames: 'Carpenter, TV Installation, Interior, Electrician, Plumber',
-    topCategories: 'Carpenter, TV Installation, Interior',
-    homeServices: 'Home Services'
+    categoryNames: 'Carpenter, Electrician, Painter, Plumber, Mason, Construction Helper',
+    topCategories: 'Carpenter, Electrician, Painter',
+    homeServices: 'Daily Labour'
   };
 
   const title = replacePlaceholders(
     areaData.seo_title || areaData.metaTitle || seoSettings.areaPageTitlePattern, 
     placeholderData,
     true
-  ) || `Home Services in ${areaData.name}, ${areaData.parentCityData?.name} | Near Me`;
+  ) || `Daily Labour in ${areaData.name}, ${areaData.parentCityData?.name} | Near Me`;
 
   const description = replacePlaceholders(
     areaData.seo_description || areaData.metaDescription || seoSettings.areaPageDescriptionPattern, 
     placeholderData
-  ) || `Book trusted carpenter, TV installation, interior, and home services near you in ${areaData.name}, ${areaData.parentCityData?.name}. Top-rated local professionals at upfront rates.`;
+  ) || `Hire verified daily wage trade workers and helpers in ${areaData.name}, ${areaData.parentCityData?.name}. Skilled carpenters, painters, electricians, and plumbers on fixed daily wages.`;
 
   const keywords = (replacePlaceholders(
     areaData.seo_keywords || areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, 
     placeholderData
-  ) || `home services ${areaData.name}, carpenter ${areaData.name}, tv installation ${areaData.name}, interior designers ${areaData.name}, electrician ${areaData.name}, home services near me`).split(',').map(k => k.trim()).filter(k => k);
+  ) || `daily labour ${areaData.name}, daily wage workers ${areaData.name}, carpenter daily labour ${areaData.name}, painter daily wage ${areaData.name}, electrician daily labour ${areaData.name}, daily labour near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = areaData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
@@ -162,7 +162,7 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
   ]);
   const placeholderData = { areaName: areaData.name, cityName: areaData.parentCityData?.name };
 
-  const h1Title = replacePlaceholders(areaData.h1_title || seoSettings.areaPageH1Pattern, placeholderData) || `Expert Home Services in ${areaData.name}`;
+  const h1Title = replacePlaceholders(areaData.h1_title || seoSettings.areaPageH1Pattern, placeholderData) || `Daily Labour in ${areaData.name} | Verified Daily Wage Workers`;
 
   const rawSchemaImage = areaData.imageUrl || seoSettings.structuredDataImage || `/android-chrome-512x512.png`;
   const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
@@ -173,8 +173,8 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
   const areaSchema = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
-    "name": `Home Services in ${areaData.name}, ${areaData.parentCityData!.name}`,
-    "description": areaData.seo_description || areaData.metaDescription || `Reliable home services in ${areaData.name}.`,
+    "name": `Daily Labour in ${areaData.name}, ${areaData.parentCityData!.name}`,
+    "description": areaData.seo_description || areaData.metaDescription || `Reliable daily wage workers and skilled trade labour in ${areaData.name} with Fixbro Daily Labour.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
     "priceRange": `${symbol}${symbol}`,

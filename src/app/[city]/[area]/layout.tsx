@@ -98,7 +98,7 @@ export async function generateMetadata(
 
   const description = areaData.seo_description?.trim() ? areaData.seo_description :
                       replacePlaceholders(seoSettings.areaPageDescriptionPattern, placeholderData) || 
-                      `Find home services in ${areaData.name}, ${areaData.parentCityData.name}. ${seoSettings.defaultMetaDescription}`;
+                      `Find daily labour in ${areaData.name}, ${areaData.parentCityData.name}. ${seoSettings.defaultMetaDescription}`;
                       
   const keywordsStr = areaData.seo_keywords?.trim() ? areaData.seo_keywords :
                       replacePlaceholders(seoSettings.areaPageKeywordsPattern, placeholderData) || 

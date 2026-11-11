@@ -115,28 +115,40 @@ export default function ProviderDefaultSettingsPage() {
         const taxSnap = await getDocs(query(taxesRef, orderBy("taxName", "asc")));
         let fetchedTaxes = taxSnap.docs.map(d => ({ ...d.data(), id: d.id } as FirestoreTax));
 
-        // Ensure a 0% "No Tax" option is always present
-        const hasNoTax = fetchedTaxes.some(t => t.id === 'no-tax' || t.taxPercent === 0 || t.taxName.toLowerCase() === 'no tax');
-        if (!hasNoTax) {
-          fetchedTaxes.unshift({
+        // Locate zero-tax option
+        let zeroTax = fetchedTaxes.find(t => t.taxPercent === 0 || t.taxName.toLowerCase().includes('no tax') || t.id === 'no-tax');
+        
+        if (!zeroTax) {
+          zeroTax = {
             id: 'no-tax',
             taxName: 'No Tax (0%)',
             taxPercent: 0,
             isActive: true,
-          } as FirestoreTax);
+          } as FirestoreTax;
+          fetchedTaxes.unshift(zeroTax);
         } else {
-          // Normalize the 0% option to top
-          fetchedTaxes = fetchedTaxes.map(t => {
-            if (t.taxPercent === 0 || t.taxName.toLowerCase() === 'no tax') {
-              return { ...t, taxName: t.taxName.includes('0%') ? t.taxName : `${t.taxName} (0%)` };
-            }
-            return t;
-          });
+          // Normalize label for 0%
+          if (!zeroTax.taxName.includes('0%')) {
+            zeroTax.taxName = `${zeroTax.taxName} (0%)`;
+          }
         }
+
+        // If the zeroTax in DB has a specific ID (like 'lifovfhrWtZitbVecOP8'), ensure 'no-tax' also exists as an alias
+        // so default/legacy references never fail to find a matching <SelectItem>
+        if (zeroTax.id !== 'no-tax' && !fetchedTaxes.some(t => t.id === 'no-tax')) {
+          fetchedTaxes.unshift({
+            id: 'no-tax',
+            taxName: zeroTax.taxName,
+            taxPercent: zeroTax.taxPercent || 0,
+            isActive: true,
+          } as FirestoreTax);
+        }
+
+        const defaultZeroTaxId = zeroTax.id;
         setTaxes(fetchedTaxes);
 
         // 2. Fetch Dynamic Skill Levels from providerControlOptions
-        let dynamicSeniorityList: SeniorityTaxConfig[] = [...DEFAULT_SENIORITY_TAXES];
+        let dynamicSeniorityList: SeniorityTaxConfig[] = [];
         try {
           const skillDoc = await getDoc(doc(db, "providerControlOptions", "skillLevels"));
           if (skillDoc.exists()) {
@@ -147,9 +159,9 @@ export default function ProviderDefaultSettingsPage() {
                 id: lvl.id || lvl.label.toLowerCase().replace(/\s+/g, '-'),
                 label: lvl.label,
                 taxType: 'inclusive',
-                taxId: 'no-tax',
-                taxName: 'No Tax',
-                taxPercent: 0,
+                taxId: defaultZeroTaxId,
+                taxName: zeroTax?.taxName || 'No Tax (0%)',
+                taxPercent: zeroTax?.taxPercent || 0,
               }));
             }
           }
@@ -157,21 +169,57 @@ export default function ProviderDefaultSettingsPage() {
           console.warn('Could not fetch custom skill levels, using defaults:', e);
         }
 
+        if (dynamicSeniorityList.length === 0) {
+          dynamicSeniorityList = DEFAULT_SENIORITY_TAXES.map(item => ({
+            ...item,
+            taxId: defaultZeroTaxId,
+            taxName: zeroTax?.taxName || 'No Tax (0%)',
+            taxPercent: zeroTax?.taxPercent || 0,
+          }));
+        }
+
         // 3. Fetch Provider Default Settings
         const savedSettings = await getProviderDefaultSettingsAction();
-        
-        // Merge seniority taxes with available levels
-        const existingMap = new Map(savedSettings.seniorityTaxes?.map(st => [st.id, st]) || []);
+        const savedList = Array.isArray(savedSettings.seniorityTaxes) ? savedSettings.seniorityTaxes : [];
+
+        // Match each dynamic skill level by ID or label
         const mergedSeniorityTaxes = dynamicSeniorityList.map(item => {
-          if (existingMap.has(item.id)) {
-            return { ...item, ...existingMap.get(item.id) };
+          const matched = savedList.find(st =>
+            st.id === item.id ||
+            (st.label && item.label && st.label.trim().toLowerCase() === item.label.trim().toLowerCase()) ||
+            (st.id && item.label && st.id.toLowerCase() === item.label.toLowerCase().replace(/\s+/g, '-')) ||
+            (st.label && item.id && st.label.toLowerCase().replace(/\s+/g, '-') === item.id.toLowerCase())
+          );
+
+          if (matched) {
+            // Check if matched.taxId exists in fetchedTaxes
+            const validTax = fetchedTaxes.find(t => t.id === matched.taxId);
+            return {
+              ...item,
+              taxType: matched.taxType || 'inclusive',
+              taxId: validTax ? validTax.id : defaultZeroTaxId,
+              taxName: validTax ? validTax.taxName : (zeroTax?.taxName || 'No Tax (0%)'),
+              taxPercent: validTax ? validTax.taxPercent : (zeroTax?.taxPercent || 0),
+            };
           }
+
           return item;
         });
 
+        // Also normalize markup tax
+        let validMarkupTaxId = savedSettings.markupTaxId;
+        const matchingMarkupTax = fetchedTaxes.find(t => t.id === validMarkupTaxId);
+        if (!matchingMarkupTax) {
+          validMarkupTaxId = defaultZeroTaxId;
+        }
+        const resolvedMarkupTax = fetchedTaxes.find(t => t.id === validMarkupTaxId) || zeroTax;
+
         setSettings({
           ...savedSettings,
-          seniorityTaxes: mergedSeniorityTaxes.length > 0 ? mergedSeniorityTaxes : DEFAULT_SENIORITY_TAXES,
+          markupTaxId: validMarkupTaxId,
+          markupTaxName: resolvedMarkupTax ? resolvedMarkupTax.taxName : 'No Tax (0%)',
+          markupTaxPercent: resolvedMarkupTax ? resolvedMarkupTax.taxPercent : 0,
+          seniorityTaxes: mergedSeniorityTaxes,
         });
       } catch (error) {
         console.error("Error loading provider default settings:", error);
@@ -513,7 +561,7 @@ export default function ProviderDefaultSettingsPage() {
             <CardTitle className="text-lg">Seniority-Level Tax Settings</CardTitle>
           </div>
           <CardDescription>
-            Define specific tax rules (Tax Inclusive vs. Exclusive and dynamic tax percent) for each worker seniority tier (Fresher, Intermediate, Senior, etc.).
+            Define specific tax rules (Tax Inclusive vs. Exclusive and dynamic tax percent) for each worker seniority tier (e.g. Beginner, Intermediate, Expert).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -545,7 +593,7 @@ export default function ProviderDefaultSettingsPage() {
                         }
                       >
                         <SelectTrigger className="w-[180px] h-9">
-                          <SelectValue />
+                          <SelectValue placeholder="Select treatment" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="inclusive">Tax Inclusive</SelectItem>
@@ -559,7 +607,7 @@ export default function ProviderDefaultSettingsPage() {
                         onValueChange={(val) => updateSeniorityTax(st.id, { taxId: val })}
                       >
                         <SelectTrigger className="w-[220px] h-9">
-                          <SelectValue />
+                          <SelectValue placeholder="Select tax bracket" />
                         </SelectTrigger>
                         <SelectContent>
                           {taxes.map((t) => (

@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ProviderApplication, FirestoreCategory } from "@/types/firestore";
 import { Loader2, Image as ImageIcon, Upload, CheckCircle, KeyRound, Info, AlertCircle } from "lucide-react";
 import AppImage from "@/components/ui/AppImage";
-import { storage } from "@/lib/firebase";
+import { storage, db } from "@/lib/firebase";
+import { doc, getDoc } from "@/lib/mysqlDb";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "@/lib/mysqlStorage";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +61,24 @@ export default function ProviderForm({
   const [imagePreview, setImagePreview] = useState<string | null>(initialData?.profilePhotoUrl || null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [availableSkillLevels, setAvailableSkillLevels] = useState<{ id: string; label: string }[]>([]);
+
+  useEffect(() => {
+    async function loadSkillLevels() {
+      try {
+        const docRef = doc(db, "providerControlOptions", "skillLevels");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const lvls = (data.levels || []).map((l: any) => ({ id: l.id || l.label, label: l.label }));
+          setAvailableSkillLevels(lvls);
+        }
+      } catch (err) {
+        console.error("Error loading skill levels in ProviderForm:", err);
+      }
+    }
+    loadSkillLevels();
+  }, []);
 
   useEffect(() => {
     if (!initialData && fullName && !slug) {
@@ -80,13 +99,26 @@ export default function ProviderForm({
     ? rawRates
     : (typeof rawRates === 'string' ? JSON.parse(rawRates || '[]') : []);
 
+  const dynamicSkillOptions = (categoryRates && categoryRates.length > 0)
+    ? categoryRates.map((r: any) => ({ id: r.skillLevelLabel || r.skillLevelId, label: r.skillLevelLabel || r.skillLevelId }))
+    : (availableSkillLevels.length > 0)
+      ? availableSkillLevels.map(l => ({ id: l.label, label: l.label }))
+      : [
+          { id: 'Beginner', label: 'Beginner' },
+          { id: 'Intermediate', label: 'Intermediate' },
+          { id: 'Expert', label: 'Expert' }
+        ];
+
+  const finalSkillOptions = [...dynamicSkillOptions];
+  if (seniorityLevel && !finalSkillOptions.some(o => o.label.toLowerCase() === seniorityLevel.toLowerCase() || o.id.toLowerCase() === seniorityLevel.toLowerCase())) {
+    finalSkillOptions.unshift({ id: seniorityLevel, label: seniorityLevel });
+  }
+
   const activeRateRule = categoryRates.find((r: any) => {
-    const lbl = r.skillLevelLabel?.toLowerCase() || '';
-    const cur = seniorityLevel.toLowerCase();
-    if (lbl === cur) return true;
-    if (cur === 'helper' && (lbl.includes('beginner') || lbl.includes('helper'))) return true;
-    if (cur === 'master craftsman' && (lbl.includes('expert') || lbl.includes('advanced'))) return true;
-    return false;
+    const lbl = (r.skillLevelLabel || '').toLowerCase();
+    const cur = (seniorityLevel || '').toLowerCase();
+    const ruleId = (r.skillLevelId || '').toLowerCase();
+    return lbl === cur || ruleId === cur || (r.skillLevelLabel && seniorityLevel && r.skillLevelLabel.trim().toLowerCase() === seniorityLevel.trim().toLowerCase());
   });
 
   const minDailyRate = activeRateRule?.minRate ?? 500;
@@ -282,10 +314,11 @@ export default function ProviderForm({
               <SelectValue placeholder="Select Seniority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Senior">Senior</SelectItem>
-              <SelectItem value="Intermediate">Intermediate</SelectItem>
-              <SelectItem value="Helper">Helper / Assistant</SelectItem>
-              <SelectItem value="Master Craftsman">Master Craftsman</SelectItem>
+              {finalSkillOptions.map((opt) => (
+                <SelectItem key={opt.id} value={opt.label || opt.id}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
