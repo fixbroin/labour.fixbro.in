@@ -191,7 +191,16 @@ export async function POST(req: NextRequest) {
         if (!matchedProviderId && (s.providerUserId || s.providerId)) {
           matchedProviderId = s.providerUserId || s.providerId;
         }
+      } else if (!matchedProviderId && (s.providerUserId || s.providerId)) {
+        matchedProviderId = s.providerUserId || s.providerId;
       }
+    }
+
+    // Determine final booking status based on provider assignment and payment method
+    if (matchedProviderId) {
+      finalStatus = 'AssignedToProvider';
+    } else {
+      finalStatus = 'Confirmed';
     }
 
     // 6. Construct Authoritative Booking Record

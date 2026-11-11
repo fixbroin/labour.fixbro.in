@@ -358,6 +358,14 @@ export default function AdminProviderApplicationsPage() {
           <span className="text-muted-foreground font-medium">Category:</span>
           <span className="text-foreground">{app.workCategoryName || "N/A"}</span>
         </div>
+        {(app.dailyRate || app.skillLevelLabel || app.seniorityLevel) && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground font-medium">Daily Rate & Skill:</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              {app.skillLevelLabel || app.seniorityLevel || 'Skill'} &bull; {appConfig?.currencySymbol || '₹'}{(Number(app.dailyRate) || 0).toLocaleString()}/day
+            </span>
+          </div>
+        )}
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground font-medium">Mobile:</span>
           <span className="text-foreground">{app.mobileNumber || "N/A"}</span>
@@ -577,7 +585,14 @@ export default function AdminProviderApplicationsPage() {
                           <div className="text-xs text-muted-foreground">{app.email}</div>
                           <div className="text-xs text-muted-foreground">{app.mobileNumber}</div>
                         </TableCell>
-                        <TableCell className="text-sm">{app.workCategoryName || "N/A"}</TableCell>
+                        <TableCell className="text-sm">
+                          <div className="font-semibold text-foreground">{app.workCategoryName || "N/A"}</div>
+                          {(app.dailyRate || app.skillLevelLabel || app.seniorityLevel) && (
+                            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                              {app.skillLevelLabel || app.seniorityLevel || 'Rate'}: {appConfig?.currencySymbol || '₹'}{(Number(app.dailyRate) || 0).toLocaleString()}/day
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs whitespace-nowrap">{formatApplicationTimestamp(app.submittedAt || app.createdAt, appConfig)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 flex-wrap whitespace-nowrap">

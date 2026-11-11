@@ -274,7 +274,7 @@ export default function ScheduleSelection({
   };
 
   const formatDateForDisplay = (date: Date): string => {
-    return formatDateInTimezone(date, appConfig?.timezone || 'Asia/Kolkata');
+    return formatDateInTimezone(date, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
   };
 
   // Compute end date for multi-day booking
@@ -283,7 +283,7 @@ export default function ScheduleSelection({
     const d = new Date(selectedDate);
     d.setDate(selectedDate.getDate() + (effectiveDurationDays - 1));
     return formatDateForDisplay(d);
-  }, [selectedDate, effectiveDurationDays, appConfig?.timezone]);
+  }, [selectedDate, effectiveDurationDays, appConfig?.timezone, appConfig?.dateFormat]);
 
   return (
     <div className="space-y-6 w-full min-w-0">

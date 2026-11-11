@@ -36,11 +36,11 @@ interface ProviderApplicationDetailsModalProps {
   isLoadingStatusUpdate: boolean;
 }
 
-const formatTimestampToReadable = (timestamp?: any): string => {
+const formatTimestampToReadable = (timestamp?: any, timezone: string = 'Asia/Kolkata', dateFormat: string = 'DD/MM/YYYY'): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return "N/A";
   const d = new Date(millis);
-  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
+  return `${formatDateInTimezone(d, timezone, dateFormat)} ${formatTimeInTimezone(d, timezone)}`;
 };
 
 
@@ -179,6 +179,9 @@ export default function ProviderApplicationDetailsModal({
   const { toast } = useToast();
   const { settings: globalCompanySettings } = useGlobalSettings();
   const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const dateFormat = appConfig?.dateFormat || 'DD/MM/YYYY';
+  const timezone = appConfig?.timezone || 'Asia/Kolkata';
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [verifyingDocType, setVerifyingDocType] = useState<string | null>(null);
   const router = useRouter();
@@ -662,11 +665,11 @@ export default function ProviderApplicationDetailsModal({
                         value={
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
-                              ₹{(Number(application.dailyRate) || 0).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ full day</span>
+                              {symbol}{(Number(application.dailyRate) || 0).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ full day</span>
                             </span>
                             {typeof minAllowedRate === 'number' && typeof maxAllowedRate === 'number' && (
                               <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold w-fit">
-                                Category Range: ₹{minAllowedRate.toLocaleString()} - ₹{maxAllowedRate.toLocaleString()}
+                                Category Range: {symbol}{minAllowedRate.toLocaleString()} - {symbol}{maxAllowedRate.toLocaleString()}
                               </Badge>
                             )}
                           </div>
@@ -679,10 +682,10 @@ export default function ProviderApplicationDetailsModal({
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <Badge className="bg-primary text-primary-foreground font-bold text-xs">
-                                  ₹{minAllowedRate.toLocaleString()} - ₹{maxAllowedRate.toLocaleString()}
+                                  {symbol}{minAllowedRate.toLocaleString()} - {symbol}{maxAllowedRate.toLocaleString()}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
-                                  (Min: ₹{minAllowedRate.toLocaleString()} &bull; Max: ₹{maxAllowedRate.toLocaleString()})
+                                  (Min: {symbol}{minAllowedRate.toLocaleString()} &bull; Max: {symbol}{maxAllowedRate.toLocaleString()})
                                 </span>
                               </div>
                               <p className="text-[11px] text-muted-foreground">
@@ -819,7 +822,7 @@ export default function ProviderApplicationDetailsModal({
                 <DetailRow label="Calculated Age" value={application.age ? `${application.age} years old` : 'N/A'} />
                 <DetailRow label="Qualification" value={application.qualificationLabel || 'N/A'} />
                 <DetailRow label="Languages Spoken" value={application.languagesSpokenLabels?.join(', ') || 'N/A'} />
-                <DetailRow label="Submitted" value={formatTimestampToReadable(application.submittedAt || application.createdAt)} />
+                <DetailRow label="Submitted" value={formatTimestampToReadable(application.submittedAt || application.createdAt, timezone, dateFormat)} />
               </TabsContent>
 
               <TabsContent value="kyc" className="space-y-4 focus-visible:outline-none focus-visible:ring-0 mt-0 w-full">
@@ -934,7 +937,7 @@ export default function ProviderApplicationDetailsModal({
                   <DetailRow 
                     label="Terms Agreement" 
                     value={application.termsConfirmedAt ? (
-                      <span className="flex items-center text-green-600 font-semibold"><CheckCircle className="mr-1.5 h-4 w-4 shrink-0"/>Confirmed on {formatTimestampToReadable(application.termsConfirmedAt)}</span>
+                      <span className="flex items-center text-green-600 font-semibold"><CheckCircle className="mr-1.5 h-4 w-4 shrink-0"/>Confirmed on {formatTimestampToReadable(application.termsConfirmedAt, timezone, dateFormat)}</span>
                     ) : (
                       <span className="flex items-center text-destructive font-semibold"><XCircle className="mr-1.5 h-4 w-4 shrink-0"/>Not Confirmed</span>
                     )} 

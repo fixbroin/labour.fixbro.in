@@ -88,7 +88,7 @@ export default function CategoryPageClient({
 }: CategoryPageClientProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, triggerAuthRedirect } = useAuth();
+  const { user, firestoreUser, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
   const currentPathname = usePathname();
   const { featuresConfig } = useFeaturesConfig();
@@ -242,6 +242,39 @@ export default function CategoryPageClient({
     return () => window.removeEventListener('fixbroUserLocationChanged', handleLocationUpdate);
   }, []);
 
+  // Sync user profile coordinates from firestoreUser on login
+  useEffect(() => {
+    if (firestoreUser) {
+      let lat = Number((firestoreUser as any)?.coordinates?.latitude ?? (firestoreUser as any)?.coordinates?.lat);
+      let lng = Number((firestoreUser as any)?.coordinates?.longitude ?? (firestoreUser as any)?.coordinates?.lng);
+      let area = (firestoreUser as any)?.area;
+      let city = (firestoreUser as any)?.city;
+
+      if (isNaN(lat) || isNaN(lng) || lat === 0) {
+        const defaultAddr = firestoreUser.addresses?.find((a: any) => a.isDefault) || firestoreUser.addresses?.[0];
+        if (defaultAddr?.latitude && defaultAddr?.longitude) {
+          lat = Number(defaultAddr.latitude);
+          lng = Number(defaultAddr.longitude);
+          area = (defaultAddr as any)?.area || defaultAddr.addressLine2 || area;
+          city = defaultAddr.city || city;
+        }
+      }
+
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0) {
+        const newLoc = { latitude: lat, longitude: lng, area, city };
+        setUserLocation(prev => {
+          if (!prev || prev.latitude !== lat || prev.longitude !== lng) {
+            try {
+              localStorage.setItem('fixbroUserLocation', JSON.stringify(newLoc));
+            } catch (e) {}
+            return newLoc;
+          }
+          return prev;
+        });
+      }
+    }
+  }, [firestoreUser]);
+
   const allCategoryProviders = useMemo(() => {
     const allServices = subCategoriesWithServices.flatMap(sc => sc.services);
 
@@ -268,7 +301,7 @@ export default function CategoryPageClient({
           const radius = Number((service as any).workAreaRadiusKm) || 15;
           return service.distanceKm <= radius;
         }
-        return true;
+        return false;
       });
     }
 

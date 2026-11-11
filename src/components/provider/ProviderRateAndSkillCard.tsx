@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, collection, query, where, getDocs } from '@/lib/mysqlDb';
 import type { ProviderApplication, RateAndSkillChangeRequest, FirestoreCategory } from '@/types/firestore';
@@ -47,6 +48,9 @@ import { cn } from "@/lib/utils";
 export default function ProviderRateAndSkillCard() {
   const { user: providerUser } = useAuth();
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 0;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -191,9 +195,9 @@ export default function ProviderRateAndSkillCard() {
   let realTimeError: string | null = null;
   if (dailyRateInput !== null && !isNaN(dailyRateInput)) {
     if (dailyRateInput < minRate) {
-      realTimeError = `Daily rate cannot be less than ₹${minRate}. Please enter at least ₹${minRate}.`;
+      realTimeError = `Daily rate cannot be less than ${symbol}${minRate}. Please enter at least ${symbol}${minRate}.`;
     } else if (dailyRateInput > maxRate) {
-      realTimeError = `Daily rate cannot exceed ₹${maxRate}. Please enter at most ₹${maxRate}.`;
+      realTimeError = `Daily rate cannot exceed ${symbol}${maxRate}. Please enter at most ${symbol}${maxRate}.`;
     }
   }
 
@@ -229,7 +233,7 @@ export default function ProviderRateAndSkillCard() {
     if (dailyRateInput < minRate) {
       toast({
         title: "Daily Rate Too Low",
-        description: `Daily rate cannot be less than ₹${minRate} for ${chosenSkillOption?.label || selectedLevel}.`,
+        description: `Daily rate cannot be less than ${symbol}${minRate} for ${chosenSkillOption?.label || selectedLevel}.`,
         variant: "destructive",
       });
       return;
@@ -238,7 +242,7 @@ export default function ProviderRateAndSkillCard() {
     if (dailyRateInput > maxRate) {
       toast({
         title: "Daily Rate Too High",
-        description: `Daily rate cannot exceed ₹${maxRate} for ${chosenSkillOption?.label || selectedLevel}.`,
+        description: `Daily rate cannot exceed ${symbol}${maxRate} for ${chosenSkillOption?.label || selectedLevel}.`,
         variant: "destructive",
       });
       return;
@@ -345,7 +349,7 @@ export default function ProviderRateAndSkillCard() {
               <span className="text-xs text-muted-foreground font-medium block">Live Daily Wage Rate</span>
               <p className="text-lg font-extrabold text-emerald-600 mt-0.5 flex items-center gap-1.5">
                 <Coins className="h-4 w-4" />
-                ₹{currentDailyRate} <span className="text-xs font-normal text-muted-foreground">/ full day</span>
+                {symbol}{currentDailyRate.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ full day</span>
               </p>
             </div>
           </div>
@@ -369,11 +373,11 @@ export default function ProviderRateAndSkillCard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
                 <div className="p-2.5 rounded-lg bg-white/80 dark:bg-zinc-900 border">
                   <span className="text-[11px] text-muted-foreground block">Current (Live):</span>
-                  <strong className="text-foreground">{pendingRequest.previousSeniorityLevel} — ₹{pendingRequest.previousDailyRate}/day</strong>
+                  <strong className="text-foreground">{pendingRequest.previousSeniorityLevel} — {symbol}{pendingRequest.previousDailyRate}/day</strong>
                 </div>
                 <div className="p-2.5 rounded-lg bg-white/80 dark:bg-zinc-900 border border-amber-300">
                   <span className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold block">Requested (After Approval):</span>
-                  <strong className="text-amber-900 dark:text-amber-200">{pendingRequest.newSeniorityLevel} — ₹{pendingRequest.newDailyRate}/day</strong>
+                  <strong className="text-amber-900 dark:text-amber-200">{pendingRequest.newSeniorityLevel} — {symbol}{pendingRequest.newDailyRate}/day</strong>
                 </div>
               </div>
 
@@ -465,20 +469,20 @@ export default function ProviderRateAndSkillCard() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="rateInput" className="text-xs font-semibold">
-                  Requested Daily Wage Rate (₹)
+                  Requested Daily Wage Rate ({symbol})
                 </Label>
                 <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold">
-                  Allowed: ₹{minRate} - ₹{maxRate}
+                  Allowed: {symbol}{minRate} - {symbol}{maxRate}
                 </Badge>
               </div>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₹</span>
+                <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">{symbol}</span>
                 <Input
                   id="rateInput"
                   type="number"
                   min={minRate}
                   max={maxRate}
-                  step={50}
+                  step={1}
                   value={dailyRateInput}
                   onChange={(e) => setDailyRateInput(Number(e.target.value) || 0)}
                   className={cn(
@@ -494,7 +498,7 @@ export default function ProviderRateAndSkillCard() {
               <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <Info className="h-3.5 w-3.5 text-primary shrink-0" />
                 <span>
-                  Allowed rate is between ₹{minRate} and ₹{maxRate} for {chosenSkillOption?.label || selectedLevel} in {categoryData?.name || providerApp?.workCategoryName || 'this category'}. Please set your desired amount within this range.
+                  Allowed rate is between {symbol}{minRate} and {symbol}{maxRate} for {chosenSkillOption?.label || selectedLevel} in {categoryData?.name || providerApp?.workCategoryName || 'this category'}. Please set your desired amount within this range.
                 </span>
               </p>
 

@@ -16,6 +16,7 @@ import { storage, db } from "@/lib/firebase";
 import { doc, getDoc } from "@/lib/mysqlDb";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "@/lib/mysqlStorage";
 import { useToast } from "@/hooks/use-toast";
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 interface ProviderFormProps {
   initialData?: ProviderApplication | null;
@@ -38,6 +39,8 @@ export default function ProviderForm({
   isSubmitting,
 }: ProviderFormProps) {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState(initialData?.fullName || "");
@@ -128,9 +131,9 @@ export default function ProviderForm({
   let rateError = null;
   if (numRate !== null && !isNaN(numRate)) {
     if (numRate < minDailyRate) {
-      rateError = `Daily rate cannot be less than ₹${minDailyRate}. Please enter at least ₹${minDailyRate}.`;
+      rateError = `Daily rate cannot be less than ${symbol}${minDailyRate}. Please enter at least ${symbol}${minDailyRate}.`;
     } else if (numRate > maxDailyRate) {
-      rateError = `Daily rate cannot exceed ₹${maxDailyRate}. Please enter at most ₹${maxDailyRate}.`;
+      rateError = `Daily rate cannot exceed ${symbol}${maxDailyRate}. Please enter at most ${symbol}${maxDailyRate}.`;
     }
   }
 
@@ -326,9 +329,9 @@ export default function ProviderForm({
         {/* Daily Rate (₹) */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="dailyRate" className="text-sm font-semibold">Daily Rate (₹) *</Label>
+            <Label htmlFor="dailyRate" className="text-sm font-semibold">Daily Rate ({symbol}) *</Label>
             <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold">
-              Allowed: ₹{minDailyRate} - ₹{maxDailyRate}
+              Allowed: {symbol}{minDailyRate} - {symbol}{maxDailyRate}
             </Badge>
           </div>
           <Input
@@ -344,7 +347,7 @@ export default function ProviderForm({
           />
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
             <Info className="h-3 w-3 text-primary shrink-0" />
-            Allowed rate: ₹{minDailyRate} to ₹{maxDailyRate} for {seniorityLevel} in {selectedCat?.name || 'selected category'}.
+            Allowed rate: {symbol}{minDailyRate} to {symbol}{maxDailyRate} for {seniorityLevel} in {selectedCat?.name || 'selected category'}.
           </p>
           {rateError && (
             <p className="text-xs font-semibold text-destructive flex items-center gap-1">

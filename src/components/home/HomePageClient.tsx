@@ -419,6 +419,7 @@ const HomepageServiceCarousel: React.FC<{ services: FirestoreService[] }> = ({ s
 };
 
 export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, initialData, initialH1Title }: HomePageClientProps) {
+  const { user, firestoreUser } = useAuth();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const { settings } = useGlobalSettings();
   const [isMounted, setIsMounted] = useState(false);
@@ -461,6 +462,39 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     return () => window.removeEventListener('fixbroUserLocationChanged', handleLocationUpdate);
   }, []);
 
+  // Sync user profile coordinates from firestoreUser on login
+  useEffect(() => {
+    if (firestoreUser) {
+      let lat = Number((firestoreUser as any)?.coordinates?.latitude ?? (firestoreUser as any)?.coordinates?.lat);
+      let lng = Number((firestoreUser as any)?.coordinates?.longitude ?? (firestoreUser as any)?.coordinates?.lng);
+      let area = (firestoreUser as any)?.area;
+      let city = (firestoreUser as any)?.city;
+
+      if (isNaN(lat) || isNaN(lng) || lat === 0) {
+        const defaultAddr = firestoreUser.addresses?.find((a: any) => a.isDefault) || firestoreUser.addresses?.[0];
+        if (defaultAddr?.latitude && defaultAddr?.longitude) {
+          lat = Number(defaultAddr.latitude);
+          lng = Number(defaultAddr.longitude);
+          area = (defaultAddr as any)?.area || defaultAddr.addressLine2 || area;
+          city = defaultAddr.city || city;
+        }
+      }
+
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0) {
+        const newLoc = { latitude: lat, longitude: lng, area, city };
+        setUserLocation(prev => {
+          if (!prev || prev.latitude !== lat || prev.longitude !== lng) {
+            try {
+              localStorage.setItem('fixbroUserLocation', JSON.stringify(newLoc));
+            } catch (e) {}
+            return newLoc;
+          }
+          return prev;
+        });
+      }
+    }
+  }, [firestoreUser]);
+
   const filterProvidersByLocation = useCallback((servicesList: FirestoreService[]) => {
     const userLat = Number(userLocation?.latitude ?? (userLocation as any)?.lat);
     const userLng = Number(userLocation?.longitude ?? (userLocation as any)?.lng);
@@ -491,7 +525,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
           const radius = Number((service as any).workAreaRadiusKm) || 15;
           return service.distanceKm <= radius;
         }
-        return true;
+        return false;
       });
 
     processed.sort((a, b) => {

@@ -382,7 +382,7 @@ export default function ThankYouPage() {
                         const millis = getTimestampMillis(bookingData.createdAt);
                         if (!millis) return 'N/A';
                         const d = new Date(millis);
-                        return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
+                        return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
                     })(),
                     scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
                     latitude: bookingData.latitude === undefined ? null : bookingData.latitude, 
@@ -467,7 +467,7 @@ export default function ThankYouPage() {
                         const millis = getTimestampMillis(bookingData.createdAt);
                         if (!millis) return 'N/A';
                         const d = new Date(millis);
-                        return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
+                        return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
                     })(),
                     scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
                     latitude: bookingData.latitude === undefined ? null : bookingData.latitude, 
@@ -606,7 +606,7 @@ export default function ThankYouPage() {
         const servicesSummary = (newBookingData.services || []).map((s: any) => `${s.name} (x${s.quantity})`).join(', ');
 
         const finalMethod = newBookingData.paymentMethod || (isOnlinePayment ? 'Online' : 'Pay After Service');
-        const finalStatus = newBookingData.status || (isOnlinePayment ? 'Confirmed' : 'Pending Payment');
+        const finalStatus = newBookingData.status || (isOnlinePayment ? 'Confirmed' : 'AssignedToProvider');
 
         logUserActivity(
           'newBooking',
@@ -632,7 +632,7 @@ export default function ThankYouPage() {
                 const millis = getTimestampMillis(newBookingData.createdAt);
                 if (!millis) return 'N/A';
                 const d = new Date(millis);
-                return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
+                return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
             })(),
             scheduledDateDisplay: formatDateForDisplay(newBookingData.scheduledDate, appConfig),
             latitude: newBookingData.latitude === undefined ? null : newBookingData.latitude, 

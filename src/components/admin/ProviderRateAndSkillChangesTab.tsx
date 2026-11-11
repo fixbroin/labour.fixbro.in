@@ -50,6 +50,7 @@ interface ProviderRateAndSkillChangesTabProps {
 export default function ProviderRateAndSkillChangesTab({ onUpdated }: ProviderRateAndSkillChangesTabProps) {
   const { toast } = useToast();
   const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
   const [requests, setRequests] = useState<PendingRateAndSkillChangeItem[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -255,7 +256,7 @@ export default function ProviderRateAndSkillChangesTab({ onUpdated }: ProviderRa
                         <span className="text-muted-foreground">Daily Wage Rate:</span>
                         <span className="font-extrabold text-foreground text-sm flex items-center gap-1">
                           <Coins className="h-3.5 w-3.5 text-muted-foreground" />
-                          ₹{(req.previousDailyRate ?? 0).toLocaleString()} <span className="text-[11px] font-normal text-muted-foreground">/ day</span>
+                          {symbol}{(req.previousDailyRate ?? 0).toLocaleString()} <span className="text-[11px] font-normal text-muted-foreground">/ day</span>
                         </span>
                       </div>
                     </div>
@@ -284,7 +285,7 @@ export default function ProviderRateAndSkillChangesTab({ onUpdated }: ProviderRa
                         <span className="text-muted-foreground">New Daily Wage Rate:</span>
                         <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-base flex items-center gap-1">
                           <Coins className="h-4 w-4" />
-                          ₹{(req.newDailyRate ?? 0).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ day</span>
+                          {symbol}{(req.newDailyRate ?? 0).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ day</span>
                         </span>
                       </div>
 
@@ -293,7 +294,7 @@ export default function ProviderRateAndSkillChangesTab({ onUpdated }: ProviderRa
                         <div className="pt-1.5 border-t border-primary/10 flex items-center justify-between">
                           <span className="text-[11px] text-muted-foreground">Category Allowed Range:</span>
                           <Badge variant="outline" className="text-[11px] bg-primary/10 text-primary border-primary/20 font-semibold">
-                            ₹{minAllowed.toLocaleString()} - ₹{maxAllowed.toLocaleString()}
+                            {symbol}{minAllowed.toLocaleString()} - {symbol}{maxAllowed.toLocaleString()}
                           </Badge>
                         </div>
                       )}

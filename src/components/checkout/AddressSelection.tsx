@@ -224,35 +224,70 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
     }
   }, [isServiceable, selectedAddressId, savedAddresses, user, firestoreUser, applicableServiceZones]);
 
+  const resolveInitialLocation = useCallback((): google.maps.LatLngLiteral => {
+    // 1. Currently selected address
+    const selected = savedAddresses.find(a => a.id === selectedAddressId);
+    if (selected?.latitude && selected?.longitude) {
+      return { lat: Number(selected.latitude), lng: Number(selected.longitude) };
+    }
+
+    // 2. User profile coordinates
+    const profileLat = Number((firestoreUser as any)?.coordinates?.latitude);
+    const profileLng = Number((firestoreUser as any)?.coordinates?.longitude);
+    if (!isNaN(profileLat) && !isNaN(profileLng) && profileLat !== 0) {
+      return { lat: profileLat, lng: profileLng };
+    }
+
+    // 3. User default address from profile
+    const defaultAddress = firestoreUser?.addresses?.find(a => a.isDefault) || firestoreUser?.addresses?.[0];
+    if (defaultAddress?.latitude && defaultAddress?.longitude) {
+      return { lat: Number(defaultAddress.latitude), lng: Number(defaultAddress.longitude) };
+    }
+
+    // 4. Stored session location in localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('fixbroUserLocation');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const sLat = Number(parsed.latitude ?? parsed.lat);
+          const sLng = Number(parsed.longitude ?? parsed.lng);
+          if (!isNaN(sLat) && !isNaN(sLng) && sLat !== 0) {
+            return { lat: sLat, lng: sLng };
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 5. Default fallback to Bangalore
+    return { lat: 12.9716, lng: 77.5946 };
+  }, [savedAddresses, selectedAddressId, firestoreUser]);
+
   const handleOpenMapClick = useCallback(async () => {
     setEditingAddress(null);
     setIsLocating(true);
-    try {
-        if (!navigator.geolocation) {
-            setInitialMapCenter(null);
-            setIsMapModalOpen(true);
-            setIsLocating(false);
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setInitialMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
-                setIsLocating(false);
-                setIsMapModalOpen(true);
-            },
-            () => {
-                setInitialMapCenter(null); 
-                setIsLocating(false);
-                setIsMapModalOpen(true);
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-    } catch (e) {
-        setInitialMapCenter(null);
-        setIsLocating(false);
-        setIsMapModalOpen(true);
+    const fallbackLocation = resolveInitialLocation();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setInitialMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+          setIsLocating(false);
+          setIsMapModalOpen(true);
+        },
+        () => {
+          setInitialMapCenter(fallbackLocation);
+          setIsLocating(false);
+          setIsMapModalOpen(true);
+        },
+        { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
+      );
+    } else {
+      setInitialMapCenter(fallbackLocation);
+      setIsLocating(false);
+      setIsMapModalOpen(true);
     }
-  }, []);
+  }, [resolveInitialLocation]);
 
   const handleMapAddressSelect = useCallback((addressData: Partial<AddressFormData>) => {
     checkServiceability(addressData); 
@@ -399,17 +434,13 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
       </Button>
 
       {isServiceable === false && selectedAddressId && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
+        <Alert variant="default" className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertTitle>
-            {applicableServiceZones.length === 0
-              ? "Providers Currently Unavailable"
-              : "Area Not Serviceable"}
+            Extended Travel Distance Notice
           </AlertTitle>
           <AlertDescription>
-            {applicableServiceZones.length === 0
-              ? "All service providers for this service are currently offline or fully busy. We will be back online soon! Please check back later."
-              : "Sorry, the selected address is outside our current service zones. Please select a different location."}
+            The selected location is outside the provider's standard operational radius. You can still confirm your address, and the provider will be notified.
           </AlertDescription>
         </Alert>
       )}
@@ -417,7 +448,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
       <div className="sticky bottom-0 left-0 right-0 bg-background pt-4 pb-2 mt-auto border-t sm:border-none flex justify-end">
         <Button 
           onClick={handleConfirm} 
-          disabled={!selectedAddressId || isServiceable === false} 
+          disabled={!selectedAddressId} 
           className="w-full sm:w-auto px-10 py-6 sm:py-2 text-lg sm:text-base font-bold sm:font-medium shadow-lg sm:shadow-none"
         >
           Confirm Address

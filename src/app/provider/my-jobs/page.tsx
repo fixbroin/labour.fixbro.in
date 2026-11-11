@@ -181,7 +181,7 @@ export default function ProviderMyJobsPage() {
 
   const newJobRequests = useMemo(() => {
     return bookings
-      .filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled')
+      .filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled' || b.status === 'Confirmed')
       .sort((a, b) => getBookingScheduledTimestamp(a) - getBookingScheduledTimestamp(b));
   }, [bookings]);
 

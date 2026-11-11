@@ -800,7 +800,7 @@ export async function getProviderBookingCountsAction(providerId: string) {
         
         if (status === 'Completed') {
           completed += count;
-        } else if (status === 'AssignedToProvider' || status === 'Rescheduled') {
+        } else if (status === 'AssignedToProvider' || status === 'Rescheduled' || status === 'Confirmed') {
           newRequests += count;
         } else if (status === 'ProviderAccepted' || status === 'InProgressByProvider') {
           ongoing += count;

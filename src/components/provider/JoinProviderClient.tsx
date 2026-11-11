@@ -491,9 +491,9 @@ export default function JoinProviderClient({
                     className="py-2"
                   />
                   <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
-                    <span>₹10,000</span>
-                    <span>₹75,000</span>
-                    <span>₹1,50,000</span>
+                    <span>{currencySymbol}10,000</span>
+                    <span>{currencySymbol}75,000</span>
+                    <span>{currencySymbol}1,50,000</span>
                   </div>
                 </div>
               </div>

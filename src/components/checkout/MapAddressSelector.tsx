@@ -3,7 +3,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { AddressFormData } from '@/components/forms/AddressForm';
-import { Loader2, LocateFixed, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Loader2, LocateFixed, CheckCircle, XCircle, Search, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -58,23 +59,39 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
   const [isLocating, setIsLocating] = useState(false);
   
   const [isServiceable, setIsServiceable] = useState<boolean | null>(null); // State for serviceability
+  const [distanceToProviderKm, setDistanceToProviderKm] = useState<number | null>(null);
+  const [zoneRadiusKm, setZoneRadiusKm] = useState<number | null>(null);
   const [hasManuallySelected, setHasManuallySelected] = useState(false); // New state to track explicit user action
   const { toast } = useToast(); // Use the toast hook
 
   const checkServiceability = useCallback((lat: number, lng: number) => {
     if (serviceZones.length === 0) {
-      setIsServiceable(false); // If no zones or providers are online, it is NOT serviceable.
+      setIsServiceable(true);
+      setDistanceToProviderKm(null);
+      setZoneRadiusKm(null);
       return;
     }
+
+    let minDistance = Infinity;
+    let closestRadius = 15;
+
     const serviceable = serviceZones.some(zone => {
+      if (!zone.center?.latitude || !zone.center?.longitude) return false;
       const distance = getHaversineDistance(
         lat,
         lng,
         zone.center.latitude,
         zone.center.longitude
       );
-      return distance <= zone.radiusKm;
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestRadius = zone.radiusKm || 15;
+      }
+      return distance <= (zone.radiusKm || 15);
     });
+
+    setDistanceToProviderKm(isFinite(minDistance) ? minDistance : null);
+    setZoneRadiusKm(closestRadius);
     setIsServiceable(serviceable);
   }, [serviceZones]);
 
@@ -234,7 +251,7 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
   }, [checkServiceability]);
 
   const handleConfirmAndClose = () => {
-    if (!hasManuallySelected) {
+    if (!selectedAddress) {
       toast({
         title: "Location Not Selected",
         description: "Please search for an address or click/drag the pin on the map to set your location.",
@@ -242,28 +259,18 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
       });
       return;
     }
+
     if (isServiceable === false) {
-      if (serviceZones.length === 0) {
-        toast({
-          title: "Providers Currently Unavailable",
-          description: "All service providers are currently offline or fully busy. We will be back online soon! Please check back later.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Area Not Serviceable",
-          description: "This address is outside our service area. Please select a different location.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Extended Distance Area",
+        description: `This location is ${distanceToProviderKm !== null ? distanceToProviderKm.toFixed(1) + ' km from the provider' : 'outside direct coverage'}.`,
+      });
       if (selectedAddress && onOutOfCoverage) {
         onOutOfCoverage(selectedAddress);
       }
-      return;
     }
-    if (selectedAddress) {
-      onAddressSelect(selectedAddress);
-    }
+
+    onAddressSelect(selectedAddress);
     onClose();
   };
 
@@ -408,12 +415,8 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
     
     map.controls[window.google.maps.ControlPosition.RIGHT_BOTTOM].push(locateMeButtonContainer);
     
-    if (initialCenter) {
-      updateMarker(centerPosition, map, true, false);
-      setHasManuallySelected(true); // If initialCenter is provided, assume it's a valid starting point
-    } else {
-      updateMarker(centerPosition, map, false, false); 
-    }
+    updateMarker(centerPosition, map, true, true);
+    setHasManuallySelected(true); // Center position is a valid starting point
 
   }, [isScriptLoaded, initialCenter, handleLocateMe, updateMarker, processAddressResult, serviceZones]);
   
@@ -429,7 +432,22 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
     serviceZoneCirclesRef.current.forEach(circle => circle.setMap(null));
     serviceZoneCirclesRef.current = [];
 
-    // Draw updated circles
+    // Draw updated circles for each service zone/provider radius
+    serviceZones.forEach(zone => {
+      if (zone.center?.latitude && zone.center?.longitude && zone.radiusKm) {
+        const circle = new window.google.maps.Circle({
+          strokeColor: "#059669",
+          strokeOpacity: 0.85,
+          strokeWeight: 2,
+          fillColor: "#10B981",
+          fillOpacity: 0.12,
+          map: mapInstanceRef.current,
+          center: { lat: zone.center.latitude, lng: zone.center.longitude },
+          radius: zone.radiusKm * 1000,
+        });
+        serviceZoneCirclesRef.current.push(circle);
+      }
+    });
 
     // Re-check serviceability with current marker position
     if (markerRef.current) {
@@ -493,15 +511,20 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
         <div className="relative w-full flex-grow" style={{ minHeight: '300px' }}>
           <div ref={mapRef} className="w-full h-full rounded-md" />
           {isServiceable !== null && (
-            <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 p-2 px-3 rounded-full text-sm font-medium shadow-lg transition-all ${
-              isServiceable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
+            <div className={cn(
+              "absolute bottom-4 left-1/2 -translate-x-1/2 z-10 p-2.5 px-4 rounded-full text-xs sm:text-sm font-bold shadow-lg transition-all flex items-center gap-2",
+              isServiceable ? "bg-emerald-600 text-white border border-emerald-400" : "bg-amber-600 text-white border border-amber-400"
+            )}>
               {isServiceable ? (
-                <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4"/> Serviceable Area</span>
-              ) : serviceZones.length === 0 ? (
-                <span className="flex items-center gap-1.5"><XCircle className="h-4 w-4"/> Providers Currently Unavailable</span>
+                <>
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  <span>Serviceable Area {distanceToProviderKm !== null ? `(${distanceToProviderKm.toFixed(1)} km from provider)` : ''}</span>
+                </>
               ) : (
-                <span className="flex items-center gap-1.5"><XCircle className="h-4 w-4"/> Not a Serviceable Area</span>
+                <>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Outside Direct Zone {distanceToProviderKm !== null ? `(${distanceToProviderKm.toFixed(1)} km • Standard: ${zoneRadiusKm} km)` : ''}</span>
+                </>
               )}
             </div>
           )}

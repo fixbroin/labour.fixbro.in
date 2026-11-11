@@ -17,6 +17,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2, ChevronRight, Check } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 const step1CategorySkillsSchema = z.object({
   workCategoryId: z.string({ required_error: "Please select your primary work category." }),
@@ -47,6 +48,9 @@ export default function Step1CategorySkills({
   userUid,
   isEditModeByAdmin = false,
 }: Step1CategorySkillsProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isExperienceDialogOpen, setIsExperienceDialogOpen] = useState(false);
   const [isSkillDialogOpen, setIsSkillDialogOpen] = useState(false);
@@ -157,14 +161,14 @@ export default function Step1CategorySkills({
     if (data.dailyRate < min) {
       form.setError('dailyRate', {
         type: 'manual',
-        message: `Daily rate cannot be less than ₹${min}. Please enter at least ₹${min}.`
+        message: `Daily rate cannot be less than ${symbol}${min}. Please enter at least ${symbol}${min}.`
       });
       return;
     }
     if (data.dailyRate > max) {
       form.setError('dailyRate', {
         type: 'manual',
-        message: `Daily rate cannot exceed ₹${max}. Please enter at most ₹${max}.`
+        message: `Daily rate cannot exceed ${symbol}${max}. Please enter at most ${symbol}${max}.`
       });
       return;
     }
@@ -389,9 +393,9 @@ export default function Step1CategorySkills({
             let realTimeError: string | null = null;
             if (numVal !== null && !isNaN(numVal)) {
               if (numVal < minRate) {
-                realTimeError = `Daily rate cannot be less than ₹${minRate}. Please enter at least ₹${minRate}.`;
+                realTimeError = `Daily rate cannot be less than ${symbol}${minRate}. Please enter at least ${symbol}${minRate}.`;
               } else if (numVal > maxRate) {
-                realTimeError = `Daily rate cannot exceed ₹${maxRate}. Please enter at most ₹${maxRate}.`;
+                realTimeError = `Daily rate cannot exceed ${symbol}${maxRate}. Please enter at most ${symbol}${maxRate}.`;
               }
             }
 
@@ -402,9 +406,9 @@ export default function Step1CategorySkills({
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center justify-between">
-                      <FormLabel>Desired Daily Rate (₹ / Day) *</FormLabel>
+                      <FormLabel>Desired Daily Rate ({symbol} / Day) *</FormLabel>
                       <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 font-semibold">
-                        Allowed: ₹{minRate} - ₹{maxRate}
+                        Allowed: {symbol}{minRate} - {symbol}{maxRate}
                       </Badge>
                     </div>
                     <FormControl>
@@ -426,7 +430,7 @@ export default function Step1CategorySkills({
                     <FormDescription className="text-xs flex items-center gap-1.5 text-muted-foreground">
                       <Info className="h-3.5 w-3.5 text-primary shrink-0" />
                       <span>
-                        Allowed rate is between ₹{minRate} and ₹{maxRate} for {chosenSkill?.label || 'this level'} in {chosenCat?.name || 'this category'}. Please set your desired amount within this range.
+                        Allowed rate is between {symbol}{minRate} and {symbol}{maxRate} for {chosenSkill?.label || 'this level'} in {chosenCat?.name || 'this category'}. Please set your desired amount within this range.
                       </span>
                     </FormDescription>
 

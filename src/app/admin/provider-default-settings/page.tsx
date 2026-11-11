@@ -63,6 +63,7 @@ import {
   Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, getDoc, query, orderBy } from "@/lib/mysqlDb";
 import type { FirestoreTax } from "@/types/firestore";
@@ -82,6 +83,8 @@ import {
 
 export default function ProviderDefaultSettingsPage() {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -450,11 +453,11 @@ export default function ProviderDefaultSettingsPage() {
             {/* Markup Fee Input */}
             <div className="space-y-2">
               <Label htmlFor="adminMarkupFee" className="text-sm font-semibold flex items-center gap-1.5">
-                Default Admin Markup Fee (₹)
+                Default Admin Markup Fee ({symbol})
                 <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₹</span>
+                <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">{symbol}</span>
                 <Input
                   id="adminMarkupFee"
                   type="number"
@@ -525,27 +528,27 @@ export default function ProviderDefaultSettingsPage() {
           <div className="rounded-xl border bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-blue-50/30 dark:from-emerald-950/20 dark:via-teal-950/10 dark:to-blue-950/10 p-4.5 sm:p-5">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-emerald-600" />
-              <h4 className="text-sm font-bold text-foreground">Live Booking Payout Breakdown (Example: ₹1,200 Provider Daily Rate)</h4>
+              <h4 className="text-sm font-bold text-foreground">Live Booking Payout Breakdown (Example: {symbol}1,200 Provider Daily Rate)</h4>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-center sm:text-left">
               <div className="bg-card/80 p-3 rounded-lg border">
                 <span className="text-xs text-muted-foreground block">Provider Sets</span>
-                <span className="text-lg font-bold text-foreground">₹{sampleProviderRate.toLocaleString()}</span>
+                <span className="text-lg font-bold text-foreground">{symbol}{sampleProviderRate.toLocaleString()}</span>
                 <span className="text-[11px] text-muted-foreground block">Base Daily Rate</span>
               </div>
               <div className="bg-card/80 p-3 rounded-lg border">
                 <span className="text-xs text-muted-foreground block">Admin Markup Fee</span>
-                <span className="text-lg font-bold text-primary">+ ₹{sampleAdminFee.toLocaleString()}</span>
+                <span className="text-lg font-bold text-primary">+ {symbol}{sampleAdminFee.toLocaleString()}</span>
                 <span className="text-[11px] text-muted-foreground block">({settings.markupTaxType})</span>
               </div>
               <div className="bg-primary/10 p-3 rounded-lg border border-primary/20">
                 <span className="text-xs font-semibold text-primary block">Customer Directly Sees</span>
-                <span className="text-xl font-extrabold text-primary">₹{sampleCustomerRate.toLocaleString()}</span>
+                <span className="text-xl font-extrabold text-primary">{symbol}{sampleCustomerRate.toLocaleString()}</span>
                 <span className="text-[11px] font-medium text-primary/80 block">/ full day</span>
               </div>
               <div className="bg-card/80 p-3 rounded-lg border">
                 <span className="text-xs text-muted-foreground block">Platform Revenue</span>
-                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">₹{sampleAdminFee} + Plat. Fee</span>
+                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{symbol}{sampleAdminFee} + Plat. Fee</span>
                 <span className="text-[11px] text-muted-foreground block">Admin Net Inflow</span>
               </div>
             </div>
