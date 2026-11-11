@@ -365,12 +365,12 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <p className="font-bold">
-                        {paymentMethod === 'online' ? 'Pay Online (UPI, Card, or More)' : 'Pay After Service'}
+                        {paymentMethod === 'online' ? 'Pay Online (UPI, Card, or More)' : 'Pay After Work'}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {paymentMethod === 'online' 
                           ? 'Instant secure payment via UPI, Cards, Netbanking' 
-                          : 'Pay with cash or UPI after service completion'}
+                          : 'Pay with cash or UPI directly after work completion'}
                       </p>
                     </div>
                   </div>

@@ -136,7 +136,7 @@ const LocalSiloLinks: React.FC<LocalSiloLinksProps> = ({ initialData }) => {
         <div className="flex items-center gap-2 mb-8">
             <div className="h-8 w-1 bg-primary rounded-full" />
             <h2 className="text-lg font-headline font-bold uppercase tracking-wider text-foreground">
-                Popular Services in {data.city.name}
+                Popular Daily Labour Providers in {data.city.name}
             </h2>
         </div>
 

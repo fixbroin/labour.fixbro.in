@@ -977,9 +977,9 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
                 <div className="flex gap-3 items-start border-t pt-3">
                   <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-xs">ℹ</div>
                   <div>
-                    <h4 className="font-semibold text-foreground text-sm">Pay After Service / Cash on Delivery</h4>
+                    <h4 className="font-semibold text-foreground text-sm">Pay After Work / Cash on Delivery</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or charge must be paid securely online before the cancellation request is processed.
+                      For bookings scheduled under <strong>Pay After Work</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or charge must be paid securely online before the cancellation request is processed.
                     </p>
                   </div>
                 </div>

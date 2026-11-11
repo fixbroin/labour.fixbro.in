@@ -302,7 +302,8 @@ export default function DetailsPage({
     }
     
     if (initialServiceData) {
-        // We already have data from server props, but we still need to set breadcrumbs and fetch reviews
+        setService(initialServiceData);
+        setH1Title(initialH1Title || initialServiceData.name);
         const crumbs: BreadcrumbItem[] = [{ label: "Home", href: "/" }];
         if (initialServiceData.parentCategoryName && initialServiceData.parentCategorySlug) {
           crumbs.push({ label: initialServiceData.parentCategoryName, href: `/category/${initialServiceData.parentCategorySlug}` });
@@ -337,6 +338,92 @@ export default function DetailsPage({
     }
 
     setIsLoading(true);
+
+    const isProviderRoute = currentPathname?.includes('/provider/');
+    if (isProviderRoute) {
+        const fetchProviderClient = async () => {
+            try {
+                const provsRef = collection(db, "providerApplications");
+                const snap = await getDocs(provsRef);
+                const normalized = (serviceSlug || '').toLowerCase().trim();
+                const matchedDoc = snap.docs.find(d => {
+                    const data = d.data();
+                    const pSlug = (data.slug || '').toLowerCase().trim();
+                    const nameSlug = data.fullName ? data.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+                    const idPrefix = ('provider-' + d.id.slice(0, 5)).toLowerCase();
+                    const bareId = d.id.toLowerCase();
+                    return pSlug === normalized || nameSlug === normalized || idPrefix === normalized || bareId === normalized || normalized.replace(/^provider-/, '') === d.id.slice(0, 5).toLowerCase();
+                });
+
+                if (matchedDoc) {
+                    const p = matchedDoc.data();
+                    const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
+                    const finalPrice = baseDailyRate + ((appConfig as any)?.adminMarkupFee || 0);
+                    const categoryName = p.workCategoryName || 'Daily Labour';
+                    const seniority = p.seniorityLevel || p.skillLevelLabel || 'Senior';
+
+                    const provData: ClientServiceData = {
+                        id: matchedDoc.id,
+                        name: p.fullName || 'Daily Labour Provider',
+                        description: p.bio || `Experienced ${seniority} daily labour provider in ${categoryName}.`,
+                        price: finalPrice,
+                        discountedPrice: finalPrice,
+                        slug: p.slug || serviceSlug,
+                        imageUrl: p.profilePhotoUrl || '/default-image.png',
+                        rating: Number(p.overallRating || p.rating) || 5,
+                        reviewCount: Number(p.reviewCount) || 0,
+                        subCategoryId: `providers-${p.workCategoryId || 'general'}`,
+                        parentCategoryId: p.workCategoryId,
+                        parentCategoryName: categoryName,
+                        parentCategorySlug: p.workCategoryName ? p.workCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'daily-labour',
+                        allowPayLater: true,
+                        isActive: true,
+                        isProvider: true,
+                        seniorityLevel: seniority,
+                        age: p.age || 28,
+                        experienceYears: p.experienceYears || 5,
+                        experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Experience`,
+                        workAreaAddress: p.workAreaAddress || 'Bangalore',
+                        workAreaRadiusKm: Number(p.workAreaRadiusKm) || 25,
+                        workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
+                        lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
+                        languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
+                        serviceFaqs: [],
+                        providerData: {
+                            id: matchedDoc.id,
+                            fullName: p.fullName,
+                            seniorityLevel: seniority,
+                            workCategoryName: categoryName,
+                            age: p.age,
+                            experienceYears: p.experienceYears,
+                            languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
+                            workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
+                            lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
+                            workAreaCenter: p.workAreaCenter,
+                            workAreaRadiusKm: Number(p.workAreaRadiusKm) || 25,
+                        },
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    };
+
+                    setService(provData);
+                    setH1Title(provData.name);
+                    const crumbs: BreadcrumbItem[] = [
+                        { label: "Home", href: "/" },
+                        ...(provData.parentCategoryName && provData.parentCategorySlug ? [{ label: provData.parentCategoryName, href: `/category/${provData.parentCategorySlug}` }] : []),
+                        { label: provData.name }
+                    ];
+                    setBreadcrumbItems(crumbs);
+                    fetchReviewsForService(provData.id);
+                }
+            } catch (e) {
+                console.error("Error fetching provider client:", e);
+            }
+            setIsLoading(false);
+        };
+        fetchProviderClient();
+        return () => {};
+    }
 
     const servicesCollectionRef = collection(db, "adminServices");
     const qService = query(servicesCollectionRef, where("slug", "==", serviceSlug), where("isActive", "==", true), limit(1));
@@ -517,7 +604,7 @@ export default function DetailsPage({
   if (!service || !h1Title) {
     return (
       <div className="container mx-auto px-2 sm:px-4 py-8 text-center min-h-[60vh] flex flex-col justify-center items-center">
-        <p className="text-lg sm:text-xl text-muted-foreground mb-4">Service not found or it is unavailable.</p>
+        <p className="text-lg sm:text-xl text-muted-foreground mb-4">Daily labour provider not found or is currently unavailable.</p>
         <Link href="/" passHref>
           <Button variant="outline">Go back to Home</Button>
         </Link>
@@ -626,8 +713,8 @@ export default function DetailsPage({
                     <div className="flex items-start gap-2 bg-muted/40 p-2.5 rounded-lg border">
                       <CalendarCheck className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
-                        <span className="font-semibold text-foreground">Total Working: </span>
-                        <span className="text-muted-foreground break-words">{service.totalWorkingHours || 7} Hours / Day</span>
+                        <span className="font-semibold text-foreground">Shift: </span>
+                        <span className="text-muted-foreground break-words">Full Day Trade Work</span>
                       </div>
                     </div>
                     <div className="flex items-start gap-2 bg-muted/40 p-2.5 rounded-lg border">
@@ -745,7 +832,7 @@ export default function DetailsPage({
               {service.serviceHighlights && service.serviceHighlights.length > 0 && (
                 <div className="p-4 sm:p-3 rounded-xl bg-accent/10 border border-accent/20">
                   <h4 className="text-lg sm:text-xl font-headline font-bold text-accent mb-3 flex items-center">
-                    <CheckCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Why choose this service?
+                    <CheckCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> {service.isProvider ? "Why choose this provider?" : "Why choose this service?"}
                   </h4>
                   <ul className="grid grid-cols-1 gap-2">
                     {service.serviceHighlights.map((highlight, index) => (

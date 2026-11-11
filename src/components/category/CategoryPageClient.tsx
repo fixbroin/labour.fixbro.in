@@ -296,13 +296,16 @@ export default function CategoryPageClient({
     });
 
     if (userLocation?.latitude && userLocation?.longitude) {
-      processed = processed.filter(service => {
+      const withinRadius = processed.filter(service => {
         if (service.distanceKm !== undefined) {
-          const radius = Number((service as any).workAreaRadiusKm) || 15;
+          const radius = Number((service as any).workAreaRadiusKm) || 25;
           return service.distanceKm <= radius;
         }
-        return false;
+        return true;
       });
+      if (withinRadius.length > 0) {
+        processed = withinRadius;
+      }
     }
 
     if (selectedSkillLevel !== 'all') {
@@ -345,19 +348,71 @@ export default function CategoryPageClient({
   const loadSubCategoryServices = useCallback(async (subCategoryId: string) => {
     if (loadingSubCats.has(subCategoryId)) return;
     
-    // Check if already has data or is loading
+    // Check if already has data
     const currentSubCat = subCategoriesWithServices.find(sc => sc.id === subCategoryId);
-    if (currentSubCat && (currentSubCat.services.length > 0 || currentSubCat.hasStartedLoading)) return;
+    if (currentSubCat && currentSubCat.services && currentSubCat.services.length > 0) return;
 
     setLoadingSubCats(prev => new Set(prev).add(subCategoryId));
     
     try {
-        const servicesRef = collection(db, "adminServices");
-        const qServices = query(servicesRef, where("subCategoryId", "==", subCategoryId), where("isActive", "==", true), orderBy("name", "asc"));
-        const snapshot = await getDocs(qServices);
-        const services = snapshot.docs
-            .map(serviceDoc => ({ id: serviceDoc.id, ...serviceDoc.data() } as FirestoreService))
-            .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+        const provsRef = collection(db, "providerApplications");
+        const snapshot = await getDocs(provsRef);
+        
+        let adminMarkupFee = 200;
+        try {
+            const settingsDoc = await getDoc(doc(db, "webSettings", "providerDefaultSettings"));
+            if (settingsDoc.exists() && typeof settingsDoc.data()?.adminMarkupFee === 'number') {
+                adminMarkupFee = settingsDoc.data().adminMarkupFee;
+            }
+        } catch (e) {}
+
+        const categoryProviders = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() } as any))
+            .filter(p => 
+                p.status === 'approved' &&
+                p.isActive !== false &&
+                (
+                    p.workCategoryId === category?.id ||
+                    (p.workCategoryName && category?.name && p.workCategoryName.toLowerCase().trim() === category.name.toLowerCase().trim()) ||
+                    (category?.name?.toLowerCase().includes('carpent') && (p.workCategoryName || '').toLowerCase().includes('carpent')) ||
+                    (category?.name?.toLowerCase().includes('electr') && (p.workCategoryName || '').toLowerCase().includes('electr')) ||
+                    (category?.name?.toLowerCase().includes('plumb') && (p.workCategoryName || '').toLowerCase().includes('plumb')) ||
+                    (category?.name?.toLowerCase().includes('paint') && (p.workCategoryName || '').toLowerCase().includes('paint'))
+                )
+            );
+
+        const services: FirestoreService[] = categoryProviders.map((p, idx) => {
+            const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
+            const finalPrice = baseDailyRate + adminMarkupFee;
+            return {
+                id: p.id,
+                subCategoryId: `providers-${category?.id || 'general'}`,
+                parentCategoryId: category?.id || 'general',
+                parentCategoryName: category?.name || p.workCategoryName || 'Daily Labour',
+                parentCategorySlug: category?.slug || 'daily-labour',
+                name: p.fullName || 'Labour Provider',
+                slug: p.slug || (p.fullName ? p.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${p.id.slice(0, 5)}`),
+                description: p.bio || `Skilled ${p.seniorityLevel || p.skillLevelLabel || 'Professional'} provider in ${category?.name || 'trade work'}.`,
+                imageUrl: p.profilePhotoUrl || '/default-image.png',
+                price: finalPrice,
+                discountedPrice: finalPrice,
+                order: idx,
+                isActive: true,
+                rating: Number(p.overallRating || p.rating) || 5,
+                reviewCount: Number(p.reviewCount) || 0,
+                isProvider: true,
+                seniorityLevel: p.seniorityLevel || p.skillLevelLabel || 'Senior',
+                age: p.age || 28,
+                experienceYears: p.experienceYears || 5,
+                experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
+                workAreaAddress: p.workAreaAddress || '',
+                workAreaRadiusKm: Number(p.workAreaRadiusKm) || 25,
+                workAreaCenter: p.workAreaCenter || null,
+                workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
+                lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
+                providerData: p,
+            } as FirestoreService;
+        });
         
         setSubCategoriesWithServices(prevSubCats => {
             const updated = prevSubCats.map(subCat => 
@@ -366,7 +421,6 @@ export default function CategoryPageClient({
                     : subCat
             );
             
-            // Auto-update cache for instant back-navigation
             const currentCache = getCache<CategoryPageCache>(cacheKey, true);
             if (currentCache) {
                 setCache(cacheKey, { ...currentCache, subCategories: updated }, true);
@@ -374,7 +428,7 @@ export default function CategoryPageClient({
             return updated;
         });
     } catch (error) {
-        console.error(`Error loading services for ${subCategoryId}:`, error);
+        console.error(`Error loading providers for ${subCategoryId}:`, error);
     } finally {
         setLoadingSubCats(prev => {
             const next = new Set(prev);
@@ -382,7 +436,7 @@ export default function CategoryPageClient({
             return next;
         });
     }
-  }, [cacheKey, subCategoriesWithServices, loadingSubCats]);
+  }, [cacheKey, category, subCategoriesWithServices, loadingSubCats]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -511,9 +565,26 @@ export default function CategoryPageClient({
         const qSubCategories = query(subCategoriesRef, where("parentId", "==", foundCategory.id), orderBy("order", "asc"));
         const subCategoriesSnapshot = await getDocs(qSubCategories);
         
-        const initialSubCats: EnrichedSubCategory[] = subCategoriesSnapshot.docs
+        let initialSubCats: EnrichedSubCategory[] = subCategoriesSnapshot.docs
           .map(d => ({ ...(d.data() as FirestoreSubCategory), id: d.id, services: [], isLoadingServices: true, hasStartedLoading: false }))
           .filter(subCat => subCat.isActive !== false);
+
+        if (initialSubCats.length === 0) {
+          initialSubCats = [
+            {
+              id: `providers-${foundCategory.id}`,
+              name: `Available ${foundCategory.name} Providers`,
+              slug: 'providers',
+              parentId: foundCategory.id,
+              imageUrl: foundCategory.imageUrl,
+              order: 0,
+              isActive: true,
+              services: [],
+              isLoadingServices: true,
+              hasStartedLoading: false,
+            } as any
+          ];
+        }
 
         setSubCategoriesWithServices(initialSubCats);
         if (initialSubCats.length > 0) {
@@ -725,8 +796,8 @@ export default function CategoryPageClient({
         {displayPageH1}
       </h1>
       <p className="text-muted-foreground mb-3">
-        Professional {category ? getCategorySearchTerm(category.name) : 'Services'} in {areaSlug && citySlug ? `${areaSlug.replace(/-/g, ' ')}, ${citySlug.replace(/-/g, ' ')}` : citySlug ? citySlug.replace(/-/g, ' ') : "Bangalore"}. 
-        Reliable experts for all your home repair and installation needs.
+        Verified daily labour {category ? category.name : 'providers'} in {areaSlug && citySlug ? `${areaSlug.replace(/-/g, ' ')}, ${citySlug.replace(/-/g, ' ')}` : citySlug ? citySlug.replace(/-/g, ' ') : "Bangalore"}. 
+        Reliable daily wage tradesmen for your trade work requirements.
       </p>
 
       {/* FILTER & SORT BAR */}

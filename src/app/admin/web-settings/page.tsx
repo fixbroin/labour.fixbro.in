@@ -185,7 +185,7 @@ export default function WebSettingsPage() {
       whyChooseUs: [
         { id: '1', title: 'Trusted Professionals', iconName: 'Users', description: 'Experienced and background-verified experts.' },
         { id: '2', title: 'Timely Service', iconName: 'ClockIcon', description: 'We value your time and ensure punctuality.' },
-        { id: '3', title: 'Verified Services', iconName: 'ShieldCheck', description: 'Quality assurance for all services provided.' },
+        { id: '3', title: 'Verified Providers', iconName: 'ShieldCheck', description: 'Quality assurance for all daily labour providers deployed.' },
         { id: '4', title: 'Transparent Pricing', iconName: 'Star', description: 'No hidden costs, clear and upfront pricing.' },
       ],
       footerCompanyBio: "Your trusted partner for verified daily wage workers and skilled daily labour in Bangalore. We connect you directly with experienced carpenters, painters, electricians, plumbers, and helpers on fixed daily rates.",

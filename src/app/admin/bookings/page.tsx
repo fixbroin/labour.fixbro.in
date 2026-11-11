@@ -208,9 +208,9 @@ const getPaymentLabel = (method: string | undefined, status: string, booking?: a
       return hasExtra ? 'Online + Extra Cash' : 'Online';
     }
     if (isMarkedOnline && !hasVerifiedOnlineProof) {
-      return status === 'Completed' ? 'Pay After Service (No Online TXN)' : 'Unpaid (Online Abandoned)';
+      return status === 'Completed' ? 'Pay After Work (No Online TXN)' : 'Unpaid (Online Abandoned)';
     }
-    return status === 'Completed' ? 'Paid (Pay After Service)' : 'Pay After Service';
+    return status === 'Completed' ? 'Paid (Pay After Work)' : 'Pay After Work';
 };
 
 const PAGE_SIZE = 10;
@@ -1265,7 +1265,7 @@ export default function AdminBookingsPage() {
               <DialogHeader>
                 <DialogTitle>Filter by Category</DialogTitle>
                 <DialogDescription>
-                  Filter bookings by service category (e.g. Plumbing, Electrician).
+                  Filter bookings by trade category (e.g. Plumbing, Electrician).
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">

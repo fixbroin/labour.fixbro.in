@@ -337,7 +337,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             </p>
             <p className="text-xs text-muted-foreground flex justify-between mt-1 pt-1 border-t border-muted/50">
               <span>Payment Method:</span>
-              <span className="font-semibold text-foreground">Pay After Service</span>
+              <span className="font-semibold text-foreground">Pay After Work</span>
             </p>
           </div>
         )}

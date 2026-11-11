@@ -277,7 +277,7 @@ export default function ProviderDashboardPage() {
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
             Welcome back, <span className="text-primary">{providerFirstName}!</span>
           </h1>
-          <p className="text-muted-foreground mt-1 font-medium">You have {newJobRequests.length} new service requests to review.</p>
+          <p className="text-muted-foreground mt-1 font-medium">You have {newJobRequests.length} new job booking requests to review.</p>
         </div>
         <Button variant="outline" size="sm" asChild className="rounded-full font-bold border-muted-foreground/20">
           <Link href="/provider/my-jobs"><Briefcase className="mr-2 h-4 w-4" /> View Full History</Link>

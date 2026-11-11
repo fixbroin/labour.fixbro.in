@@ -135,7 +135,7 @@ export default function CompleteBookingDialog({
                   </span>
                 ) : (
                   <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                    Pay After Service
+                    Pay After Work
                   </span>
                 )}
               </div>
@@ -166,7 +166,7 @@ export default function CompleteBookingDialog({
                   )}
                   onClick={() => setSelectedPaymentMethod('Pay After Service')}
                 >
-                  Pay After Service
+                  Pay After Work
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground pt-0.5 leading-snug">
@@ -232,12 +232,12 @@ export default function CompleteBookingDialog({
                       ? "bg-green-100 text-green-800 border border-green-200" 
                       : "bg-amber-100 text-amber-800 border border-amber-200"
                   )}>
-                    {selectedPaymentMethod === 'Online' ? "Paid Online" : "Pay After Service"}
+                    {selectedPaymentMethod === 'Online' ? "Paid Online" : "Pay After Work"}
                   </span>
                 </div>
                 {additionalTotal > 0 && (
                   <div className="flex justify-between items-center text-xs sm:text-sm text-green-700 font-bold pt-1 border-t border-dashed">
-                    <span>Additional Charges (Pay After Service):</span>
+                    <span>Additional Charges (Pay After Work):</span>
                     <span>+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
                   </div>
                 )}
@@ -248,7 +248,7 @@ export default function CompleteBookingDialog({
                 </div>
                 {selectedPaymentMethod === 'Online' && additionalTotal > 0 && (
                   <p className="text-[11px] text-muted-foreground pt-0.5 leading-tight">
-                    * Core booking is settled online. Additional charges ({formatCurrency(additionalTotal, symbol, decimals, code)}) will be collected by provider as Pay After Service.
+                    * Core booking is settled online. Additional charges ({formatCurrency(additionalTotal, symbol, decimals, code)}) will be collected by provider as Pay After Work.
                   </p>
                 )}
               </div>

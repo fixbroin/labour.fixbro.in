@@ -45,7 +45,7 @@ function NotFoundContent() {
         </Link>
         <Link href="/categories" passHref className="w-full sm:w-auto">
           <Button variant="outline" size="lg" className="w-full sm:w-auto px-8 rounded-full">
-            Browse Services
+            Browse Providers
           </Button>
         </Link>
       </div>

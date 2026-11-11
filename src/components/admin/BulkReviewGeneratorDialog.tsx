@@ -123,6 +123,7 @@ export default function BulkReviewGeneratorDialog({
           providerName: selectedProvider.fullName,
           seniorityLevel: selectedProvider.seniorityLevel,
           categoryName: selectedProvider.workCategoryName || 'Daily Labour',
+          subCategoryName: selectedProvider.workCategoryName || 'Daily Labour',
           numberOfReviews: data.numberOfReviews,
         });
 

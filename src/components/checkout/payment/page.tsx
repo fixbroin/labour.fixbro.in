@@ -885,7 +885,7 @@ export default function PaymentPage() {
 
   const basePaymentOptions = [
     { value: 'online', label: 'Pay Online (UPI, Cards, Net Banking, Wallets)', icon: CreditCard, online: true, available: onlinePaymentEnabled },
-    { value: 'Pay After Service', label: 'Pay After Service', icon: HandCoins, online: false, available: payAfterServiceEnabled && !isCancellationFeeMode },
+    { value: 'Pay After Service', label: 'Pay After Work', icon: HandCoins, online: false, available: payAfterServiceEnabled && !isCancellationFeeMode },
   ];
   const currentAvailablePaymentOptions = basePaymentOptions.filter(option => option.available);
 
@@ -962,7 +962,7 @@ export default function PaymentPage() {
                     )
                 )}
                  <div className="flex justify-between text-lg font-semibold pt-1 border-t mt-1"><span>Total Amount Due:</span><span className="text-primary">{symbol}{totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                 {paymentMethod === 'Pay After Service' && payAfterServiceEnabled && !isCancellationFeeMode && (<p className="text-sm text-muted-foreground mt-1 text-right">You will be charged after service.</p>)}
+                 {paymentMethod === 'Pay After Service' && payAfterServiceEnabled && !isCancellationFeeMode && (<p className="text-sm text-muted-foreground mt-1 text-right">You will pay directly after work completion.</p>)}
               </div>
             </>
           )}
@@ -1119,9 +1119,9 @@ export default function PaymentPage() {
                 <div className="flex gap-3 items-start border-t pt-3">
                   <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-xs">â„¹</div>
                   <div>
-                    <h4 className="font-semibold text-foreground text-sm">Pay After Service / Cash on Delivery</h4>
+                    <h4 className="font-semibold text-foreground text-sm">Pay After Work / Cash on Delivery</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or charge must be paid securely online before the cancellation request is processed.
+                      For bookings scheduled under <strong>Pay After Work</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or charge must be paid securely online before the cancellation request is processed.
                     </p>
                   </div>
                 </div>

@@ -892,7 +892,7 @@ export default function ThankYouPage() {
                 />
                 <Separator className="opacity-40" />
 
-                <SummaryItem icon={Wallet} label="Payment Method" value={bookingDetailsForDisplay.paymentMethod} />
+                <SummaryItem icon={Wallet} label="Payment Method" value={bookingDetailsForDisplay.paymentMethod === 'Pay After Service' ? 'Pay After Work' : bookingDetailsForDisplay.paymentMethod} />
                 <Separator className="opacity-40" />
 
                 <SummaryItem icon={Activity} label="Status" value={bookingDetailsForDisplay.status} />

@@ -13,7 +13,7 @@ import { unstable_cache } from 'next/cache';
 import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
-export const revalidate = false;
+export const revalidate = 0;
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -154,7 +154,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
     const seoSettings = await getGlobalSEOSettings();
     const placeholderData = { categoryName: data.category.name };
-    const h1Title = replacePlaceholders(data.category.h1_title || seoSettings.categoryPageH1Pattern, placeholderData) || `Expert ${data.category.name} Services`;
+    const h1Title = replacePlaceholders(data.category.h1_title || seoSettings.categoryPageH1Pattern, placeholderData) || `Expert ${data.category.name} Daily Labour Providers`;
 
     const rawSchemaImage = data.category.imageUrl || `/android-chrome-512x512.png`;
     const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
@@ -164,8 +164,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     const categorySchema = {
       "@context": "https://schema.org",
       "@type": "Product",
-      "name": `${data.category.name} Services`,
-      "description": data.category.seo_description || `Professional ${data.category.name} services near you.`,
+      "name": `${data.category.name} Daily Labour Providers`,
+      "description": data.category.seo_description || `Verified daily wage ${data.category.name} providers and skilled craftsmen near you.`,
       "image": schemaImage,
       "brand": {
         "@type": "Brand",

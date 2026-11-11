@@ -10,7 +10,8 @@ import { notFound } from 'next/navigation';
 import { getAggregateRating } from '@/lib/homepageUtils';
 import { getGlobalAppSettings } from '@/lib/webServerUtils';
 
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function generateStaticParams() {
   return [];
@@ -42,8 +43,10 @@ const extractLocationParts = (address?: string) => {
 
 const getProviderData = cache(async (slug: string): Promise<ClientServiceData | null> => {
   try {
+    const normalizedSlug = slug.toLowerCase().trim();
+
     let provSnap = await adminDb.collection('providerApplications')
-      .where('slug', '==', slug)
+      .where('slug', '==', normalizedSlug)
       .limit(1)
       .get();
 
@@ -51,6 +54,34 @@ const getProviderData = cache(async (slug: string): Promise<ClientServiceData | 
       const provDoc = await adminDb.collection('providerApplications').doc(slug).get();
       if (provDoc.exists) {
         provSnap = { docs: [provDoc], empty: false } as any;
+      }
+    }
+
+    if (provSnap.empty) {
+      // Flexible matching for name slugs, provider ID prefixes, and full names
+      const allApprovedSnap = await adminDb.collection('providerApplications')
+        .where('status', '==', 'approved')
+        .get();
+
+      const matched = allApprovedSnap.docs.find(d => {
+        const data = d.data();
+        const pSlug = (data.slug || '').toLowerCase().trim();
+        const nameSlug = data.fullName ? data.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+        const idPrefix = ('provider-' + d.id.slice(0, 5)).toLowerCase();
+        const bareId = d.id.toLowerCase();
+
+        return (
+          pSlug === normalizedSlug ||
+          nameSlug === normalizedSlug ||
+          idPrefix === normalizedSlug ||
+          bareId === normalizedSlug ||
+          normalizedSlug.replace(/^provider-/, '') === d.id.slice(0, 5).toLowerCase() ||
+          (data.fullName && normalizedSlug.replace(/-/g, ' ') === data.fullName.toLowerCase().trim())
+        );
+      });
+
+      if (matched) {
+        provSnap = { docs: [matched], empty: false } as any;
       }
     }
 
@@ -88,7 +119,6 @@ const getProviderData = cache(async (slug: string): Promise<ClientServiceData | 
 
     const workingHours = pData.workingHours || catWorkingHours;
     const lunchBreak = pData.lunchBreak || catLunchBreak;
-    const totalDailyHours = 7;
 
     // Load registered languages dynamically
     const languages = Array.isArray(pData.languagesSpokenLabels) && pData.languagesSpokenLabels.length > 0
@@ -112,7 +142,7 @@ const getProviderData = cache(async (slug: string): Promise<ClientServiceData | 
       }
     } catch (e) {}
 
-    const baseDailyRate = Number(pData.dailyRate) || 1200;
+    const baseDailyRate = Number(pData.dailyRate) || Number(pData.dailyWage) || Number(pData.desiredDailyRate) || Number(pData.price) || 1200;
     const customerDailyRate = baseDailyRate + adminMarkupFee;
 
     // High Ranking Local SEO: Category in Area, City | Category Near Me - Provider Name | FixBro
@@ -128,7 +158,7 @@ const getProviderData = cache(async (slug: string): Promise<ClientServiceData | 
       discountedPrice: customerDailyRate,
       slug: pData.slug || slug,
       imageUrl: pData.profilePhotoUrl || '/default-image.png',
-      rating: Number(pData.overallRating) || 0,
+      rating: Number(pData.overallRating || pData.rating) || 5,
       reviewCount: Number(pData.reviewCount) || 0,
       subCategoryId: `providers-${parentCategoryId || 'general'}`,
       parentCategoryId,
@@ -142,11 +172,10 @@ const getProviderData = cache(async (slug: string): Promise<ClientServiceData | 
       experienceYears: pData.experienceYears || 5,
       experienceLevelLabel: pData.experienceLevelLabel || `${pData.experienceYears || 5} Years Experience`,
       workAreaAddress: pData.workAreaAddress || 'Bangalore',
-      workAreaRadiusKm: pData.workAreaRadiusKm || 15,
+      workAreaRadiusKm: Number(pData.workAreaRadiusKm) || 25,
       workingHours,
       lunchBreak,
       languagesSpokenLabels: languages,
-      totalWorkingHours: totalDailyHours,
       serviceFaqs: [],
       providerData: {
         id: pDoc.id,
@@ -158,9 +187,8 @@ const getProviderData = cache(async (slug: string): Promise<ClientServiceData | 
         languagesSpokenLabels: languages,
         workingHours,
         lunchBreak,
-        totalWorkingHours: totalDailyHours,
         workAreaCenter: pData.workAreaCenter,
-        workAreaRadiusKm: pData.workAreaRadiusKm,
+        workAreaRadiusKm: Number(pData.workAreaRadiusKm) || 25,
         // STRICT PRIVACY: mobileNumber and email are never exposed
       },
       metaTitle: seoTitle,
@@ -183,15 +211,13 @@ const getRecommendedProviders = cache(async (
   try {
     let q = adminDb.collection('providerApplications')
       .where('status', '==', 'approved')
-      .where('isActive', '==', true)
-      .limit(8);
+      .limit(10);
 
     if (parentCategoryId) {
       q = adminDb.collection('providerApplications')
         .where('workCategoryId', '==', parentCategoryId)
         .where('status', '==', 'approved')
-        .where('isActive', '==', true)
-        .limit(8);
+        .limit(10);
     }
 
     const snap = await q.get();
@@ -200,25 +226,32 @@ const getRecommendedProviders = cache(async (
     snap.docs.forEach((docSnap, idx) => {
       if (docSnap.id !== currentProviderId) {
         const p = docSnap.data();
-        // Only online providers
-        if (p.isOnline !== false) {
+        if (p.isActive !== false) {
+          const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
           results.push({
             id: docSnap.id,
             subCategoryId: `providers-${p.workCategoryId || 'general'}`,
             parentCategoryId: p.workCategoryId,
             name: p.fullName || 'Labour Provider',
-            slug: p.slug || `provider-${docSnap.id.slice(0, 5)}`,
+            slug: p.slug || (p.fullName ? p.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${docSnap.id.slice(0, 5)}`),
             description: p.bio || `Skilled ${p.seniorityLevel || 'Professional'} provider.`,
             imageUrl: p.profilePhotoUrl || '/default-image.png',
-            price: Number(p.dailyRate) || 1200,
-            discountedPrice: Number(p.dailyRate) || 1200,
+            price: baseDailyRate,
+            discountedPrice: baseDailyRate,
             order: idx,
             isActive: true,
-            rating: Number(p.overallRating) || 0,
+            rating: Number(p.overallRating || p.rating) || 5,
             reviewCount: Number(p.reviewCount) || 0,
             isProvider: true,
             seniorityLevel: p.seniorityLevel || 'Senior',
+            age: p.age || 28,
+            experienceYears: p.experienceYears || 5,
             experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
+            workAreaAddress: p.workAreaAddress || '',
+            workAreaRadiusKm: Number(p.workAreaRadiusKm) || 25,
+            workAreaCenter: p.workAreaCenter || null,
+            workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
+            lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
           } as FirestoreService);
         }
       }

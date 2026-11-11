@@ -88,7 +88,7 @@ export default function SearchPopup({ isOpen, onClose }: SearchPopupProps) {
           return {
             id: doc.id,
             fullName: d.fullName || '',
-            slug: d.slug || doc.id,
+            slug: d.slug || (d.fullName ? d.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${doc.id.slice(0, 5)}`),
             workCategoryName: d.workCategoryName || d.categoryName || '',
             seniorityLevel: d.seniorityLevel || '',
             dailyWage: Number(d.dailyWage || d.desiredDailyRate || d.price || 0),
@@ -158,7 +158,7 @@ export default function SearchPopup({ isOpen, onClose }: SearchPopupProps) {
       const matchedCats = allCategories.filter(cat => {
         const name = (cat.name || '').toLowerCase();
         const slug = (cat.slug || '').toLowerCase();
-        const desc = (cat.description || '').toLowerCase();
+        const desc = ((cat as any).description || cat.seo_description || '').toLowerCase();
         return name.includes(trimmed) || slug.includes(trimmed) || desc.includes(trimmed);
       });
 

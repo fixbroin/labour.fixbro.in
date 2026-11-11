@@ -496,18 +496,15 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   }, [firestoreUser]);
 
   const filterProvidersByLocation = useCallback((servicesList: FirestoreService[]) => {
+    if (!servicesList || servicesList.length === 0) return [];
+
     const userLat = Number(userLocation?.latitude ?? (userLocation as any)?.lat);
     const userLng = Number(userLocation?.longitude ?? (userLocation as any)?.lng);
     const hasValidUserLocation = !isNaN(userLat) && !isNaN(userLng) && userLat !== 0;
 
-    if (!hasValidUserLocation) {
-      // Before login / guest without set location: show all providers
-      return servicesList;
-    }
-
-    const processed = servicesList
-      .map(service => {
-        let distanceKm: number | undefined = undefined;
+    const mapped = servicesList.map(service => {
+      let distanceKm: number | undefined = undefined;
+      if (hasValidUserLocation) {
         const center = (service as any).workAreaCenter || (service as any).providerData?.workAreaCenter;
         const centerLat = Number(center?.latitude ?? center?.lat);
         const centerLng = Number(center?.longitude ?? center?.lng);
@@ -515,20 +512,28 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         if (!isNaN(centerLat) && !isNaN(centerLng) && centerLat !== 0) {
           distanceKm = getHaversineDistance(userLat, userLng, centerLat, centerLng);
         }
-        return {
-          ...service,
-          distanceKm,
-        };
-      })
-      .filter(service => {
-        if (service.distanceKm !== undefined) {
-          const radius = Number((service as any).workAreaRadiusKm) || 25;
-          return service.distanceKm <= radius;
-        }
-        return true;
-      });
+      }
+      return {
+        ...service,
+        distanceKm,
+      };
+    });
 
-    processed.sort((a, b) => {
+    if (!hasValidUserLocation) {
+      return mapped;
+    }
+
+    const withinRadius = mapped.filter(service => {
+      if (service.distanceKm !== undefined) {
+        const radius = Number((service as any).workAreaRadiusKm) || 25;
+        return service.distanceKm <= radius;
+      }
+      return true;
+    });
+
+    const targetList = withinRadius.length > 0 ? withinRadius : mapped;
+
+    targetList.sort((a, b) => {
       if (a.distanceKm !== undefined && b.distanceKm !== undefined) {
         return a.distanceKm - b.distanceKm;
       }
@@ -537,7 +542,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       return (b.rating || 0) - (a.rating || 0);
     });
 
-    return processed.length > 0 ? processed : servicesList;
+    return targetList;
   }, [userLocation]);
 
   const displayedPopularProviders = useMemo(() => {
@@ -700,26 +705,28 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   }, [citySlug, areaSlug, initialData, seoSettings, initialH1Title]);
 
   const setupRealtimeListeners = useCallback(() => {
-    // CRITICAL: We only want real-time listeners for ADMINS to see live changes.
-    // Regular visitors should ONLY use the cached data from initialData.
-    if (isVisitorBot.current || !isAdmin) {
+    if (isVisitorBot.current) {
         setIsLoadingFeaturesConfig(false);
         setIsLoadingPopular(false);
         setIsLoadingRecent(false);
-        return () => {}; // No-op cleanup
+        return () => {};
     }
 
-    // 1. Features Config Listener (Admins Only)
-    const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
-    const unsubscribeConfig = onSnapshot(configDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const config = { ...defaultFeaturesConfig, ...(docSnap.data() as Partial<FeaturesConfiguration>) };
-        setFeaturesConfig(config);
-        setCache('featuresConfig', config, true);
-        setActiveAds((config.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
-        setIsLoadingFeaturesConfig(false);
-      }
-    }, (error) => console.error("Error listening to features config:", error));
+    let unsubscribeConfig = () => {};
+    if (isAdmin) {
+      const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
+      unsubscribeConfig = onSnapshot(configDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const config = { ...defaultFeaturesConfig, ...(docSnap.data() as Partial<FeaturesConfiguration>) };
+          setFeaturesConfig(config);
+          setCache('featuresConfig', config, true);
+          setActiveAds((config.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
+          setIsLoadingFeaturesConfig(false);
+        }
+      }, (error) => console.error("Error listening to features config:", error));
+    } else {
+      setIsLoadingFeaturesConfig(false);
+    }
 
     // Helper to map provider doc to service card item
     const mapDocToProviderCard = (p: any, idx: number): FirestoreService => {
@@ -727,7 +734,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       const categoryId = p.workCategoryId || 'general';
       const categorySlug = p.workCategoryName ? p.workCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'daily-labour';
       const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
-      const finalPrice = baseDailyRate + (appConfig?.adminMarkupFee || 0);
+      const finalPrice = baseDailyRate + ((appConfig as any)?.adminMarkupFee || 0);
 
       return {
         id: p.id,
@@ -736,7 +743,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         parentCategoryName: categoryName,
         parentCategorySlug: categorySlug,
         name: p.fullName || 'Daily Provider',
-        slug: p.slug || `provider-${p.id.slice(0, 5)}`,
+        slug: p.slug || (p.fullName ? p.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${p.id.slice(0, 5)}`),
         description: p.bio || `Experienced ${p.seniorityLevel || 'Professional'} provider in ${categoryName}.`,
         imageUrl: p.profilePhotoUrl || '/default-image.png',
         price: finalPrice,
@@ -751,12 +758,11 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         experienceYears: p.experienceYears || 5,
         experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
         workAreaAddress: p.workAreaAddress || '',
-        workAreaRadiusKm: p.workAreaRadiusKm || 25,
+        workAreaRadiusKm: Number(p.workAreaRadiusKm) || 25,
         workAreaCenter: p.workAreaCenter || null,
         workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
         lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
         languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
-        totalWorkingHours: 7,
       } as FirestoreService;
     };
 
@@ -795,11 +801,23 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       unsubscribeConfig();
       unsubscribeProviders();
     };
-  }, [appConfig?.adminMarkupFee]);
+  }, [(appConfig as any)?.adminMarkupFee]);
 
   useEffect(() => {
     setIsMounted(true);
     if (initialData) {
+      if (initialData.popularServices && initialData.popularServices.length > 0) {
+        setPopularServices(initialData.popularServices);
+      }
+      if (initialData.recentServices && initialData.recentServices.length > 0) {
+        setRecentServices(initialData.recentServices);
+      }
+      if (initialData.categoryWiseServices && initialData.categoryWiseServices.length > 0) {
+        setCategoryWiseServicesData(initialData.categoryWiseServices);
+      }
+      if (initialData.featuresConfig) {
+        setFeaturesConfig(initialData.featuresConfig);
+      }
       setCache('featuresConfig', initialData.featuresConfig, true);
       setCache('popularServices', initialData.popularServices, true);
       setCache('recentServices', initialData.recentServices, true);
@@ -824,7 +842,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     if (!currentFeaturesConfig.showCategoryWiseServices) return;
     
     // If we have initialData or it's a bot, we don't need to re-fetch this on client
-    if (initialData?.categoryWiseServices || isVisitorBot.current) {
+    if ((initialData?.categoryWiseServices && initialData.categoryWiseServices.length > 0) || isVisitorBot.current) {
         setIsLoadingCategoryWise(false);
         return;
     }
@@ -853,7 +871,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
           const categoryId = p.workCategoryId || 'general';
           const categorySlug = p.workCategoryName ? p.workCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'daily-labour';
           const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
-          const finalPrice = baseDailyRate + (appConfig?.adminMarkupFee || 0);
+          const finalPrice = baseDailyRate + ((appConfig as any)?.adminMarkupFee || 0);
 
           return {
             id: p.id,
@@ -862,7 +880,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             parentCategoryName: categoryName,
             parentCategorySlug: categorySlug,
             name: p.fullName || 'Daily Provider',
-            slug: p.slug || `provider-${p.id.slice(0, 5)}`,
+            slug: p.slug || (p.fullName ? p.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${p.id.slice(0, 5)}`),
             description: p.bio || `Experienced ${p.seniorityLevel || 'Professional'} provider in ${categoryName}.`,
             imageUrl: p.profilePhotoUrl || '/default-image.png',
             price: finalPrice,
@@ -882,7 +900,6 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
             lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
             languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
-            totalWorkingHours: 7,
           } as FirestoreService;
         };
 
@@ -908,7 +925,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         console.error("Error fetching category-wise providers:", e);
     }
     setIsLoadingCategoryWise(false);
-  }, [appConfig?.adminMarkupFee]);
+  }, [(appConfig as any)?.adminMarkupFee]);
 
   useEffect(() => {
       if (featuresConfig) {
@@ -1084,16 +1101,16 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                         
                         {(isLoadingCategoryWise && categoryWiseServicesData.length === 0) ? (
                             <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-                        ) : displayedCategoryWiseServices.length > 0 ? (
-                            displayedCategoryWiseServices.map(catGroup => (
-                                <div key={catGroup.category.id} className="mb-8">
-                                    <h3 className="text-xl font-semibold mb-4 text-left text-foreground border-l-4 border-primary pl-3">{catGroup.category.name}</h3>
-                                    {catGroup.services.length > 0 ? (
+                        ) : displayedCategoryWiseServices.filter(cg => cg.services.length > 0).length > 0 ? (
+                            displayedCategoryWiseServices
+                                .filter(catGroup => catGroup.services.length > 0)
+                                .map(catGroup => (
+                                    <div key={catGroup.category.id} className="mb-8">
+                                        <h3 className="text-xl font-semibold mb-4 text-left text-foreground border-l-4 border-primary pl-3">{catGroup.category.name}</h3>
                                         <HomepageServiceCarousel services={catGroup.services} />
-                                    ) : ( <p className="text-sm text-muted-foreground ml-4">{userLocation ? "No providers currently available within your location radius for this category." : "No providers currently available in this category."}</p> )}
-                                </div>
-                            ))
-                        ) : (<p className="text-center text-muted-foreground">No daily labour providers to display in this category currently.</p>)}
+                                    </div>
+                                ))
+                        ) : null}
                     </div>
                 </section>
                 {renderAdsByPlacement('AFTER_CATEGORY_SECTIONS')}

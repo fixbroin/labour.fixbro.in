@@ -856,7 +856,7 @@ export default function MyBookingsPage() {
                   <div>
                     <p className="text-muted-foreground">Payment Method</p>
                     <p className="font-medium">
-                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Service'}
+                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Work'}
                     </p>
                   </div>
                   {booking.dailyTimeline && booking.dailyTimeline.length > 1 && (

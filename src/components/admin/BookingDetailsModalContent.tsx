@@ -289,11 +289,11 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                         const hasExtra = booking.additionalCharges && booking.additionalCharges.length > 0;
                         if (hasProof || !isCashPayment(booking.paymentMethod)) {
                           if (booking.status === 'Completed') {
-                            return hasExtra ? "Paid (Online) + Extra Pay After Service" : "Paid (Online)";
+                            return hasExtra ? "Paid (Online) + Extra Pay After Work" : "Paid (Online)";
                           }
-                          return hasExtra ? "Online + Extra Pay After Service" : "Online";
+                          return hasExtra ? "Online + Extra Pay After Work" : "Online";
                         }
-                        return booking.status === 'Completed' ? "Paid (Pay After Service)" : "Pay After Service";
+                        return booking.status === 'Completed' ? "Paid (Pay After Work)" : "Pay After Work";
                     })()}
                 </Badge>
             </div>
@@ -528,7 +528,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Original Payment Option:</strong>
-                  <span className="font-semibold text-foreground text-sm block mt-0.5">Pay After Service / Cash on Delivery</span>
+                  <span className="font-semibold text-foreground text-sm block mt-0.5">Pay After Work / Cash on Delivery</span>
                 </div>
                 <div>
                   <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Cancellation Fee Paid:</strong>

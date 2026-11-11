@@ -137,7 +137,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                         parentCategoryName: categoryName,
                         parentCategorySlug: categorySlug,
                         name: p.fullName || 'Daily Provider',
-                        slug: p.slug || `provider-${p.id.slice(0, 5)}`,
+                        slug: p.slug || (p.fullName ? p.fullName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${p.id.slice(0, 5)}`),
                         description: p.bio || `Experienced ${p.seniorityLevel || 'Professional'} provider in ${categoryName}.`,
                         imageUrl: p.profilePhotoUrl || '/default-image.png',
                         price: customerDailyRate,
@@ -157,7 +157,6 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                         workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
                         lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
                         languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
-                        totalWorkingHours: 7,
                     } as FirestoreService;
                 };
 
@@ -346,21 +345,29 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                 const categoryProviders = provSnapshot.docs
                     .map(doc => ({ id: doc.id, ...serializeFirestoreData(doc.data() as any) } as any))
                     .filter((p: any) => 
-                        (p.workCategoryId === category.id || (p.workCategoryName && p.workCategoryName.toLowerCase() === category.name.toLowerCase())) &&
-                        p.isActive !== false &&
-                        p.isOnline !== false
+                        (
+                            p.workCategoryId === category.id || 
+                            (p.workCategoryName && p.workCategoryName.toLowerCase().trim() === category.name.toLowerCase().trim()) ||
+                            (category.name.toLowerCase().includes('carpent') && (p.workCategoryName || '').toLowerCase().includes('carpent')) ||
+                            (category.name.toLowerCase().includes('electr') && (p.workCategoryName || '').toLowerCase().includes('electr')) ||
+                            (category.name.toLowerCase().includes('plumb') && (p.workCategoryName || '').toLowerCase().includes('plumb')) ||
+                            (category.name.toLowerCase().includes('paint') && (p.workCategoryName || '').toLowerCase().includes('paint'))
+                        ) &&
+                        p.isActive !== false
                     );
 
                 let subCategoriesWithServices: Array<FirestoreSubCategory & { services: FirestoreService[] }> = [];
 
                 if (categoryProviders.length > 0) {
                     const providerServices: FirestoreService[] = categoryProviders.map((p: any, idx: number) => {
-                        const baseDailyRate = Number(p.dailyRate) || 1200;
+                        const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
                         const customerDailyRate = baseDailyRate + categoryAdminMarkup;
                         return {
                             id: p.id,
                             subCategoryId: `providers-${category.id}`,
                             parentCategoryId: category.id,
+                            parentCategoryName: category.name,
+                            parentCategorySlug: category.slug,
                             name: p.fullName || 'Labour Provider',
                             slug: p.slug || (p.fullName ? p.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `provider-${p.id.slice(0, 5)}`),
                             description: p.bio || `Skilled ${p.seniorityLevel || p.skillLevelLabel || 'Professional'} provider in ${category.name}.`,
@@ -369,7 +376,7 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                             discountedPrice: customerDailyRate,
                             order: idx,
                             isActive: true,
-                            rating: Number(p.overallRating) || 0,
+                            rating: Number(p.overallRating || p.rating) || 5,
                             reviewCount: Number(p.reviewCount) || 0,
                             isProvider: true,
                             seniorityLevel: p.seniorityLevel || p.skillLevelLabel || 'Senior',
@@ -377,7 +384,7 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                             experienceYears: p.experienceYears || 5,
                             experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
                             workAreaAddress: p.workAreaAddress || '',
-                            workAreaRadiusKm: p.workAreaRadiusKm || 15,
+                            workAreaRadiusKm: Number(p.workAreaRadiusKm) || 25,
                             workAreaCenter: p.workAreaCenter || null,
                             workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
                             lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },

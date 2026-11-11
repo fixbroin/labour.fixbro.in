@@ -384,8 +384,8 @@ export default function RecommendedServicesSection({
     return null;
   }
 
-  const heading = title || (parentCategoryName ? `More in ${parentCategoryName}` : `Recommended Services`);
-  const subHeading = subtitle || `Popular related services you can easily add to your booking`;
+  const heading = title || (parentCategoryName ? `More ${parentCategoryName} Providers` : `Recommended Providers`);
+  const subHeading = subtitle || `Verified daily labour providers available for hire`;
 
   return (
     <section className="mt-8 sm:mt-12">

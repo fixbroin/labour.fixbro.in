@@ -351,7 +351,7 @@ export default function AdminReviewsPage() {
                               <UserCheck className="h-3 w-3 inline" /> Daily Labour Provider
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted-foreground">Service</span>
+                            <span className="text-[10px] text-muted-foreground">Daily Labour</span>
                           )}
                         </div>
                       </TableCell>

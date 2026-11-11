@@ -242,9 +242,9 @@ export default async function CancellationPolicyPage() {
                     <HandCoins className="h-4.5 w-4.5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground">Pay After Service / Cash on Delivery</h3>
+                    <h3 className="font-semibold text-foreground">Pay After Work / Cash on Delivery</h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
-                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or restricted charge must be paid securely online before the cancellation request is processed.
+                      For bookings scheduled under <strong>Pay After Work</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or restricted charge must be paid securely online before the cancellation request is processed.
                     </p>
                   </div>
                 </div>
