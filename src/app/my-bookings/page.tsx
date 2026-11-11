@@ -909,7 +909,7 @@ export default function MyBookingsPage() {
                           <span className="font-bold text-sm text-emerald-800 dark:text-emerald-300">Job Start OTP</span>
                         </div>
                         <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                          Share this 4-digit code with your service provider when they arrive on-site to begin work.
+                          Share this 4-digit code with your daily labour provider when they arrive on-site to begin work.
                         </p>
                       </div>
                       <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-4 py-2 rounded-lg border border-emerald-300 shadow-sm shrink-0">

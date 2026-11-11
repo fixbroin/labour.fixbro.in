@@ -1,11 +1,27 @@
-const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
-const path = require('path');
-const crypto = require('crypto');
+/**
+ * 4 Default Curated Blogs for FixBro Daily Labour
+ * Strict constraints: No mention of "7 hours", no mention of "OTP".
+ */
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+export interface DefaultBlogItem {
+  title: string;
+  slug: string;
+  excerpt: string;
+  categoryId: string;
+  categoryName: string;
+  coverImageUrl: string;
+  imageHint: string;
+  tags: string[];
+  readingTime: string;
+  isPublished: boolean;
+  h1_title: string;
+  meta_title: string;
+  meta_description: string;
+  meta_keywords: string;
+  content: string;
+}
 
-const defaultBlogs = [
+export const DEFAULT_DAILY_LABOUR_BLOGS: DefaultBlogItem[] = [
   {
     title: "The Complete Guide to Hiring Daily Wage Labour for Home Renovation & Repairs",
     slug: "guide-to-hiring-daily-wage-labour",
@@ -141,59 +157,3 @@ const defaultBlogs = [
     `
   }
 ];
-
-async function seed() {
-  console.log('[Seed Blogs] Connecting to MySQL...');
-  const conn = await mysql.createConnection({
-    host: process.env.MYSQL_HOST || 'localhost',
-    user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || '',
-    database: process.env.MYSQL_DATABASE || 'fixbro_labour'
-  });
-
-  // Clear existing
-  await conn.execute('DELETE FROM blogPosts');
-
-  console.log('[Seed Blogs] Seeding 4 default blogs for Daily Labour...');
-
-  for (const b of defaultBlogs) {
-    const id = 'blog_' + crypto.randomBytes(8).toString('hex');
-    const now = Math.floor(Date.now() / 1000);
-    const blogData = {
-      id,
-      title: b.title,
-      slug: b.slug,
-      excerpt: b.excerpt,
-      content: b.content.trim(),
-      categoryId: b.categoryId,
-      categoryName: b.categoryName,
-      coverImageUrl: b.coverImageUrl,
-      imageHint: b.imageHint,
-      tags: b.tags,
-      readingTime: b.readingTime,
-      isPublished: true,
-      authorId: "admin",
-      authorName: "FixBro Editorial Team",
-      h1_title: b.h1_title,
-      meta_title: b.meta_title,
-      meta_description: b.meta_description,
-      meta_keywords: b.meta_keywords,
-      createdAt: { _seconds: now, _nanoseconds: 0 },
-      updatedAt: { _seconds: now, _nanoseconds: 0 }
-    };
-
-    await conn.execute(
-      'INSERT INTO blogPosts (id, parent_id, data, createdAt, updatedAt) VALUES (?, NULL, ?, NOW(), NOW())',
-      [id, JSON.stringify(blogData)]
-    );
-    console.log(`[Seed Blogs] Inserted blog: "${b.title}" (${b.slug})`);
-  }
-
-  await conn.end();
-  console.log('[Seed Blogs] All 4 default blogs seeded successfully!');
-}
-
-seed().catch(err => {
-  console.error('[Seed Blogs] Error:', err);
-  process.exit(1);
-});

@@ -121,13 +121,13 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
 
                 const approvedProviders = allProvidersSnap.docs
                     .map(doc => ({ id: doc.id, ...serializeFirestoreData<any>(doc.data()) }))
-                    .filter(p => p.isActive !== false && p.isOnline === true);
+                    .filter(p => p.isActive !== false);
 
                 const mapProviderToService = (p: any, idx: number, cat?: FirestoreCategory): FirestoreService => {
                     const categoryName = cat?.name || p.workCategoryName || 'Daily Labour';
                     const categorySlug = cat?.slug || (p.workCategoryName ? p.workCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'daily-labour');
                     const categoryId = cat?.id || p.workCategoryId || 'general';
-                    const baseDailyRate = Number(p.dailyRate) || 1200;
+                    const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
                     const customerDailyRate = baseDailyRate + adminMarkupFee;
 
                     return {
@@ -144,7 +144,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                         discountedPrice: customerDailyRate,
                         order: idx,
                         isActive: true,
-                        rating: Number(p.overallRating) || 0,
+                        rating: Number(p.rating) || Number(p.overallRating) || 5,
                         reviewCount: Number(p.reviewCount) || 0,
                         isProvider: true,
                         seniorityLevel: p.seniorityLevel || p.skillLevelLabel || 'Senior',
@@ -152,7 +152,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                         experienceYears: p.experienceYears || 5,
                         experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
                         workAreaAddress: p.workAreaAddress || '',
-                        workAreaRadiusKm: p.workAreaRadiusKm || 15,
+                        workAreaRadiusKm: p.workAreaRadiusKm || 25,
                         workAreaCenter: p.workAreaCenter || null,
                         workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
                         lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
@@ -161,11 +161,11 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     } as FirestoreService;
                 };
 
-                // 1. Popular Providers / Services
+                // 1. Popular Providers
                 if (featuresConfig.showMostPopularServices) {
                     if (approvedProviders.length > 0) {
                         const sorted = [...approvedProviders]
-                            .sort((a, b) => (Number(b.overallRating) || 0) - (Number(a.overallRating) || 0) || (Number(b.reviewCount) || 0) - (Number(a.reviewCount) || 0))
+                            .sort((a, b) => (Number(b.rating || b.overallRating) || 5) - (Number(a.rating || a.overallRating) || 5) || (Number(b.reviewCount) || 0) - (Number(a.reviewCount) || 0))
                             .slice(0, 10);
                         promises.push(Promise.resolve(sorted.map((p, idx) => mapProviderToService(p, idx))));
                     } else {
@@ -183,7 +183,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     promises.push(Promise.resolve([] as FirestoreService[]));
                 }
 
-                // 2. Recent Providers / Services
+                // 2. Recent Providers
                 if (featuresConfig.showRecentlyAddedServices) {
                     if (approvedProviders.length > 0) {
                         const sorted = [...approvedProviders].slice(0, 10);
@@ -202,7 +202,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     promises.push(Promise.resolve([] as FirestoreService[]));
                 }
 
-                // 3. Category Wise Providers / Services
+                // 3. Category Wise Providers
                 if (featuresConfig.showCategoryWiseServices) {
                     const enabledCategoryIds = Object.entries(featuresConfig.homepageCategoryVisibility || {})
                         .filter(([, isVisible]) => isVisible)
@@ -215,7 +215,11 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     const categoryWisePromises = targetCategories.map(async (cat) => {
                         const catProviders = approvedProviders.filter(p => 
                             p.workCategoryId === cat.id || 
-                            (p.workCategoryName && p.workCategoryName.toLowerCase() === cat.name.toLowerCase())
+                            (p.workCategoryName && p.workCategoryName.toLowerCase().trim() === cat.name.toLowerCase().trim()) ||
+                            (cat.name.toLowerCase().includes('carpent') && (p.workCategoryName || '').toLowerCase().includes('carpent')) ||
+                            (cat.name.toLowerCase().includes('electr') && (p.workCategoryName || '').toLowerCase().includes('electr')) ||
+                            (cat.name.toLowerCase().includes('plumb') && (p.workCategoryName || '').toLowerCase().includes('plumb')) ||
+                            (cat.name.toLowerCase().includes('paint') && (p.workCategoryName || '').toLowerCase().includes('paint'))
                         );
 
                         if (catProviders.length > 0) {

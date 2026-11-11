@@ -235,7 +235,7 @@ const Footer: React.FC<FooterProps> = ({ initialWebSettings, initialSiloData }) 
 
           {/* Quick Links Columns */}
           <div className="lg:col-span-2">
-            <h3 className="font-headline text-sm font-bold uppercase tracking-wider mb-6">Services</h3>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-wider mb-6">Daily Labour</h3>
             <div className="flex flex-wrap gap-2">
               {serviceLinks.map(link => (
                 <FooterLink key={link.slug} href={`/category/${link.slug}`}>{link.name}</FooterLink>
@@ -253,16 +253,16 @@ const Footer: React.FC<FooterProps> = ({ initialWebSettings, initialSiloData }) 
               <FooterLink href="/careers">Careers</FooterLink>
               <FooterLink href="/blog">Our Blog</FooterLink>
               <FooterLink href="/faq">FAQ</FooterLink>
-              <FooterLink href="/near-me">Near Me Services</FooterLink>
+              <FooterLink href="/near-me">Near Me Providers</FooterLink>
               <FooterLink href="/sitemap">Sitemap</FooterLink>
-              <FooterLink href="/service-disclaimer">Service Disclaimer</FooterLink>
+              <FooterLink href="/service-disclaimer">Labour Disclaimer</FooterLink>
             </div>
           </div>
 
           {/* Newsletter Column */}
           <div className="lg:col-span-4">
             <h3 className="font-headline text-sm font-bold uppercase tracking-wider mb-6">Stay Updated</h3>
-            <p className="text-sm text-muted-foreground mb-4">Subscribe to get updates on offers and new services.</p>
+            <p className="text-sm text-muted-foreground mb-4">Subscribe to get updates on offers and verified daily labour providers.</p>
             <form onSubmit={handleSubscribe} className="flex gap-2">
               <Input 
                 type="email"

@@ -522,10 +522,10 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       })
       .filter(service => {
         if (service.distanceKm !== undefined) {
-          const radius = Number((service as any).workAreaRadiusKm) || 15;
+          const radius = Number((service as any).workAreaRadiusKm) || 25;
           return service.distanceKm <= radius;
         }
-        return false;
+        return true;
       });
 
     processed.sort((a, b) => {
@@ -537,7 +537,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       return (b.rating || 0) - (a.rating || 0);
     });
 
-    return processed;
+    return processed.length > 0 ? processed : servicesList;
   }, [userLocation]);
 
   const displayedPopularProviders = useMemo(() => {
@@ -721,30 +721,81 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       }
     }, (error) => console.error("Error listening to features config:", error));
 
-    // 2. Popular Services Listener
-    const popularQuery = query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("rating", "desc"), orderBy("reviewCount", "desc"), limit(10));
-    const unsubscribePopular = onSnapshot(popularQuery, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<FirestoreService, 'id'>) } as FirestoreService));
-      setPopularServices(data);
-      setCache('popularServices', data, true);
-      setIsLoadingPopular(false);
-    }, (error) => console.error("Error listening to popular services:", error));
+    // Helper to map provider doc to service card item
+    const mapDocToProviderCard = (p: any, idx: number): FirestoreService => {
+      const categoryName = p.workCategoryName || p.categoryName || 'Daily Labour';
+      const categoryId = p.workCategoryId || 'general';
+      const categorySlug = p.workCategoryName ? p.workCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'daily-labour';
+      const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
+      const finalPrice = baseDailyRate + (appConfig?.adminMarkupFee || 0);
 
-    // 3. Recent Services Listener
-    const recentQuery = query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("createdAt", "desc"), limit(10));
-    const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<FirestoreService, 'id'>) } as FirestoreService));
-      setRecentServices(data);
-      setCache('recentServices', data, true);
+      return {
+        id: p.id,
+        subCategoryId: `providers-${categoryId}`,
+        parentCategoryId: categoryId,
+        parentCategoryName: categoryName,
+        parentCategorySlug: categorySlug,
+        name: p.fullName || 'Daily Provider',
+        slug: p.slug || `provider-${p.id.slice(0, 5)}`,
+        description: p.bio || `Experienced ${p.seniorityLevel || 'Professional'} provider in ${categoryName}.`,
+        imageUrl: p.profilePhotoUrl || '/default-image.png',
+        price: finalPrice,
+        discountedPrice: finalPrice,
+        order: idx,
+        isActive: true,
+        rating: Number(p.rating) || Number(p.overallRating) || 5,
+        reviewCount: Number(p.reviewCount) || 0,
+        isProvider: true,
+        seniorityLevel: p.seniorityLevel || p.skillLevelLabel || 'Senior',
+        age: p.age || 28,
+        experienceYears: p.experienceYears || 5,
+        experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
+        workAreaAddress: p.workAreaAddress || '',
+        workAreaRadiusKm: p.workAreaRadiusKm || 25,
+        workAreaCenter: p.workAreaCenter || null,
+        workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
+        lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
+        languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
+        totalWorkingHours: 7,
+      } as FirestoreService;
+    };
+
+    // Providers Listener (for Popular & Recent Daily Labour Providers)
+    const provQuery = query(collection(db, "providerApplications"));
+    const unsubscribeProviders = onSnapshot(provQuery, (snapshot) => {
+      const approvedDocs = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(p => p.status === 'approved' && p.isActive !== false);
+
+      if (approvedDocs.length > 0) {
+        // 1. Most Popular Providers
+        const sortedPopular = [...approvedDocs]
+          .sort((a, b) => (Number(b.rating || b.overallRating) || 5) - (Number(a.rating || a.overallRating) || 5) || (Number(b.reviewCount) || 0) - (Number(a.reviewCount) || 0))
+          .slice(0, 10)
+          .map((p, idx) => mapDocToProviderCard(p, idx));
+        setPopularServices(sortedPopular);
+        setCache('popularServices', sortedPopular, true);
+
+        // 2. Recently Joined Providers
+        const sortedRecent = [...approvedDocs]
+          .slice(0, 10)
+          .map((p, idx) => mapDocToProviderCard(p, idx));
+        setRecentServices(sortedRecent);
+        setCache('recentServices', sortedRecent, true);
+      }
+      setIsLoadingPopular(false);
       setIsLoadingRecent(false);
-    }, (error) => console.error("Error listening to recent services:", error));
+    }, (error) => {
+      console.error("Error listening to providers:", error);
+      setIsLoadingPopular(false);
+      setIsLoadingRecent(false);
+    });
 
     return () => {
       unsubscribeConfig();
-      unsubscribePopular();
-      unsubscribeRecent();
+      unsubscribeProviders();
     };
-  }, []);
+  }, [appConfig?.adminMarkupFee]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -768,7 +819,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     };
   }, [isLoadingAppSettings, initialData, fetchPageSpecificData, setupRealtimeListeners]);
 
-  // CATEGORY WISE SERVICES (Still manual fetch as it involves complex multi-step queries)
+  // CATEGORY WISE DAILY LABOUR PROVIDERS
   const fetchCategoryWiseData = useCallback(async (currentFeaturesConfig: FeaturesConfiguration) => {
     if (!currentFeaturesConfig.showCategoryWiseServices) return;
     
@@ -783,35 +834,81 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             .filter(([, isVisible]) => isVisible)
             .map(([catId]) => catId);
 
-        if (enabledCategoryIds.length > 0) {
-            const categoriesQuery = query(collection(db, "adminCategories"), where(documentId(), "in", enabledCategoryIds), where("isActive", "==", true), orderBy("order", "asc"));
-            const categoriesSnapshot = await getDocs(categoriesQuery);
-            const enabledCategories = categoriesSnapshot.docs.map(d => ({...d.data(), id: d.id } as FirestoreCategory));
-            
-            const categoryServicesPromises = enabledCategories.map(async (cat) => {
-                    const subCategoriesSnapshot = await getDocs(query(collection(db, "adminSubCategories"), where("parentId", "==", cat.id), where("isActive", "==", true)));
-                const subCategoryIds = subCategoriesSnapshot.docs.map(subDoc => subDoc.id);
+        const catsQuery = enabledCategoryIds.length > 0
+            ? query(collection(db, "adminCategories"), where(documentId(), "in", enabledCategoryIds), where("isActive", "==", true), orderBy("order", "asc"))
+            : query(collection(db, "adminCategories"), where("isActive", "==", true), orderBy("order", "asc"));
+        
+        const [categoriesSnapshot, providersSnapshot] = await Promise.all([
+            getDocs(catsQuery),
+            getDocs(collection(db, "providerApplications"))
+        ]);
 
-                let servicesForCategory: FirestoreService[] = [];
-                if (subCategoryIds.length > 0) {
-                        const servicesQuery = query(collection(db, "adminServices"), where("isActive", "==", true), where("subCategoryId", "in", subCategoryIds), orderBy("name", "asc"));
-                        const servicesSnapshot = await getDocs(servicesQuery);
-                        servicesForCategory = servicesSnapshot.docs
-                            .map(sDoc => ({...sDoc.data() as Omit<FirestoreService, 'id'>, id: sDoc.id} as FirestoreService))
-                            .sort((a, b) => (a.order || 0) - (b.order || 0))
-                            .slice(0, 10);
-                }
-                return { category: cat, services: servicesForCategory };
-            });
-            const resolvedCategoryServices = (await Promise.all(categoryServicesPromises)).filter(cs => cs.services.length > 0);
-            setCategoryWiseServicesData(resolvedCategoryServices);
-            setCache('categoryWiseServices', resolvedCategoryServices, true);
-        } else {
-            setCategoryWiseServicesData([]);
-        }
-    } catch (e) { console.error("Error fetching category-wise services:", e); }
+        const enabledCategories = categoriesSnapshot.docs.map(d => ({...d.data(), id: d.id } as FirestoreCategory));
+        const approvedProviders = providersSnapshot.docs
+            .map(d => ({ id: d.id, ...d.data() } as any))
+            .filter(p => p.status === 'approved' && p.isActive !== false);
+
+        const mapDocToProviderCard = (p: any, idx: number): FirestoreService => {
+          const categoryName = p.workCategoryName || p.categoryName || 'Daily Labour';
+          const categoryId = p.workCategoryId || 'general';
+          const categorySlug = p.workCategoryName ? p.workCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'daily-labour';
+          const baseDailyRate = Number(p.dailyRate) || Number(p.dailyWage) || Number(p.desiredDailyRate) || Number(p.price) || 1200;
+          const finalPrice = baseDailyRate + (appConfig?.adminMarkupFee || 0);
+
+          return {
+            id: p.id,
+            subCategoryId: `providers-${categoryId}`,
+            parentCategoryId: categoryId,
+            parentCategoryName: categoryName,
+            parentCategorySlug: categorySlug,
+            name: p.fullName || 'Daily Provider',
+            slug: p.slug || `provider-${p.id.slice(0, 5)}`,
+            description: p.bio || `Experienced ${p.seniorityLevel || 'Professional'} provider in ${categoryName}.`,
+            imageUrl: p.profilePhotoUrl || '/default-image.png',
+            price: finalPrice,
+            discountedPrice: finalPrice,
+            order: idx,
+            isActive: true,
+            rating: Number(p.rating) || Number(p.overallRating) || 5,
+            reviewCount: Number(p.reviewCount) || 0,
+            isProvider: true,
+            seniorityLevel: p.seniorityLevel || p.skillLevelLabel || 'Senior',
+            age: p.age || 28,
+            experienceYears: p.experienceYears || 5,
+            experienceLevelLabel: p.experienceLevelLabel || `${p.experienceYears || 5} Years Exp`,
+            workAreaAddress: p.workAreaAddress || '',
+            workAreaRadiusKm: p.workAreaRadiusKm || 25,
+            workAreaCenter: p.workAreaCenter || null,
+            workingHours: p.workingHours || { start: "09:30 AM", end: "05:30 PM" },
+            lunchBreak: p.lunchBreak || { start: "01:00 PM", end: "02:00 PM" },
+            languagesSpokenLabels: p.languagesSpokenLabels || ["Hindi", "English", "Kannada"],
+            totalWorkingHours: 7,
+          } as FirestoreService;
+        };
+
+        const resolvedCategoryProviders = enabledCategories.map(cat => {
+            const catProviders = approvedProviders.filter(p => 
+                p.workCategoryId === cat.id || 
+                (p.workCategoryName && p.workCategoryName.toLowerCase().trim() === cat.name.toLowerCase().trim()) ||
+                (cat.name.toLowerCase().includes('carpent') && (p.workCategoryName || '').toLowerCase().includes('carpent')) ||
+                (cat.name.toLowerCase().includes('electr') && (p.workCategoryName || '').toLowerCase().includes('electr')) ||
+                (cat.name.toLowerCase().includes('plumb') && (p.workCategoryName || '').toLowerCase().includes('plumb')) ||
+                (cat.name.toLowerCase().includes('paint') && (p.workCategoryName || '').toLowerCase().includes('paint'))
+            );
+
+            return {
+                category: cat,
+                services: catProviders.map((p, idx) => mapDocToProviderCard(p, idx))
+            };
+        }).filter(cg => cg.services.length > 0);
+
+        setCategoryWiseServicesData(resolvedCategoryProviders);
+        setCache('categoryWiseServices', resolvedCategoryProviders, true);
+    } catch (e) {
+        console.error("Error fetching category-wise providers:", e);
+    }
     setIsLoadingCategoryWise(false);
-  }, []);
+  }, [appConfig?.adminMarkupFee]);
 
   useEffect(() => {
       if (featuresConfig) {
@@ -952,7 +1049,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             <SectionHeader 
                 title={finalH1} 
                 isH1={true}
-                subtitle={`Discover a wide range of services to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
+                subtitle={`Discover verified daily labour providers and skilled craftsmen to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
             />
             <HomeCategoriesSection initialCategories={initialData?.allCategories} />
             
@@ -993,10 +1090,10 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                                     <h3 className="text-xl font-semibold mb-4 text-left text-foreground border-l-4 border-primary pl-3">{catGroup.category.name}</h3>
                                     {catGroup.services.length > 0 ? (
                                         <HomepageServiceCarousel services={catGroup.services} />
-                                    ) : ( <p className="text-sm text-muted-foreground ml-4">{userLocation ? "No providers currently available within your location radius for this category." : "No services currently available in this category."}</p> )}
+                                    ) : ( <p className="text-sm text-muted-foreground ml-4">{userLocation ? "No providers currently available within your location radius for this category." : "No providers currently available in this category."}</p> )}
                                 </div>
                             ))
-                        ) : (<p className="text-center text-muted-foreground">No category-specific services to display currently.</p>)}
+                        ) : (<p className="text-center text-muted-foreground">No daily labour providers to display in this category currently.</p>)}
                     </div>
                 </section>
                 {renderAdsByPlacement('AFTER_CATEGORY_SECTIONS')}
@@ -1044,7 +1141,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                         </h2>
                         <div className="prose prose-sm md:prose-base max-w-none text-muted-foreground">
                             <p>
-                                Fixbro Daily Labour is your trusted platform for verified <strong>daily wage workers in Bangalore</strong>. Whether you need a skilled <strong>carpenter daily labour near me</strong>, an experienced <strong>painter daily wage worker</strong>, a licensed <strong>electrician daily labour</strong>, or construction and tiling helpers, we connect you directly with background-checked tradesmen. All workers operate on a dedicated full-day shift (09:30 AM to 05:30 PM) on fixed, transparent daily rates with OTP verification.
+                                Fixbro Daily Labour is your trusted platform for verified <strong>daily wage workers in Bangalore</strong>. Whether you need a skilled <strong>carpenter daily labour near me</strong>, an experienced <strong>painter daily wage worker</strong>, a licensed <strong>electrician daily labour</strong>, or construction and tiling helpers, we connect you directly with background-checked tradesmen. All workers operate on a dedicated full-day shift (09:30 AM to 05:30 PM) on fixed, transparent daily rates.
                             </p>
                             <p>
                                 We serve all major localities in Bangalore, including <strong>Whitefield, HSR Layout, Koramangala, Indiranagar, Electronic City, Sarjapur Road, and Jayanagar</strong>. With transparent pricing, verified government IDs, and direct worker deployment, Fixbro Daily Labour is Bangalore&apos;s premier daily wage hiring platform.
@@ -1062,7 +1159,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
               {settings.homepageContent?.footerCTA?.title || "Ready to get started?"}
             </h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
-              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
+              {settings.homepageContent?.footerCTA?.subtitle || "Book your verified daily labour provider today and experience the Fixbro difference."}
             </p>
             <Button
               size="lg"
@@ -1077,7 +1174,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                 }
               }}
             >
-              {settings.homepageContent?.footerCTA?.buttonText || "Book a Service"}
+              {settings.homepageContent?.footerCTA?.buttonText || "Book a Provider"}
             </Button>
           </div>
         </section>

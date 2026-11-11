@@ -94,19 +94,22 @@ Trade / Category: {{categoryName}}
 Platform: Fixbro Daily Labour (Full-day 09:30 AM – 05:30 PM on-site labour)
 
 CRITICAL WORKER REVIEW GUIDELINES:
-1. FOCUS ON THE WORKER: Reviewers hired this specific worker ({{serviceName}}) for a full-day labour shift.
+1. FOCUS ON THE WORKER: Reviewers hired this specific worker ({{serviceName}}) for a daily labour shift.
 2. PRAISE WORK ETHIC & ATTRIBUTES:
-   - Punctual 09:30 AM arrival at the site.
-   - Dedicated full 7-hour active workday (took only their standard 1-hour lunch break).
-   - Skilled trade craftsmanship in {{categoryName}} (e.g. carpentry cutting/assembly/finishing, neat wall painting coats, accurate electrical wiring & switch installations).
+   - Punctual arrival at the scheduled shift time.
+   - Dedicated focus on the customer's prioritized checklist throughout the shift.
+   - Skilled trade craftsmanship in {{categoryName}} (e.g. carpentry woodwork/cabinet fixes, neat wall painting coats, accurate electrical wiring & switch installations, clean leak-free plumbing).
    - Brought their own professional hand tools.
    - Polite, respectful, and honest attitude without requesting extra hidden charges.
-   - Cleaned up sawdust, paint splatters, or debris before verifying completion via OTP.
+   - Cleaned up the workspace before concluding work.
 3. DIVERSE PERSPECTIVES:
-   - Customer A: Hired {{serviceName}} for full-day home renovation/woodwork.
-   - Customer B: Hired {{serviceName}} for flat interior preparation and repairs.
-   - Customer C: Appreciated honest communication, punctual start, and steady pace throughout the day.
+   - Customer A: Hired {{serviceName}} for home woodwork or maintenance.
+   - Customer B: Hired {{serviceName}} for flat preparation and repairs.
+   - Customer C: Appreciated honest communication, punctual start, and steady pace throughout the shift.
    - Customer D: Great value for the transparent daily wage rate with no haggling.
+4. STRICT NEGATIVE CONSTRAINTS:
+   - DO NOT mention "7 hours" or any hardcoded hour count.
+   - DO NOT mention "OTP" or verification codes (since OTP is optional).
 {{else}}
 TARGET SERVICE CONTEXT:
 Service Name: {{serviceName}}

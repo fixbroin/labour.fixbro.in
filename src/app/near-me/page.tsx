@@ -89,19 +89,18 @@ export default async function NearMeHubPage() {
         <div className="bg-primary/5 py-12 md:py-20 border-b">
           <div className="container mx-auto px-4 text-center">
             <Badge className="mb-4 px-4 py-1 text-sm">
-              Bangalore's Trusted Local Service Platform
+              Bangalore&apos;s Trusted Daily Labour Platform
             </Badge>
 
             <h1 className="text-3xl md:text-5xl font-headline font-bold text-foreground mb-6">
-              Carpenter, Plumber & Electrician Near Me
+              Daily Labour Providers Near Me
             </h1>
 
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Book trusted carpenter, plumber,
-              electrician, TV installation,
-              painting, and furniture assembly
-              services near you in Bangalore with
-              same-day expert support.
+              Book trusted carpenters, plumbers,
+              electricians, painters, and general daily labour
+              providers near you in Bangalore with
+              fixed daily wage rates and verified workers.
             </p>
           </div>
         </div>
@@ -163,7 +162,7 @@ export default async function NearMeHubPage() {
           {/* City Links */}
           <div className="bg-muted/30 rounded-3xl p-8 md:p-12">
             <h2 className="text-2xl font-headline font-bold mb-8 text-center">
-              Services Available Across Bangalore
+              Daily Labour Providers Available Across Bangalore
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -206,22 +205,20 @@ export default async function NearMeHubPage() {
           {/* SEO Content */}
           <div className="mt-20 max-w-4xl mx-auto prose prose-sm md:prose-base text-muted-foreground text-center">
             <h2 className="text-foreground">
-              Why Choose Fixbro for Local
-              Services in Bangalore?
+              Why Choose Fixbro for Daily Labour Providers in Bangalore?
             </h2>
 
             <p>
               Looking for trusted carpenter,
-              plumber, electrician, TV
-              installation, painting, or furniture
-              assembly services near you?
+              plumber, electrician, painting, or
+              general daily labour providers near you?
               Fixbro connects Bangalore residents
-              with verified local experts for fast,
-              reliable, and affordable home
-              services across Whitefield, HSR
+              with verified local trade workers for transparent,
+              reliable, and affordable daily wage
+              labour across Whitefield, HSR
               Layout, Electronic City,
               Koramangala, Marathahalli, and all
-              major Bangalore areas.
+              major Bangalore localities.
             </p>
           </div>
         </div>

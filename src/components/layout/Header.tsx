@@ -340,7 +340,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                         : "bg-muted/50 text-foreground/70 hover:bg-primary hover:text-primary-foreground hover:shadow-md"
                     )}
                   >
-                    <Construction className="mr-2 h-4 w-4" /> Custom Service
+                    <Construction className="mr-2 h-4 w-4" /> Custom Request
                  </Link>
               )}
               { (appConfig.isProviderRegistrationEnabled || (user && user.email === ADMIN_EMAIL) || providerStatus === 'approved') && (() => {

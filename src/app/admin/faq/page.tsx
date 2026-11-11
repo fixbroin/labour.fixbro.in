@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Loader2, HelpCircle } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, HelpCircle, Sparkles } from "lucide-react";
 import type { FirestoreFAQ } from '@/types/firestore';
 import FAQForm from '@/components/admin/FAQForm';
 import { db } from '@/lib/firebase';
@@ -15,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { DEFAULT_DAILY_LABOUR_FAQS } from '@/lib/defaultDailyLabourFaqs';
 
 export default function AdminFAQPage() {
   const [faqs, setFaqs] = useState<FirestoreFAQ[]>([]);
@@ -22,7 +22,7 @@ export default function AdminFAQPage() {
   const [editingFAQ, setEditingFAQ] = useState<FirestoreFAQ | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [isSeedingDefault, setIsSeedingDefault] = useState(false);
   const { toast } = useToast();
 
   const faqsCollectionRef = collection(db, "adminFAQs");
@@ -66,6 +66,57 @@ export default function AdminFAQPage() {
     }
   };
 
+  const handleLoadDefaultFAQs = async () => {
+    setIsSeedingDefault(true);
+    try {
+      // Fetch existing questions to avoid any duplicates
+      const snap = await getDocs(faqsCollectionRef);
+      const existingQuestions = new Set<string>();
+      snap.docs.forEach(d => {
+        const q = (d.data().question || '').trim().toLowerCase();
+        if (q) existingQuestions.add(q);
+      });
+
+      const faqsToAdd = DEFAULT_DAILY_LABOUR_FAQS.filter(
+        item => !existingQuestions.has(item.question.trim().toLowerCase())
+      );
+
+      if (faqsToAdd.length === 0) {
+        toast({
+          title: "FAQs Already Exist",
+          description: "All 10 default Daily Labour FAQs are already present in the database."
+        });
+        return;
+      }
+
+      for (const item of faqsToAdd) {
+        await addDoc(faqsCollectionRef, {
+          question: item.question,
+          answer: item.answer,
+          order: item.order,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+      }
+
+      await triggerRefresh('faqs');
+      toast({
+        title: "Default FAQs Created!",
+        description: `Successfully loaded ${faqsToAdd.length} default Daily Labour FAQs.`,
+        className: "bg-green-100 text-green-700 border-green-300"
+      });
+    } catch (error) {
+      console.error("Error loading default FAQs:", error);
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Could not load default FAQs.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSeedingDefault(false);
+    }
+  };
+
   const handleFormSubmit = async (data: Omit<FirestoreFAQ, "createdAt" | "updatedAt" | "id"> & { id?: string; }) => {
     setIsSubmitting(true);
     try {
@@ -91,21 +142,34 @@ export default function AdminFAQPage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-2xl flex items-center">
               <HelpCircle className="mr-2 h-6 w-6 text-primary" />
               FAQ Management
             </CardTitle>
             <CardDescription>
-              Manage frequently asked questions that appear on the website.
+              Manage frequently asked questions for FixBro Daily Labour.
             </CardDescription>
           </div>
-          <PermissionGuard moduleId="faq" action="create">
-            <Button onClick={handleAddFAQ} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New FAQ
-            </Button>
-          </PermissionGuard>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <PermissionGuard moduleId="faq" action="create">
+              <Button
+                variant="outline"
+                onClick={handleLoadDefaultFAQs}
+                disabled={isSubmitting || isLoading || isSeedingDefault}
+                className="w-full sm:w-auto"
+              >
+                {isSeedingDefault ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-primary" />}
+                Load Default FAQs
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard moduleId="faq" action="create">
+              <Button onClick={handleAddFAQ} disabled={isSubmitting || isLoading || isSeedingDefault} className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New FAQ
+              </Button>
+            </PermissionGuard>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
@@ -114,8 +178,21 @@ export default function AdminFAQPage() {
               <p className="ml-2">Loading FAQs...</p>
             </div>
           ) : faqs.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-xl">
-              <p>No FAQs found. Add your first one above.</p>
+            <div className="text-center py-12 px-4 text-muted-foreground border-2 border-dashed rounded-2xl space-y-3">
+              <HelpCircle className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <div>
+                <p className="font-semibold text-foreground">No FAQs currently available</p>
+                <p className="text-xs text-muted-foreground mt-1">You can add your own FAQ or click below to load the 10 default Daily Labour questions.</p>
+              </div>
+              <Button
+                variant="default"
+                onClick={handleLoadDefaultFAQs}
+                disabled={isSeedingDefault}
+                className="rounded-xl font-semibold mt-2"
+              >
+                {isSeedingDefault ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Load 10 Default Daily Labour FAQs
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -133,7 +210,7 @@ export default function AdminFAQPage() {
                     <TableRow key={faq.id}>
                       <TableCell className="font-mono font-bold align-top text-center text-primary">{faq.order ?? 0}</TableCell>
                       <TableCell className="font-medium align-top">{faq.question}</TableCell>
-                      <TableCell className="max-w-md truncate align-top">{faq.answer}</TableCell>
+                      <TableCell className="max-w-md truncate align-top text-muted-foreground text-xs">{faq.answer}</TableCell>
                       <TableCell>
                         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
                           <PermissionGuard moduleId="faq" action="write">

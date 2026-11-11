@@ -133,7 +133,7 @@ export default function CheckoutPage() {
     localStorage.setItem('fixbroInterveningBreaks', JSON.stringify(interveningBreaks));
     localStorage.setItem('fixbroDailyTimeline', JSON.stringify(dailyTimeline || []));
     setIsScheduleModalOpen(false);
-    toast({ title: "Schedule Updated", description: "Your service time has been updated." });
+    toast({ title: "Schedule Updated", description: "Your scheduled work date and time has been updated." });
 
     // Log time slot selection activity
     logUserActivity(
@@ -181,7 +181,7 @@ export default function CheckoutPage() {
     localStorage.setItem('fixbroCustomerAddress', JSON.stringify(address));
     localStorage.setItem('fixbroCustomerEmail', address.email || "");
     setIsAddressModalOpen(false);
-    toast({ title: "Address Updated", description: "Your service address has been updated." });
+    toast({ title: "Address Updated", description: "Your work site address has been updated." });
 
     // Log address selection activity
     logUserActivity(
@@ -295,7 +295,7 @@ export default function CheckoutPage() {
                   <div className="flex flex-col items-center py-4 text-center cursor-pointer" onClick={() => setIsAddressModalOpen(true)}>
                     <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
                     <p className="font-medium">No address selected</p>
-                    <p className="text-sm text-muted-foreground">Click to provide service location</p>
+                    <p className="text-sm text-muted-foreground">Click to provide work site location</p>
                   </div>
                 )}
               </CardContent>
@@ -426,7 +426,7 @@ export default function CheckoutPage() {
           <DialogHeader>
             <DialogTitle>Select Date & Time</DialogTitle>
             <DialogDescription>
-              Choose a convenient date and time slot for your service.
+              Choose a convenient date and time slot for your daily labour booking.
             </DialogDescription>
           </DialogHeader>
           <ScheduleSelection 
@@ -445,9 +445,9 @@ export default function CheckoutPage() {
       <Dialog open={isAddressModalOpen} onOpenChange={setIsAddressModalOpen}>
         <DialogContent className="max-w-2xl w-[95vw] overflow-y-auto max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Select Service Address</DialogTitle>
+            <DialogTitle>Select Work Site Address</DialogTitle>
             <DialogDescription>
-              Provide the location where the service should be performed.
+              Provide the location where the daily labour should be performed.
             </DialogDescription>
           </DialogHeader>
           <AddressSelection 
@@ -463,7 +463,7 @@ export default function CheckoutPage() {
           <DialogHeader>
             <DialogTitle>Select Payment Method</DialogTitle>
             <DialogDescription>
-              Choose how you would like to pay for your service.
+              Choose how you would like to pay for your daily labour booking.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">

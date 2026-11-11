@@ -44,7 +44,7 @@ export default function CustomServicePage() {
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
-    { label: "Request a Custom Service" },
+    { label: "Request a Custom Labour Booking" },
   ];
 
   const fetchCategories = useCallback(async () => {

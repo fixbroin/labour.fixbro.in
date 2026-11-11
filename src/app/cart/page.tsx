@@ -244,7 +244,7 @@ function CartPageContent() {
           }
           
           let categoryId = serviceData.parentCategoryId || 'unknown';
-          let categoryName = 'Other Services';
+          let categoryName = 'Daily Labour';
 
           // 1. Resolve Category ID (from sub-category)
           if (!serviceData.parentCategoryId && serviceData.subCategoryId) {

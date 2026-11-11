@@ -12,11 +12,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Loader2, Sparkles, Search, Check, ChevronsUpDown, UserCheck } from 'lucide-react';
+import { Loader2, Sparkles, Search, Check, ChevronsUpDown, UserCheck, Bot, Zap } from 'lucide-react';
 import type { FirestoreReview } from '@/types/firestore';
 import type { ReviewTargetProvider } from '@/components/admin/ReviewForm';
 import { useToast } from '@/hooks/use-toast';
 import { generateCuratedReviews } from '@/lib/reviewTemplates';
+import { generateBulkReviews } from '@/ai/flows/generateBulkReviewsFlow';
 import { db } from '@/lib/firebase';
 import { collection, writeBatch, Timestamp, doc, query, where, getDocs, updateDoc } from '@/lib/mysqlDb';
 
@@ -44,6 +45,7 @@ export default function BulkReviewGeneratorDialog({
   providers = [],
 }: BulkReviewGeneratorDialogProps) {
   const { toast } = useToast();
+  const [generationMode, setGenerationMode] = useState<'manual' | 'ai'>('manual');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,8 +83,10 @@ export default function BulkReviewGeneratorDialog({
   const onSubmit = async (data: BulkReviewFormData) => {
     setIsGenerating(true);
     toast({ 
-      title: "Generating Reviews...", 
-      description: "Selecting authentic trade-matched customer reviews with unique Indian names." 
+      title: generationMode === 'ai' ? "AI Generating Reviews..." : "Generating Reviews...", 
+      description: generationMode === 'ai' 
+        ? "Gemini AI is crafting realistic customer reviews for this provider..." 
+        : "Selecting authentic trade-matched customer reviews from curated pool..." 
     });
 
     const selectedProvider = providers.find((p) => p.id === data.providerId);
@@ -108,23 +112,49 @@ export default function BulkReviewGeneratorDialog({
         }
       });
 
-      // 2. Generate curated, category-matched reviews with authentic Indian names
-      const generated = generateCuratedReviews(
-        selectedProvider.workCategoryName || 'general',
-        data.numberOfReviews,
-        usedNames,
-        usedComments
-      );
+      let reviewsToInsert: { userName: string; rating: number; comment: string; daysAgo: number }[] = [];
 
-      if (!generated || generated.length === 0) {
-        throw new Error("Could not generate reviews from the curated pool.");
+      if (generationMode === 'ai') {
+        // AI GENERATION VIA GEMINI
+        const aiResult = await generateBulkReviews({
+          serviceId: selectedProvider.id,
+          serviceName: selectedProvider.fullName,
+          providerId: selectedProvider.id,
+          providerName: selectedProvider.fullName,
+          seniorityLevel: selectedProvider.seniorityLevel,
+          categoryName: selectedProvider.workCategoryName || 'Daily Labour',
+          numberOfReviews: data.numberOfReviews,
+        });
+
+        if (!aiResult.reviews || aiResult.reviews.length === 0) {
+          throw new Error("AI did not return any reviews.");
+        }
+
+        reviewsToInsert = aiResult.reviews.map((rev, idx) => ({
+          userName: rev.userName,
+          rating: rev.rating,
+          comment: rev.comment,
+          daysAgo: Math.floor(Math.random() * 40) + 2 + idx,
+        }));
+      } else {
+        // MANUAL CURATED TEMPLATES POOL
+        reviewsToInsert = generateCuratedReviews(
+          selectedProvider.workCategoryName || 'general',
+          data.numberOfReviews,
+          usedNames,
+          usedComments
+        );
       }
 
-      // 3. Batch write reviews to adminReviews
+      if (!reviewsToInsert || reviewsToInsert.length === 0) {
+        throw new Error("Could not produce reviews.");
+      }
+
+      // 2. Batch write reviews to adminReviews
       const batch = writeBatch(db);
       const reviewsCollectionRef = collection(db, "adminReviews");
 
-      generated.forEach((rev) => {
+      reviewsToInsert.forEach((rev) => {
         const newReviewRef = doc(reviewsCollectionRef);
         // Staggered past timestamp spread over daysAgo
         const reviewTimestamp = Timestamp.fromMillis(Date.now() - (rev.daysAgo * 86400000) - Math.floor(Math.random() * 3600000));
@@ -146,7 +176,7 @@ export default function BulkReviewGeneratorDialog({
 
       await batch.commit();
 
-      // 4. Recalculate provider aggregate rating and reviewCount in providerApplications
+      // 3. Recalculate provider aggregate rating and reviewCount in providerApplications
       try {
         const qProv = query(
           collection(db, "adminReviews"),
@@ -176,7 +206,7 @@ export default function BulkReviewGeneratorDialog({
 
       toast({
         title: "Success!",
-        description: `${generated.length} authentic trade reviews added for ${selectedProvider.fullName}.`,
+        description: `${reviewsToInsert.length} authentic reviews generated (${generationMode === 'ai' ? 'AI' : 'Curated Template'}) for ${selectedProvider.fullName}.`,
         className: "bg-green-100 text-green-700 border-green-300"
       });
       onGenerationComplete();
@@ -199,9 +229,45 @@ export default function BulkReviewGeneratorDialog({
             Bulk Review Generator
           </DialogTitle>
           <DialogDescription>
-            Select a verified daily labour provider to generate authentic customer reviews matching their trade with unique Indian user names.
+            Generate verified customer reviews for Daily Labour providers using curated templates or Gemini AI.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Generation Mode Switcher */}
+        <div className="space-y-1.5 pt-1">
+          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            Generation Mode
+          </label>
+          <div className="grid grid-cols-2 gap-2 p-1 bg-muted/60 rounded-xl">
+            <Button
+              type="button"
+              size="sm"
+              variant={generationMode === 'manual' ? 'default' : 'ghost'}
+              className="rounded-lg text-xs font-semibold gap-1.5 h-9"
+              onClick={() => setGenerationMode('manual')}
+              disabled={isGenerating}
+            >
+              <Zap className="h-3.5 w-3.5 text-amber-500" />
+              Curated Pool (Fast)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={generationMode === 'ai' ? 'default' : 'ghost'}
+              className="rounded-lg text-xs font-semibold gap-1.5 h-9"
+              onClick={() => setGenerationMode('ai')}
+              disabled={isGenerating}
+            >
+              <Bot className="h-3.5 w-3.5 text-primary" />
+              AI Generate (Gemini)
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground px-1">
+            {generationMode === 'manual'
+              ? "⚡ Instant selection from 100+ authentic Indian names & category reviews with zero duplicate guarantee."
+              : "🤖 Dynamically writes unique, realistic trade reviews powered by Gemini AI matching provider details."}
+          </p>
+        </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-1">
@@ -237,7 +303,7 @@ export default function BulkReviewGeneratorDialog({
                           Choose Daily Labour Provider
                         </DialogTitle>
                         <DialogDescription>
-                          Select the worker whose profile and ratings will be updated with category-matched customer reviews.
+                          Select the worker whose profile and ratings will be updated with customer reviews.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="relative my-2">
@@ -318,7 +384,7 @@ export default function BulkReviewGeneratorDialog({
                     <Input type="number" min="1" max="30" placeholder="e.g., 5" {...field} disabled={isGenerating} />
                   </FormControl>
                   <FormDescription className="text-xs">
-                    Reviews are automatically matched to the provider&apos;s trade (e.g. Carpentry, Electrician, Plumber, Painting) using a unique pool of authentic Indian names with zero duplicates across all providers.
+                    Reviews are strictly matched to the provider&apos;s trade (e.g. Carpentry, Electrician, Plumber, Painting) with unique Indian reviewer names and natural past dates.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -331,7 +397,7 @@ export default function BulkReviewGeneratorDialog({
               </DialogClose>
               <Button type="submit" disabled={isGenerating}>
                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                Generate Reviews
+                {isGenerating ? "Generating..." : `Generate ${form.watch('numberOfReviews') || 5} Reviews`}
               </Button>
             </DialogFooter>
           </form>

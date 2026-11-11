@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, Edit, Trash2, Loader2, FileText, CheckCircle, XCircle, PackageSearch } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, FileText, CheckCircle, XCircle, PackageSearch, Sparkles } from "lucide-react";
 import type { FirestoreBlogPost, FirestoreCategory } from '@/types/firestore';
 import BlogForm from '@/components/admin/BlogForm';
 import { db, storage } from '@/lib/firebase';
@@ -23,6 +22,7 @@ import { hasActionPermission } from '@/config/rbac';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { DEFAULT_DAILY_LABOUR_BLOGS } from '@/lib/defaultDailyLabourBlogs';
 
 export default function AdminBlogPage() {
   const [posts, setPosts] = useState<FirestoreBlogPost[]>([]);
@@ -31,6 +31,7 @@ export default function AdminBlogPage() {
   const [editingPost, setEditingPost] = useState<FirestoreBlogPost | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSeedingDefault, setIsSeedingDefault] = useState(false);
   const { toast } = useToast();
   const { user, adminPermissions } = useAuth();
 
@@ -61,9 +62,9 @@ export default function AdminBlogPage() {
         return bTime - aTime;
       });
       setPosts(fetchedPosts);
-      if (isLoading) setIsLoading(false);
+      setIsLoading(false);
     }, (error) => {
-      console.error("Error fetching blog posts: ", error);
+      console.error("Error fetching posts:", error);
       toast({ title: "Error", description: "Could not fetch blog posts.", variant: "destructive" });
       setIsLoading(false);
     });
@@ -71,7 +72,8 @@ export default function AdminBlogPage() {
     fetchCategories();
 
     return () => unsubscribePosts();
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAddPost = () => {
     setEditingPost(null);
@@ -122,6 +124,72 @@ export default function AdminBlogPage() {
     }
   };
 
+  const handleLoadDefaultBlogs = async () => {
+    setIsSeedingDefault(true);
+    try {
+      const snap = await getDocs(postsCollectionRef);
+      const existingSlugs = new Set<string>();
+      snap.docs.forEach(d => {
+        const s = (d.data().slug || '').trim().toLowerCase();
+        if (s) existingSlugs.add(s);
+      });
+
+      const blogsToAdd = DEFAULT_DAILY_LABOUR_BLOGS.filter(
+        b => !existingSlugs.has(b.slug.trim().toLowerCase())
+      );
+
+      if (blogsToAdd.length === 0) {
+        toast({
+          title: "Blogs Already Exist",
+          description: "All 4 default Daily Labour blogs are already present in the database."
+        });
+        return;
+      }
+
+      for (const b of blogsToAdd) {
+        await addDoc(postsCollectionRef, {
+          title: b.title,
+          slug: b.slug,
+          excerpt: b.excerpt,
+          content: b.content.trim(),
+          categoryId: b.categoryId,
+          categoryName: b.categoryName,
+          coverImageUrl: b.coverImageUrl,
+          imageHint: b.imageHint,
+          tags: b.tags,
+          readingTime: b.readingTime,
+          isPublished: true,
+          authorId: user?.uid || "admin",
+          authorName: user?.displayName || "FixBro Editorial Team",
+          h1_title: b.h1_title,
+          meta_title: b.meta_title,
+          meta_description: b.meta_description,
+          meta_keywords: b.meta_keywords,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+      }
+
+      await triggerRefresh('blog');
+      await triggerRefresh('sitemap');
+
+      toast({
+        title: "Default Blogs Created!",
+        description: `Successfully loaded ${blogsToAdd.length} default Daily Labour blogs.`,
+        className: "bg-green-100 text-green-700 border-green-300"
+      });
+    } catch (error) {
+      console.error("Error loading default blogs:", error);
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Could not load default blogs.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSeedingDefault(false);
+    }
+  };
+
   const handleFormSubmit = async (data: Omit<FirestoreBlogPost, 'id' | 'createdAt' | 'updatedAt' | 'authorId' | 'authorName'> & { id?: string }) => {
     setIsSubmitting(true);
     const { id, ...payload } = data;
@@ -140,14 +208,12 @@ export default function AdminBlogPage() {
             ...payload, 
             authorId: user?.uid, 
             authorName: user?.displayName, 
-            createdAt: Timestamp.now() 
+            createdAt: Timestamp.now(), 
+            updatedAt: Timestamp.now() 
         });
         toast({ title: "Success", description: "New blog post created." });
       }
       await triggerRefresh('blog');
-      if (payload.slug) {
-        await triggerRefresh(`blog-${payload.slug}`);
-      }
       await triggerRefresh('sitemap');
       if (payload.slug) {
         await submitToGoogleIndexing('blog', payload.slug, payload.isPublished);
@@ -165,22 +231,50 @@ export default function AdminBlogPage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-2xl flex items-center"><FileText className="mr-2 h-6 w-6 text-primary" />Manage Blog Posts</CardTitle>
-            <CardDescription>Create, edit, publish, and AI-generate verified daily labour articles and hiring guides for your website.</CardDescription>
+            <CardDescription>Create, edit, publish, and manage verified daily labour articles and hiring guides for your website.</CardDescription>
           </div>
-          <PermissionGuard moduleId="blog" action="create">
-            <Button onClick={handleAddPost} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Post
-            </Button>
-          </PermissionGuard>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <PermissionGuard moduleId="blog" action="create">
+              <Button
+                variant="outline"
+                onClick={handleLoadDefaultBlogs}
+                disabled={isSubmitting || isLoading || isSeedingDefault}
+                className="w-full sm:w-auto"
+              >
+                {isSeedingDefault ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-primary" />}
+                Load Default Blogs
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard moduleId="blog" action="create">
+              <Button onClick={handleAddPost} disabled={isSubmitting || isLoading || isSeedingDefault} className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Post
+              </Button>
+            </PermissionGuard>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
             <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : posts.length === 0 ? (
-            <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No blog posts found. Add one to get started.</p></div>
+            <div className="text-center py-12 px-4 text-muted-foreground border-2 border-dashed rounded-2xl space-y-3">
+              <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <div>
+                <p className="font-semibold text-foreground">No blog posts found</p>
+                <p className="text-xs text-muted-foreground mt-1">You can create your own post or click below to load the 4 default Daily Labour blogs.</p>
+              </div>
+              <Button
+                variant="default"
+                onClick={handleLoadDefaultBlogs}
+                disabled={isSeedingDefault}
+                className="rounded-xl font-semibold mt-2"
+              >
+                {isSeedingDefault ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Load 4 Default Daily Labour Blogs
+              </Button>
+            </div>
           ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Category</TableHead><TableHead>Slug</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -206,7 +300,7 @@ export default function AdminBlogPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="destructive" size="icon" disabled={isSubmitting} className="ml-2"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the post "{post.title}".</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the post &quot;{post.title}&quot;.</AlertDialogDescription></AlertDialogHeader>
                             <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePost(post)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
