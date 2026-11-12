@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; 
 import { Label } from "@/components/ui/label";
-import { Settings2, Save, Loader2, AlertTriangle, Building, Image as ImageIcon, FileText, ExternalLink, Trash2, Facebook, Instagram, Linkedin, Youtube, TwitterIcon, Heading1, Heading2, Bold, List, Link as LinkIcon, Type, ImagePlus, Copy, Check, Pilcrow, LayoutDashboard, Plus, Trash, Search, Tags, CheckCircle } from "lucide-react";
+import { Settings2, Save, Loader2, AlertTriangle, Building, Image as ImageIcon, FileText, ExternalLink, Trash2, Facebook, Instagram, Linkedin, Youtube, TwitterIcon, Heading1, Heading2, Bold, List, Link as LinkIcon, Type, ImagePlus, Copy, Check, Pilcrow, LayoutDashboard, Plus, Trash, Search, Tags, CheckCircle, Sparkles, RotateCcw } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, query, orderBy, onSnapshot } from '@/lib/mysqlDb';
@@ -101,6 +101,90 @@ const pageDisplayNames: Record<string, string> = {
   "service-disclaimer": "Service Disclaimer",
   "cancellation-policy": "Cancellation Policy",
   "damage-and-claims-policy": "Damage & Claims Policy",
+};
+
+const DEFAULT_HOMEPAGE_CONTENT: HomepageContentFormData = {
+  whyChooseUs: [
+    {
+      id: '1',
+      title: 'Trusted Professionals',
+      iconName: 'Users',
+      description: 'Experienced and background-verified trade workers.'
+    },
+    {
+      id: '2',
+      title: 'Punctual Providers',
+      iconName: 'ClockIcon',
+      description: 'We value your time with on-time shift arrivals.'
+    },
+    {
+      id: '3',
+      title: 'Verified Providers',
+      iconName: 'ShieldCheck',
+      description: 'Quality craftsmanship and identity verification for all daily labour providers.'
+    },
+    {
+      id: '4',
+      title: 'Transparent Day Rates',
+      iconName: 'Star',
+      description: 'No hidden costs, clear and upfront daily wage pricing.'
+    }
+  ],
+  footerCompanyBio: "Your trusted platform for verified daily wage workers and skilled daily labour in Bangalore. We connect you directly with experienced carpenters, painters, electricians, plumbers, and helpers on fixed daily rates.",
+  footerCTA: {
+    title: "Ready to get started?",
+    subtitle: "Book your verified daily labour provider today and experience reliable craftsmanship.",
+    buttonText: "Book a Provider",
+    buttonLink: "/categories"
+  }
+};
+
+const DEFAULT_GENERAL_INFO: GeneralInfoFormData = {
+  websiteName: "Fixbro Daily Labour",
+  contactEmail: "support@fixbro.in",
+  contactMobile: "+91 98765 43210",
+  address: "Bangalore, Karnataka, India",
+};
+
+const DEFAULT_CONTENT_PAGES_TEMPLATES: Record<string, string> = {
+  "about-us": `<h2>About Fixbro Daily Labour</h2>
+<p>Fixbro Daily Labour is Bangalore's premier platform for hiring verified daily wage workers and skilled tradesmen. Whether you require carpenters, electricians, plumbers, painters, or construction helpers, we provide background-checked providers on transparent daily rates.</p>
+<h3>Why Choose Daily Labour With Fixbro?</h3>
+<ul>
+  <li><strong>Background-Verified Workers:</strong> Every provider undergoes identity verification before onboarding.</li>
+  <li><strong>Dedicated Full-Day Shifts:</strong> Standard full-day shift timings from 09:30 AM to 05:30 PM.</li>
+  <li><strong>Transparent Day Rates:</strong> Clear, upfront daily wages without hidden surcharges.</li>
+  <li><strong>Direct Booking:</strong> Fast, hassle-free hiring with doorstep arrival across all major localities in Bangalore.</li>
+</ul>`,
+  "contact-us": `<h2>Contact Fixbro Daily Labour</h2>
+<p>Have questions about booking a daily labour provider or need assistance with your booking? Reach out to our dedicated support team.</p>
+<ul>
+  <li><strong>Helpline:</strong> +91 98765 43210</li>
+  <li><strong>Email:</strong> support@fixbro.in</li>
+  <li><strong>Operating Hours:</strong> Monday - Sunday, 08:00 AM - 08:00 PM</li>
+  <li><strong>Headquarters:</strong> Bangalore, Karnataka, India</li>
+</ul>`,
+  "careers": `<h2>Join the Fixbro Team</h2>
+<p>We are revolutionizing how daily wage and skilled trade workers connect with homeowners, contractors, and businesses across India. Explore rewarding careers in technology, operations, and partner support.</p>
+<p>To view open roles or submit your resume, contact our talent team at <strong>careers@fixbro.in</strong>.</p>`,
+  "terms-and-conditions": `<h2>Terms &amp; Conditions</h2>
+<p>Welcome to Fixbro Daily Labour. By accessing or using our booking platform, you agree to comply with and be bound by these terms.</p>
+<h3>1. Daily Labour Bookings</h3>
+<p>Daily labour providers are hired on a daily wage rate basis for standard shift hours (09:30 AM to 05:30 PM). Customers agree to provide a safe working environment and necessary materials unless otherwise agreed.</p>
+<h3>2. Payments &amp; Settlement</h3>
+<p>Payment terms depend on the selected method (Pay Online or Pay After Work). The agreed daily rate and platform fees must be settled upon shift completion.</p>`,
+  "privacy-policy": `<h2>Privacy Policy</h2>
+<p>At Fixbro Daily Labour, we respect and safeguard the privacy of our customers and daily wage providers. This policy details how your personal data and work site location coordinates are collected, utilized, and protected.</p>
+<h3>Location Data Usage</h3>
+<p>We use your device location and selected map coordinates solely to calculate distances and match you with nearby available trade providers.</p>`,
+  "faq": `<h2>Frequently Asked Questions</h2>
+<p>Find answers to common questions about hiring daily labour providers, shift timings, day rates, and service coverage across Bangalore.</p>`,
+  "service-disclaimer": `<h2>Service Disclaimer</h2>
+<p>Fixbro Daily Labour acts as a technology intermediary connecting independent daily wage workers and trade professionals with customers. While we verify provider identities, customers are encouraged to inspect work upon shift conclusion.</p>`,
+  "cancellation-policy": `<h2>Cancellation &amp; Reschedule Policy</h2>
+<p>You can cancel or reschedule your daily labour booking prior to provider arrival. If cancelled after the provider has departed for the work site, a nominal transit fee may apply.</p>`,
+  "damage-and-claims-policy": `<h2>Damage &amp; Claims Policy</h2>
+<p>Customer satisfaction and property safety are paramount. In the unlikely event of property damage during a service shift, report the incident to Fixbro Support within 24 hours with photographic documentation for investigation.</p>`
 };
 
 
@@ -660,6 +744,51 @@ export default function WebSettingsPage() {
     }
   };
 
+  const handleLoadDefaultHomepageContent = () => {
+    homepageContentForm.reset(DEFAULT_HOMEPAGE_CONTENT);
+    toast({
+      title: "Default Content Loaded",
+      description: "Standard Daily Labour marketing and Why Choose Us content loaded into form. Click 'Save Homepage Content' to save.",
+    });
+  };
+
+  const handleLoadDefaultWhyChooseUs = () => {
+    homepageContentForm.setValue('whyChooseUs', DEFAULT_HOMEPAGE_CONTENT.whyChooseUs, { shouldValidate: true, shouldDirty: true });
+    toast({
+      title: "Default Why Choose Us Loaded",
+      description: "Default 4 Why Choose Us items loaded. Click 'Save Homepage Content' to save.",
+    });
+  };
+
+  const handleLoadDefaultGeneralInfo = () => {
+    generalInfoForm.setValue('websiteName', DEFAULT_GENERAL_INFO.websiteName);
+    generalInfoForm.setValue('contactEmail', DEFAULT_GENERAL_INFO.contactEmail);
+    generalInfoForm.setValue('contactMobile', DEFAULT_GENERAL_INFO.contactMobile);
+    generalInfoForm.setValue('address', DEFAULT_GENERAL_INFO.address);
+    toast({
+      title: "Default Info Loaded",
+      description: "Default Fixbro Daily Labour details loaded into form. Click 'Save General Info' to apply.",
+    });
+  };
+
+  const handleLoadDefaultPageContent = () => {
+    if (!selectedPageSlug) return;
+    const defaultHtml = DEFAULT_CONTENT_PAGES_TEMPLATES[selectedPageSlug];
+    if (defaultHtml) {
+      contentPageForm.setValue('content', defaultHtml, { shouldValidate: true, shouldDirty: true });
+      toast({
+        title: "Default Content Loaded",
+        description: `Loaded standard daily labour template for ${pageDisplayNames[selectedPageSlug] || selectedPageSlug}. Click 'Save Page Content' to save.`,
+      });
+    } else {
+      toast({
+        title: "No Template Found",
+        description: "No default template available for this page.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Helper for inserting HTML tags into textarea
   const insertHtmlTag = (tag: string, endTag?: string) => {
     const textarea = textareaRef.current;
@@ -887,7 +1016,15 @@ export default function WebSettingsPage() {
                   <FormField control={generalInfoForm.control} name="contactMobile" render={({ field }) => (<FormItem><FormLabel>Contact Mobile</FormLabel><FormControl><Input type="tel" placeholder="e.g., +919876543210" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={generalInfoForm.control} name="address" render={({ field }) => (<FormItem><FormLabel>Company Address</FormLabel><FormControl><Textarea placeholder="123 Main St, Anytown, ST 12345" {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleLoadDefaultGeneralInfo} 
+                    className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+                  >
+                    <Sparkles className="h-4 w-4 text-primary" /> Load Default Info
+                  </Button>
                   <Button type="submit" disabled={isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save General Info
                   </Button>
@@ -948,20 +1085,31 @@ export default function WebSettingsPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Why Choose Us Items</h3>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          const current = homepageContentForm.getValues('whyChooseUs');
-                          homepageContentForm.setValue('whyChooseUs', [
-                            ...current, 
-                            { id: Math.random().toString(36).substr(2, 9), title: '', description: '', iconName: 'Users' }
-                          ]);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-1" /> Add Item
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={handleLoadDefaultWhyChooseUs}
+                          className="text-xs font-semibold gap-1.5"
+                        >
+                          <Sparkles className="h-4 w-4 text-primary" /> Default Why Choose Us
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            const current = homepageContentForm.getValues('whyChooseUs');
+                            homepageContentForm.setValue('whyChooseUs', [
+                              ...current, 
+                              { id: Math.random().toString(36).substr(2, 9), title: '', description: '', iconName: 'Users' }
+                            ]);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> Add Item
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {homepageContentForm.watch('whyChooseUs').map((item, index) => (
@@ -1098,7 +1246,15 @@ export default function WebSettingsPage() {
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleLoadDefaultHomepageContent} 
+                    className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+                  >
+                    <Sparkles className="h-4 w-4 text-primary" /> Load Default Homepage Content
+                  </Button>
                   <Button type="submit" disabled={isSaving} size="lg">
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Homepage Content
                   </Button>
@@ -1310,6 +1466,15 @@ export default function WebSettingsPage() {
                                 <Button type="button" variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => insertHtmlTag('<img src="INSERT_URL_HERE" className="w-full rounded-lg my-4" alt="Image" />')}><ImageIcon className="h-3.5 w-3.5 mr-1" /> Img</Button>
                                 <Separator orientation="vertical" className="h-6 mx-1" />
                                 <Button type="button" variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => insertHtmlTag('<br />')}><Type className="h-3.5 w-3.5 mr-1" /> Break</Button>
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 text-xs px-2 gap-1 text-primary border-primary/30 hover:bg-primary/10 ml-auto" 
+                                  onClick={handleLoadDefaultPageContent}
+                                >
+                                  <Sparkles className="h-3.5 w-3.5" /> Load Default Template
+                                </Button>
                             </div>
 
                             <FormField control={contentPageForm.control} name="content" render={({ field }) => (
@@ -1343,7 +1508,15 @@ export default function WebSettingsPage() {
                             )} />
                         </div>
 
-                        <div className="flex justify-end pt-2">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10" 
+                              onClick={handleLoadDefaultPageContent}
+                            >
+                              <Sparkles className="h-4 w-4 text-primary" /> Load Default {pageDisplayNames[selectedPageSlug] || "Template"}
+                            </Button>
                             <PermissionGuard moduleId="web_settings" action="write">
                                 <Button type="submit" disabled={isSavingContent} size="lg" className="w-full sm:w-auto">
                                     {isSavingContent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Page Content & Banner

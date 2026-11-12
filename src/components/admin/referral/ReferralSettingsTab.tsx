@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Handshake } from "lucide-react";
+import { Loader2, Save, Handshake, Sparkles } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
@@ -94,6 +94,14 @@ export default function ReferralSettingsTab() {
     }
   };
 
+  const handleResetToDefault = () => {
+    form.reset(defaultReferralSettings);
+    toast({
+      title: "Defaults Restored",
+      description: "Default referral program settings loaded. Click 'Save Referral Settings' to apply.",
+    });
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -165,7 +173,16 @@ export default function ReferralSettingsTab() {
                  <FormField control={form.control} name="preventReuse" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3"><div className="space-y-0.5"><FormLabel>Prevent Reuse</FormLabel><FormDescription className="text-xs">Attempt to detect and block abuse from the same device/IP.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)}/>
             </div>
           </CardContent>
-          <CardFooter className="border-t px-6 py-4">
+          <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetToDefault}
+              disabled={isSaving}
+              className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+            >
+              <Sparkles className="h-4 w-4 text-primary" /> Reset to Defaults
+            </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Referral Settings

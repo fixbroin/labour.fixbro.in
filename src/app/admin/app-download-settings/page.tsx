@@ -22,6 +22,7 @@ import {
   Radio,
   Apple,
   Store,
+  Sparkles,
 } from "lucide-react";
 import type { AppDownloadSettings, AppDownloadMode } from "@/types/firestore";
 
@@ -116,6 +117,14 @@ export default function AppDownloadSettingsPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleResetToDefault = () => {
+    setSettings(DEFAULT_SETTINGS);
+    toast({
+      title: "Defaults Restored",
+      description: "Default app download settings loaded. Click 'Save Changes' to apply.",
+    });
   };
 
   if (isLoading) {
@@ -415,13 +424,22 @@ export default function AppDownloadSettingsPage() {
           </Card>
         </div>
 
-        {/* Footer Save */}
-        <div className="flex justify-end pt-2">
+        {/* Footer Actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleResetToDefault}
+            disabled={isSaving}
+            className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+          >
+            <Sparkles className="h-4 w-4 text-primary" /> Reset to Defaults
+          </Button>
           <Button
             onClick={handleSave}
             disabled={isSaving}
             size="lg"
-            className="rounded-xl px-8 font-bold shadow-lg shadow-primary/20"
+            className="rounded-xl px-8 font-bold shadow-lg shadow-primary/20 w-full sm:w-auto"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save Changes

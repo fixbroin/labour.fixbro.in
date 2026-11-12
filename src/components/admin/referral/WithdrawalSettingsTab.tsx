@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Banknote, Gift, CreditCard } from "lucide-react";
+import { Loader2, Save, Banknote, Gift, CreditCard, Sparkles } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
@@ -90,6 +90,14 @@ export default function WithdrawalSettingsTab() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleResetToDefault = () => {
+    form.reset(defaultWithdrawalSettings);
+    toast({
+      title: "Defaults Restored",
+      description: "Default withdrawal settings loaded. Click 'Save Withdrawal Settings' to apply.",
+    });
   };
 
   if (isLoading) {
@@ -179,7 +187,16 @@ export default function WithdrawalSettingsTab() {
             </div>
 
           </CardContent>
-          <CardFooter className="border-t px-6 py-4">
+          <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetToDefault}
+              disabled={isSaving}
+              className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+            >
+              <Sparkles className="h-4 w-4 text-primary" /> Reset to Defaults
+            </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Withdrawal Settings

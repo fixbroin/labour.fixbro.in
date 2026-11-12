@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Cookie, Save, Loader2 } from "lucide-react";
+import { Cookie, Save, Loader2, Sparkles } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { db } from '@/lib/firebase';
@@ -30,6 +30,21 @@ const cookieSettingsSchema = z.object({
 });
 
 type CookieSettingsFormData = z.infer<typeof cookieSettingsSchema>;
+
+const DEFAULT_COOKIE_SETTINGS: CookieSettingsFormData = {
+  isCookieConsentEnabled: true,
+  cookieConsentMessage: "We use cookies to improve your experience and connect you with verified daily labour providers. By continuing, you agree to our Cookie Policy.",
+  cookiePolicyContent: `<h2>Fixbro Daily Labour Cookie Policy</h2>
+<p>Fixbro Daily Labour uses cookies and related technologies to facilitate navigation, remember your preferred work location coordinates in Bangalore, and ensure secure user logins.</p>
+<h3>1. What Are Cookies?</h3>
+<p>Cookies are small text files placed on your device to help web applications operate reliably and store user preferences.</p>
+<h3>2. How We Use Cookies</h3>
+<ul>
+  <li><strong>Authentication &amp; Session:</strong> Keeps you logged into your customer or provider account.</li>
+  <li><strong>Location Coordinates:</strong> Stores your selected map location coordinates so nearby daily wage workers are instantly displayed.</li>
+  <li><strong>Performance &amp; Analytics:</strong> Helps us optimize booking workflows and service reliability.</li>
+</ul>`,
+};
 
 export default function CookieSettingsPage() {
   const { toast } = useToast();
@@ -75,6 +90,14 @@ export default function CookieSettingsPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleResetToDefault = () => {
+    form.reset(DEFAULT_COOKIE_SETTINGS);
+    toast({
+      title: "Defaults Restored",
+      description: "Default cookie consent message and policy loaded. Click 'Save Cookie Settings' to apply.",
+    });
   };
 
   if (isLoadingGlobalSettings) {
@@ -186,7 +209,16 @@ export default function CookieSettingsPage() {
             </CardContent>
           </Card>
 
-          <CardFooter className="mt-6 border-t pt-6 flex justify-end">
+          <CardFooter className="mt-6 border-t pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetToDefault}
+              disabled={isSaving}
+              className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+            >
+              <Sparkles className="h-4 w-4 text-primary" /> Reset to Defaults
+            </Button>
             <PermissionGuard moduleId="cookie_settings" action="write">
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}

@@ -154,6 +154,22 @@ export default function AppUpdatePage() {
     }
   };
 
+  const handleResetToDefault = () => {
+    if (activeTab === "customer") {
+      setCustomerConfig(DEFAULT_CUSTOMER_CONFIG);
+      toast({
+        title: "Customer Defaults Restored",
+        description: "Standard customer app update configuration loaded. Click 'Save Changes' to apply.",
+      });
+    } else {
+      setProviderConfig(DEFAULT_PROVIDER_CONFIG);
+      toast({
+        title: "Provider Defaults Restored",
+        description: "Standard provider partner app update configuration loaded. Click 'Save Changes' to apply.",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -182,7 +198,18 @@ export default function AppUpdatePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleResetToDefault}
+              disabled={isLoading || isSaving}
+              className="text-xs font-semibold gap-1.5 border-primary/20 hover:bg-primary/10"
+            >
+              <Sparkles className="w-4 h-4 text-primary" />
+              Reset {activeTab === "customer" ? "Customer" : "Provider"} Defaults
+            </Button>
             <Button variant="outline" size="sm" onClick={fetchConfig} disabled={isLoading || isSaving}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh

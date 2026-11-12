@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Send, MessageSquare, AlertTriangle, FileText } from "lucide-react"; 
+import { Loader2, Save, Send, MessageSquare, AlertTriangle, FileText, Sparkles } from "lucide-react"; 
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
@@ -126,6 +126,14 @@ export default function WhatsAppTemplateManagementTab() {
     }
   };
 
+  const handleResetToDefault = () => {
+    form.reset(defaultWhatsAppSettings);
+    toast({
+      title: "Defaults Restored",
+      description: "Default WhatsApp automation settings and templates loaded. Click 'Save Automation Settings' to apply.",
+    });
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -208,7 +216,16 @@ export default function WhatsAppTemplateManagementTab() {
             </Accordion>
             </div>
           </CardContent>
-           <CardFooter className="border-t px-6 py-4">
+           <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetToDefault}
+              disabled={isSaving}
+              className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+            >
+              <Sparkles className="h-4 w-4 text-primary" /> Reset to Defaults
+            </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Automation Settings

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { KeyRound, Save, Loader2, Mail, Phone, MessageSquare } from "lucide-react";
+import { KeyRound, Save, Loader2, Mail, Phone, MessageSquare, Sparkles } from "lucide-react";
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useToast } from '@/hooks/use-toast';
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -29,6 +29,14 @@ const loginSettingsSchema = z.object({
 });
 
 type LoginSettingsFormData = z.infer<typeof loginSettingsSchema>;
+
+const DEFAULT_LOGIN_SETTINGS: LoginSettingsFormData = {
+  enableEmailPasswordLogin: true,
+  enableOtpLogin: true,
+  enableGoogleLogin: true,
+  defaultLoginMethod: 'email',
+  defaultOtpCountryCode: '+91',
+};
 
 const loginMethods: { value: LoginMethod; label: string; icon: React.ElementType; fieldName: keyof LoginSettingsFormData }[] = [
   { value: 'email', label: 'Email & Password', icon: Mail, fieldName: 'enableEmailPasswordLogin' },
@@ -93,6 +101,14 @@ export default function LoginSettingsPage() {
       setIsSaving(false);
     }
   };
+
+  const handleResetToDefault = () => {
+    form.reset(DEFAULT_LOGIN_SETTINGS);
+    toast({
+      title: "Defaults Restored",
+      description: "Default login & authentication settings loaded. Click 'Save All Login Settings' to apply.",
+    });
+  };
   
   if (isLoadingConfig) {
     return (
@@ -154,7 +170,16 @@ export default function LoginSettingsPage() {
             </CardContent>
           </Card>
           
-          <div className="flex justify-end pt-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetToDefault}
+              disabled={isSaving}
+              className="text-xs sm:text-sm font-semibold gap-2 border-primary/20 hover:bg-primary/10"
+            >
+              <Sparkles className="h-4 w-4 text-primary" /> Reset to Defaults
+            </Button>
             <PermissionGuard moduleId="login_settings" action="write">
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
