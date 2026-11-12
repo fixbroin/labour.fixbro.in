@@ -281,9 +281,9 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
   return (
     <>
       <header className="bg-background/95 backdrop-blur-xl shadow-sm sticky top-0 z-50 border-b border-border/40 transition-all duration-300">
-        <div data-hydration-state="hydrated" className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div data-hydration-state="hydrated" className="container mx-auto px-2.5 sm:px-4 h-16 flex items-center justify-between">
           {/* Left: Desktop Nav / Mobile Logo */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4 sm:gap-8 min-w-0">
              <div className="md:hidden">
                 <Logo logoUrl={globalSettings?.logoUrl} websiteName={globalSettings?.websiteName} />
              </div>
@@ -381,7 +381,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
              {user && !isLoadingReferral && referralSettings?.isReferralSystemEnabled && (
                 <button
                   onClick={(e) => handleAuthRequiredNav(e, '/referral')}
@@ -392,13 +392,13 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                 </button>
               )}
             
-            <div className="flex items-center gap-2">
-              {/* Work Location Pill */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Work Location Pill (Desktop) */}
               <button
                 type="button"
                 onClick={() => setIsLocationModalOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-semibold transition-all max-w-[105px] sm:max-w-[160px] shrink-0"
-                title="Change work location"
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-semibold transition-all max-w-[160px] shrink-0"
+                title={`Change work location: ${userLocationDisplay}`}
               >
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
                 <span className="truncate" suppressHydrationWarning>
@@ -406,17 +406,30 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                 </span>
               </button>
 
+              {/* Work Location Button (Mobile - simple round icon like other buttons) */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                type="button"
+                onClick={() => setIsLocationModalOpen(true)} 
+                className="sm:hidden rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300 shrink-0"
+                aria-label="Change work location"
+                title={`Work location: ${userLocationDisplay}`}
+              >
+                <MapPin className="h-5 w-5" />
+              </Button>
+
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsSearchPopupOpen(true)} 
-                className="rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300"
+                className="rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300 shrink-0"
                 aria-label="Search"
               >
                 <Search className="h-5 w-5" />
               </Button>
               
-              <div className="hidden sm:block">
+              <div className="hidden sm:block shrink-0">
                 <ThemeToggle />
               </div>
 
@@ -426,7 +439,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                   size="icon" 
                   aria-label="Chat" 
                   onClick={(e) => handleAuthRequiredNav(e, '/chat')}
-                  className="relative hidden md:inline-flex rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300" 
+                  className="relative hidden md:inline-flex rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300 shrink-0" 
                 >
                   <MessageSquare className="h-5 w-5" />
                 </Button>
@@ -437,7 +450,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                 size="icon" 
                 aria-label="Notifications" 
                 onClick={(e) => handleAuthRequiredNav(e, '/notifications')} 
-                className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300"
+                className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300 shrink-0"
               >
                 <Bell className="h-5 w-5" />
                 {isMounted && !isLoadingCount && headerUnreadCount > 0 && (
@@ -451,7 +464,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                 variant="ghost" 
                 size="icon" 
                 aria-label="Cart" 
-                className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300" 
+                className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300 shrink-0" 
                 onClick={(e) => handleAuthRequiredNav(e, '/cart')}
               >
                 <ShoppingCart className="h-5 w-5" />
