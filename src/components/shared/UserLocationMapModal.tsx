@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
@@ -35,9 +35,10 @@ interface UserLocationMapModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLocationSaved?: (loc: UserSavedLocation) => void;
+  isMandatory?: boolean;
 }
 
-export default function UserLocationMapModal({ isOpen, onClose, onLocationSaved }: UserLocationMapModalProps) {
+export default function UserLocationMapModal({ isOpen, onClose, onLocationSaved, isMandatory = false }: UserLocationMapModalProps) {
   const { user, firestoreUser } = useAuth();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
 
@@ -116,20 +117,37 @@ export default function UserLocationMapModal({ isOpen, onClose, onLocationSaved 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isMandatory) onClose(); }}>
       <DialogContent
         className="max-w-3xl w-[95vw] sm:w-[90vw] h-[90vh] p-0 flex flex-col"
         aria-describedby={undefined}
+        hideCloseButton={isMandatory}
         onPointerDownOutside={(e) => {
+          if (isMandatory) {
+            e.preventDefault();
+            return;
+          }
           const target = e.target as HTMLElement;
           if (target.closest('.pac-container')) {
             e.preventDefault();
           }
         }}
+        onEscapeKeyDown={(e) => {
+          if (isMandatory) {
+            e.preventDefault();
+          }
+        }}
       >
         <DialogHeader className="p-4 border-b">
-          <DialogTitle>Select Service Location</DialogTitle>
-          <DialogDescription>Select location on map.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2 font-headline text-lg sm:text-xl font-bold">
+            <MapPin className="h-5 w-5 text-primary shrink-0" />
+            {isMandatory ? "Set Work Site Location (Required)" : "Select Work Site Location"}
+          </DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            {isMandatory 
+              ? "Please select or search your exact work site location on the map to view and hire verified daily labour providers nearest to you."
+              : "Select your work site location on the map to find nearby daily labour providers."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-grow flex flex-col h-full overflow-hidden">

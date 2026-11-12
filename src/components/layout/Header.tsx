@@ -138,8 +138,6 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<any>(null);
 
-  const hasCheckedInitialLocationRef = useRef(false);
-  const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -157,32 +155,25 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
     return () => window.removeEventListener('fixbroUserLocationChanged', handleLocationUpdate);
   }, []);
 
-  // Reset check flag when user logs in so we always verify their location
-  useEffect(() => {
-    if (user?.uid && user.uid !== lastUserIdRef.current) {
-      lastUserIdRef.current = user.uid;
-      hasCheckedInitialLocationRef.current = false;
-    }
-  }, [user]);
+  const hasCoordsInProfile = !!(firestoreUser as any)?.coordinates?.latitude;
+  const hasCoordsInLocal = !!userLocation?.latitude;
+  const isLocationMandatory = !!user && !hasCoordsInProfile && !hasCoordsInLocal;
 
-  // Auto-prompt on login if user has no coordinates saved (on Home or Category pages)
+  // Persistent mandatory location check for logged-in users who have no coordinates
   useEffect(() => {
-    if (authIsLoading || !user || hasCheckedInitialLocationRef.current) return;
+    if (authIsLoading || !user) return;
 
-    const isTargetPage = pathname === '/' || pathname.startsWith('/category');
+    // Check target pages where distance and provider booking require coordinates
+    const isTargetPage = pathname === '/' || pathname.startsWith('/category') || pathname.startsWith('/provider') || pathname.startsWith('/near-me');
     if (!isTargetPage) return;
 
-    const hasCoordsInProfile = !!(firestoreUser as any)?.coordinates?.latitude;
-    const hasCoordsInLocal = !!userLocation?.latitude;
-
-    if (!hasCoordsInProfile && !hasCoordsInLocal) {
-      hasCheckedInitialLocationRef.current = true;
+    if (isLocationMandatory) {
       const timer = setTimeout(() => {
         setIsLocationModalOpen(true);
-      }, 800);
+      }, 500);
       return () => clearTimeout(timer);
     }
-  }, [user, authIsLoading, firestoreUser, userLocation, pathname]);
+  }, [user, authIsLoading, isLocationMandatory, pathname]);
 
   const userLocationDisplay = useMemo(() => {
     if (userLocation?.area) {
@@ -586,7 +577,16 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
       <SearchPopup isOpen={isSearchPopupOpen} onClose={() => setIsSearchPopupOpen(false)} />
       <UserLocationMapModal
         isOpen={isLocationModalOpen}
-        onClose={() => setIsLocationModalOpen(false)}
+        isMandatory={isLocationMandatory}
+        onClose={() => {
+          if (!isLocationMandatory) {
+            setIsLocationModalOpen(false);
+          }
+        }}
+        onLocationSaved={(savedLoc) => {
+          setUserLocation(savedLoc);
+          setIsLocationModalOpen(false);
+        }}
       />
     </>
   );
